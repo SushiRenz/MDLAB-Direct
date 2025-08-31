@@ -1,0 +1,7 @@
+/* App-wide styles */
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: linear-gradient(135deg, #9AEEBC 0%, #21AEA8 100%);
+  min-height: 100vh;
+}
