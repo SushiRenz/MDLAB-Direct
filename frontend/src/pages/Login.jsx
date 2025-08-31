@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import '../design/Login.css';
 import mdlabLogo from '../assets/mdlab-logo.png';
 
-function Login({ onNavigateToSignUp }) {
+function Login({ onNavigateToSignUp, onNavigateToDashboard }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -10,7 +10,8 @@ function Login({ onNavigateToSignUp }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log('Login attempt:', { username, password, rememberMe });
-    // Add your login logic here
+    // Simulate successful login
+    onNavigateToDashboard();
   };
 
   const handleGoogleLogin = () => {
