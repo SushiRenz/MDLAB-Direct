@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import './Login.css';
-import mdlabLogo from './assets/mdlab-logo.png';
+import '../design/Login.css';
+import mdlabLogo from '../assets/mdlab-logo.png';
 
-function Login() {
+function Login({ onNavigateToSignUp }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -20,6 +20,11 @@ function Login() {
 
   const handleLogoClick = () => {
     window.open('https://www.facebook.com/vizcayalab', '_blank');
+  };
+
+  const handleSignUpClick = (e) => {
+    e.preventDefault();
+    onNavigateToSignUp();
   };
 
   return (
@@ -85,7 +90,7 @@ function Login() {
           
           <div className="signup-row">
             <span>Don't have an account?</span>
-            <a href="#" className="signup-link">Sign Up</a>
+            <a href="#" className="signup-link" onClick={handleSignUpClick}>Sign Up</a>
           </div>
         </div>
       </div>
