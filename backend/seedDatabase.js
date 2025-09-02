@@ -56,6 +56,42 @@ const createAdminUser = async () => {
   }
 };
 
+// Create IT admin account for development/testing
+const createITAdminUser = async () => {
+  try {
+    // Check if IT admin user already exists
+    const existingITAdmin = await User.findOne({ username: 'adminZero' });
+    
+    if (existingITAdmin) {
+      console.log('IT Admin user already exists:', existingITAdmin.username);
+      return;
+    }
+
+    // Create IT admin user - No email required, username-only login
+    const itAdminUser = {
+      username: 'adminZero',
+      email: 'adminzero@mdlab.com', // Valid email format for system purposes
+      passwordHash: 'adminZero_25', // Will be hashed by pre-save middleware
+      firstName: 'IT',
+      lastName: 'Administrator',
+      role: 'admin',
+      phone: '+639000000000',
+      isActive: true,
+      isEmailVerified: true
+    };
+
+    const user = await User.create(itAdminUser);
+    console.log('✅ IT Admin user created successfully:');
+    console.log('   Username: adminZero');
+    console.log('   Password: adminZero_25');
+    console.log('   Role: admin');
+    console.log('   🔧 This is your personal IT admin account for testing/debugging');
+
+  } catch (error) {
+    console.error('Error creating IT admin user:', error.message);
+  }
+};
+
 // Create sample users for testing
 const createSampleUsers = async () => {
   try {
@@ -127,6 +163,7 @@ const seedDatabase = async () => {
   console.log('🌱 Starting database seeding...\n');
   
   await createAdminUser();
+  await createITAdminUser();
   await createSampleUsers();
   
   console.log('\n✅ Database seeding completed!');
@@ -144,6 +181,11 @@ const seedDatabase = async () => {
   console.log(`   Med Techs: ${medtechCount}`);
   console.log(`   Pathologists: ${pathologistCount}`);
   console.log(`   Patients: ${patientCount}`);
+  
+  console.log('\n🔧 IT Admin Account for Testing:');
+  console.log('   Username: adminZero');
+  console.log('   Password: adminZero_25');
+  console.log('   Access: Full admin privileges');
   
   mongoose.disconnect();
 };

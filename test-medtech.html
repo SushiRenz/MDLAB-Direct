@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MedTech Login Test</title>
+</head>
+<body>
+    <h1>MedTech Login Test</h1>
+    <button onclick="testMedTechLogin()">Test MedTech Login</button>
+    <div id="result"></div>
+
+    <script>
+        async function testMedTechLogin() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        identifier: 'medtech1',
+                        password: 'MedTech123!'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <h3>Response Status: ${response.status}</h3>
+                    <h3>Response Data:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+                
+                if (data.success && data.user) {
+                    resultDiv.innerHTML += `
+                        <h3>User Role: ${data.user.role}</h3>
+                        <h3>User Name: ${data.user.firstName} ${data.user.lastName}</h3>
+                    `;
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<h3>Error: ${error.message}</h3>`;
+            }
+        }
+    </script>
+</body>
+</html>

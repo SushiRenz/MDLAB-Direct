@@ -121,6 +121,10 @@ userSchema.virtual('fullName').get(function() {
 
 // Virtual for account lock status
 userSchema.virtual('isLocked').get(function() {
+  // Never lock accounts in development
+  if (process.env.NODE_ENV === 'development') {
+    return false;
+  }
   return !!(this.lockUntil && this.lockUntil > Date.now());
 });
 
@@ -150,6 +154,11 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 
 // Method to increment login attempts
 userSchema.methods.incLoginAttempts = function() {
+  // In development, don't lock accounts
+  if (process.env.NODE_ENV === 'development') {
+    return this.updateOne({ $set: { loginAttempts: 1 } });
+  }
+  
   // If we have a previous lock that has expired, restart at 1
   if (this.lockUntil && this.lockUntil < Date.now()) {
     return this.updateOne({

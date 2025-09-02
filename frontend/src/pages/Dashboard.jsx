@@ -40,7 +40,7 @@ function Dashboard({ currentUser, onLogout }) {
       case 'patient': return 'Patient Management';
       case 'staff': return 'Staff Management';
       case 'pathologist': return 'Pathologist Management';
-      case 'admin': return 'Admin Management';
+      case 'admin': return 'Staff Management';
       case 'mobile-account': return 'Mobile Account Management';
       case 'bills': return 'Bills Management';
       case 'transaction': return 'Transaction History';
@@ -584,17 +584,17 @@ function Dashboard({ currentUser, onLogout }) {
     <div className="management-container">
       <div className="management-header">
         <div className="management-title">
-          <h2>Admin Management</h2>
-          <p>Manage system administrators and access permissions</p>
+          <h2>Staff Management</h2>
+          <p>Manage staff members and access permissions</p>
         </div>
-        <button className="add-btn">+ Add New Admin</button>
+        <button className="add-btn">+ Add New Staff Member</button>
       </div>
 
       <div className="management-stats">
         <div className="stat-card">
-          <div className="stat-icon">👑</div>
+          <div className="stat-icon">�‍💼</div>
           <div className="stat-info">
-            <div className="stat-label">Total Admins</div>
+            <div className="stat-label">Total Staff</div>
             <div className="stat-value">5</div>
           </div>
         </div>
@@ -624,13 +624,13 @@ function Dashboard({ currentUser, onLogout }) {
       <div className="management-content">
         <div className="content-header">
           <div className="search-filter">
-            <input type="text" placeholder="Search admins..." className="search-input" />
+            <input type="text" placeholder="Search staff..." className="search-input" />
             <select className="filter-select">
-              <option>All Admins</option>
-              <option>Super Admin</option>
-              <option>System Admin</option>
-              <option>Lab Admin</option>
-              <option>Finance Admin</option>
+              <option>All Staff</option>
+              <option>Administrators</option>
+              <option>Lab Managers</option>
+              <option>System Users</option>
+              <option>Support Staff</option>
             </select>
           </div>
         </div>
@@ -639,7 +639,7 @@ function Dashboard({ currentUser, onLogout }) {
           <table>
             <thead>
               <tr>
-                <th>Admin ID</th>
+                <th>Staff ID</th>
                 <th>Name</th>
                 <th>Role</th>
                 <th>Permissions</th>
@@ -650,9 +650,9 @@ function Dashboard({ currentUser, onLogout }) {
             </thead>
             <tbody>
               <tr>
-                <td>A001</td>
+                <td>S001</td>
                 <td>Sarah Johnson</td>
-                <td>Super Admin</td>
+                <td>Lab Manager</td>
                 <td>Full Access</td>
                 <td>2024-09-01 08:30</td>
                 <td><span className="status active">Active</span></td>
@@ -665,9 +665,9 @@ function Dashboard({ currentUser, onLogout }) {
                 </td>
               </tr>
               <tr>
-                <td>A002</td>
+                <td>S002</td>
                 <td>Robert Chen</td>
-                <td>System Admin</td>
+                <td>System Administrator</td>
                 <td>User Management, System</td>
                 <td>2024-08-31 16:45</td>
                 <td><span className="status active">Active</span></td>
@@ -680,9 +680,9 @@ function Dashboard({ currentUser, onLogout }) {
                 </td>
               </tr>
               <tr>
-                <td>A003</td>
+                <td>S003</td>
                 <td>Linda Martinez</td>
-                <td>Lab Admin</td>
+                <td>Lab Administrator</td>
                 <td>Lab Operations, Reports</td>
                 <td>2024-09-01 07:15</td>
                 <td><span className="status active">Active</span></td>
@@ -875,7 +875,7 @@ function Dashboard({ currentUser, onLogout }) {
                   className={`nav-subitem ${activeSection === 'admin' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('admin')}
                 >
-                  Admin
+                  Staff
                 </div>
                 <div 
                   className={`nav-subitem ${activeSection === 'mobile-account' ? 'active' : ''}`}

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import '../design/Login.css';
 import mdlabLogo from '../assets/mdlab-logo.png';
 
-function Login({ onNavigateToSignUp, onNavigateToDashboard }) {
+function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLogin }) {
   const [formData, setFormData] = useState({
     identifier: '', // Can be username or email
     password: ''
@@ -10,6 +10,7 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -73,18 +74,36 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard }) {
         return; // Important: return here to prevent further execution
       }
 
-      // Success - store user data and redirect
+      // Success - store user data and redirect based on role
       if (data.success && data.token) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         
         console.log('Login successful:', data.user);
         
-        // Small delay to show success, then redirect
-        setTimeout(() => {
+        // Check user role and redirect accordingly
+        const userRole = data.user.role;
+        
+        if (userRole === 'admin' || userRole === 'pathologist' || userRole === 'medtech') {
+          // These roles go to dashboard
+          setTimeout(() => {
+            setLoading(false);
+            onNavigateToDashboard();
+          }, 500);
+        } else if (userRole === 'patient') {
+          // Patients get a different message for now (until you create their interface)
           setLoading(false);
-          onNavigateToDashboard();
-        }, 500);
+          setError('Patient portal is not yet available. Please contact the laboratory for assistance.');
+          // Clear the stored data since patients can't access anything yet
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        } else {
+          // Unknown role
+          setLoading(false);
+          setError('Account role not recognized. Please contact administrator.');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
       } else {
         console.log('Login response missing token or success flag');
         setError('Login failed. Please try again.');
@@ -98,10 +117,6 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard }) {
     }
   };
 
-  const handleGoogleLogin = () => {
-    setError('Google login is not yet implemented');
-  };
-
   const handleLogoClick = () => {
     window.open('https://www.facebook.com/vizcayalab', '_blank');
   };
@@ -111,21 +126,61 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard }) {
     onNavigateToSignUp();
   };
 
-  // Quick login buttons for testing (remove in production)
-  const quickLogin = (role) => {
-    if (role === 'admin') {
-      setFormData({ identifier: 'admin@mdlab.com', password: 'Admin123!' });
-    } else if (role === 'medtech') {
-      setFormData({ identifier: 'medtech@mdlab.com', password: 'MedTech123!' });
-    } else if (role === 'pathologist') {
-      setFormData({ identifier: 'pathologist@mdlab.com', password: 'Pathologist123!' });
-    } else if (role === 'patient') {
-      setFormData({ identifier: 'patient@example.com', password: 'Patient123!' });
-    }
+  const handleAdminClick = (e) => {
+    e.preventDefault();
+    onNavigateToAdminLogin();
   };
 
   return (
     <div className="login-container">
+      {/* Subtle Admin Arrow - Top Right */}
+      <div 
+        onClick={handleAdminClick}
+        style={{
+          position: 'absolute',
+          top: '20px',
+          right: '25px',
+          width: '50px',
+          height: '50px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          opacity: '0.4',
+          transition: 'all 0.3s ease',
+          borderRadius: '50%',
+          zIndex: 10,
+          border: '1px solid rgba(0, 0, 0, 0.1)'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = '0.8';
+          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+          e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)';
+          e.currentTarget.style.transform = 'scale(1.1)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = '0.4';
+          e.currentTarget.style.backgroundColor = 'transparent';
+          e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+          e.currentTarget.style.transform = 'scale(1)';
+        }}
+        title="Staff Portal"
+      >
+        <svg 
+          width="20" 
+          height="20" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="2.5" 
+          strokeLinecap="round" 
+          strokeLinejoin="round"
+          style={{ color: '#4b5563' }}
+        >
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+      </div>
+
       <div className="login-left">
         <img 
           src={mdlabLogo} 
@@ -142,17 +197,17 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard }) {
           {/* Error message display */}
           {error && (
             <div style={{
-              background: '#fee',
-              border: '2px solid #f00',
-              color: '#c33',
-              padding: '15px',
-              borderRadius: '4px',
-              marginBottom: '15px',
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#dc2626',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              marginBottom: '16px',
               fontSize: '14px',
               textAlign: 'center',
-              fontWeight: 'bold'
+              fontWeight: '500'
             }}>
-              ⚠️ {error}
+              {error}
             </div>
           )}
           
@@ -168,16 +223,42 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard }) {
               disabled={loading}
             />
             
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              className="login-input"
-              value={formData.password}
-              onChange={handleInputChange}
-              required
-              disabled={loading}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                placeholder="Password"
+                className="login-input"
+                value={formData.password}
+                onChange={handleInputChange}
+                required
+                disabled={loading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#666',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                disabled={loading}
+              >
+                {showPassword ? 'HIDE' : 'SHOW'}
+              </button>
+            </div>
             
             <div className="login-options">
               <label className="remember-label">
@@ -204,51 +285,6 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard }) {
               {loading ? 'Signing In...' : 'Login'}
             </button>
           </form>
-          
-          {/* Quick login buttons for testing */}
-          {process.env.NODE_ENV === 'development' && (
-            <div style={{ marginTop: '20px', padding: '15px', background: '#f5f5f5', borderRadius: '5px' }}>
-              <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#666' }}>Development Tools:</p>
-              
-              {/* API Test Button */}
-              <div style={{ marginBottom: '10px' }}>
-                <button 
-                  type="button" 
-                  onClick={async () => {
-                    try {
-                      const response = await fetch('http://localhost:5000/api/health');
-                      const data = await response.json();
-                      alert('Backend is working: ' + JSON.stringify(data));
-                    } catch (error) {
-                      alert('Backend connection failed: ' + error.message);
-                    }
-                  }}
-                  style={{ padding: '5px 10px', fontSize: '11px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}
-                >
-                  Test Backend Connection
-                </button>
-              </div>
-              
-              {/* Quick Login */}
-              <p style={{ margin: '10px 0 5px 0', fontSize: '11px', color: '#666' }}>Quick Login:</p>
-              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                <button type="button" onClick={() => quickLogin('admin')} style={{ padding: '5px 10px', fontSize: '11px', background: '#007bff', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Admin</button>
-                <button type="button" onClick={() => quickLogin('medtech')} style={{ padding: '5px 10px', fontSize: '11px', background: '#28a745', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>MedTech</button>
-                <button type="button" onClick={() => quickLogin('pathologist')} style={{ padding: '5px 10px', fontSize: '11px', background: '#17a2b8', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Pathologist</button>
-                <button type="button" onClick={() => quickLogin('patient')} style={{ padding: '5px 10px', fontSize: '11px', background: '#6c757d', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Patient</button>
-              </div>
-            </div>
-          )}
-          
-          <div className="google-login" onClick={handleGoogleLogin}>
-            <svg className="google-icon" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            Sign in with Google
-          </div>
           
           <div className="signup-row">
             <span>Don't have an account?</span>

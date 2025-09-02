@@ -3,6 +3,9 @@ import './App.css';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import Dashboard from './pages/Dashboard';
+import AdminLogin from './pages/AdminLogin';
+import MedTechDashboard from './pages/MedTechDashboard';
+import PathologistDashboard from './pages/PathologistDashboard';
 
 function App() {
   const [currentView, setCurrentView] = useState('login');
@@ -11,32 +14,92 @@ function App() {
 
   // Check if user is already authenticated on app start
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
-    
-    if (token && user) {
-      try {
-        const userData = JSON.parse(user);
-        setCurrentUser(userData);
-        setIsAuthenticated(true);
-        setCurrentView('dashboard');
-        console.log('Restored user session:', userData);
-      } catch (error) {
-        console.error('Error parsing stored user data:', error);
-        // Clear invalid data
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+    const validateStoredSession = async () => {
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
+      
+      if (token && user) {
+        try {
+          const userData = JSON.parse(user);
+          
+          // Validate token with backend
+          const response = await fetch('http://localhost:5000/api/auth/me', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.user) {
+              // Valid session - use fresh user data from backend
+              setCurrentUser(data.user);
+              setIsAuthenticated(true);
+              
+              // Route to appropriate dashboard based on role
+              switch (data.user.role) {
+                case 'admin':
+                  setCurrentView('dashboard');
+                  break;
+                case 'medtech':
+                  setCurrentView('medtech-dashboard');
+                  break;
+                case 'pathologist':
+                  setCurrentView('pathologist-dashboard');
+                  break;
+                case 'patient':
+                  setCurrentView('patient-portal');
+                  break;
+                default:
+                  setCurrentView('login');
+              }
+              
+              console.log('Valid session restored for user:', data.user);
+            } else {
+              throw new Error('Invalid session data from backend');
+            }
+          } else {
+            throw new Error('Token validation failed');
+          }
+        } catch (error) {
+          console.error('Session validation failed:', error);
+          // Clear invalid session data
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setCurrentUser(null);
+          setIsAuthenticated(false);
+          setCurrentView('login');
+        }
+      } else {
+        // No stored session
+        setCurrentView('login');
       }
-    }
+    };
+    
+    validateStoredSession();
   }, []);
 
   const handleLogout = () => {
+    // Clear localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    
+    // Clear session state
     setIsAuthenticated(false);
     setCurrentUser(null);
+    
+    // Force navigation to login page
     setCurrentView('login');
-    console.log('User logged out');
+    
+    console.log('User logged out and session cleared');
+    
+    // Optional: Call backend logout endpoint
+    fetch('http://localhost:5000/api/auth/logout', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    }).catch(err => console.log('Backend logout call failed:', err));
   };
 
   const handleNavigateToSignUp = () => {
@@ -45,6 +108,10 @@ function App() {
 
   const handleNavigateToLogin = () => {
     setCurrentView('login');
+  };
+
+  const handleNavigateToAdminLogin = () => {
+    setCurrentView('admin-login');
   };
 
   const handleNavigateToDashboard = () => {
@@ -57,8 +124,31 @@ function App() {
         const userData = JSON.parse(user);
         setCurrentUser(userData);
         setIsAuthenticated(true);
-        setCurrentView('dashboard');
-        console.log('Navigating to dashboard for user:', userData);
+        
+        // Role-based routing
+        switch (userData.role) {
+          case 'admin':
+            console.log('Routing to admin dashboard');
+            setCurrentView('dashboard'); // Admin Dashboard
+            break;
+          case 'medtech':
+            console.log('Routing to medtech dashboard');
+            setCurrentView('medtech-dashboard'); // MedTech Dashboard
+            break;
+          case 'pathologist':
+            console.log('Routing to pathologist dashboard');
+            setCurrentView('pathologist-dashboard'); // Pathologist Dashboard
+            break;
+          case 'patient':
+            console.log('Routing to patient portal');
+            setCurrentView('patient-portal'); // Patient Portal (for future)
+            break;
+          default:
+            console.log('Unknown role, routing to default dashboard:', userData.role);
+            setCurrentView('dashboard'); // Fallback to admin dashboard
+        }
+        
+        console.log('Navigating to dashboard for user:', userData, 'Role:', userData.role);
       } catch (error) {
         console.error('Error parsing user data during navigation:', error);
         // Stay on login if data is invalid
@@ -77,11 +167,19 @@ function App() {
           <Login
             onNavigateToSignUp={handleNavigateToSignUp}
             onNavigateToDashboard={handleNavigateToDashboard}
+            onNavigateToAdminLogin={handleNavigateToAdminLogin}
           />
         );
       case 'signup':
         return (
           <SignUp
+            onNavigateToLogin={handleNavigateToLogin}
+            onNavigateToDashboard={handleNavigateToDashboard}
+          />
+        );
+      case 'admin-login':
+        return (
+          <AdminLogin
             onNavigateToLogin={handleNavigateToLogin}
             onNavigateToDashboard={handleNavigateToDashboard}
           />
@@ -93,11 +191,26 @@ function App() {
             onLogout={handleLogout}
           />
         );
+      case 'medtech-dashboard':
+        return (
+          <MedTechDashboard
+            currentUser={currentUser}
+            onLogout={handleLogout}
+          />
+        );
+      case 'pathologist-dashboard':
+        return (
+          <PathologistDashboard
+            currentUser={currentUser}
+            onLogout={handleLogout}
+          />
+        );
       default:
         return (
           <Login
             onNavigateToSignUp={handleNavigateToSignUp}
             onNavigateToDashboard={handleNavigateToDashboard}
+            onNavigateToAdminLogin={handleNavigateToAdminLogin}
           />
         );
     }

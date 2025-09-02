@@ -1,0 +1,900 @@
+/* MedTech Dashboard Styles */
+.medtech-dashboard-container {
+  display: flex;
+  min-height: 100vh;
+  background: #f8fafc;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Sidebar Styles */
+.medtech-sidebar {
+  width: 280px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  height: 100vh;
+  overflow-y: auto;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: 1px;
+}
+
+.sidebar-subtitle {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 20px 0;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: rgba(255, 255, 255, 0.8);
+  border-left: 3px solid transparent;
+}
+
+.nav-item:hover,
+.nav-item.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border-left-color: #60a5fa;
+}
+
+.nav-icon {
+  margin-right: 12px;
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+.nav-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.dropdown {
+  margin: 4px 0;
+}
+
+.nav-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.nav-item-header:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.nav-item-main {
+  display: flex;
+  align-items: center;
+}
+
+.dropdown-arrow {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.nav-submenu {
+  background: rgba(0, 0, 0, 0.1);
+  border-left: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-subitem {
+  padding: 10px 20px 10px 50px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+}
+
+.nav-subitem:hover,
+.nav-subitem.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.sidebar-footer {
+  padding: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.user-details {
+  flex: 1;
+}
+
+.user-role {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.9;
+  display: block;
+}
+
+.user-email {
+  font-size: 11px;
+  opacity: 0.7;
+  display: block;
+}
+
+.user-name {
+  font-size: 13px;
+  font-weight: 500;
+  display: block;
+  margin-top: 2px;
+}
+
+.logout-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 16px;
+}
+
+.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Main Content */
+.medtech-main {
+  flex: 1;
+  margin-left: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.medtech-header {
+  background: white;
+  padding: 20px 30px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.notification-btn {
+  background: #f1f5f9;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.notification-btn:hover {
+  background: #e2e8f0;
+}
+
+.time-display {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.medtech-content {
+  flex: 1;
+  padding: 30px;
+  overflow-y: auto;
+}
+
+/* Dashboard Stats */
+.medtech-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.medtech-stat-card {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.2s ease;
+}
+
+.medtech-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.medtech-stat-card.urgent {
+  border-left: 4px solid #ef4444;
+}
+
+.stat-icon {
+  font-size: 32px;
+  width: 60px;
+  height: 60px;
+  background: #f8fafc;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* Quick Actions */
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.quick-action-card {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.quick-action-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.action-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.action-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+.action-description {
+  font-size: 14px;
+  color: #64748b;
+}
+
+/* Work List */
+.worklist-section {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 30px;
+}
+
+.worklist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.worklist-header h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.refresh-btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.refresh-btn:hover {
+  background: #1d4ed8;
+}
+
+.worklist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 20px;
+}
+
+.worklist-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.worklist-title {
+  background: #f8fafc;
+  padding: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.worklist-content {
+  padding: 16px;
+}
+
+.test-item {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  align-items: center;
+}
+
+.test-item.priority-high {
+  background: #fef2f2;
+  border-left: 3px solid #ef4444;
+}
+
+.test-item.priority-urgent {
+  background: #fefbeb;
+  border-left: 3px solid #f59e0b;
+}
+
+.test-item.priority-normal {
+  background: #f0fdf4;
+  border-left: 3px solid #10b981;
+}
+
+.test-code {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.patient-name {
+  color: #475569;
+}
+
+.test-type {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.priority {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.test-item.priority-high .priority {
+  background: #ef4444;
+  color: white;
+}
+
+.test-item.priority-urgent .priority {
+  background: #f59e0b;
+  color: white;
+}
+
+.test-item.priority-normal .priority {
+  background: #10b981;
+  color: white;
+}
+
+/* Quality Control */
+.qc-item {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  align-items: center;
+}
+
+.qc-item.qc-passed {
+  background: #f0fdf4;
+  border-left: 3px solid #10b981;
+}
+
+.qc-item.qc-pending {
+  background: #fefbeb;
+  border-left: 3px solid #f59e0b;
+}
+
+.qc-item.qc-failed {
+  background: #fef2f2;
+  border-left: 3px solid #ef4444;
+}
+
+.qc-test {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.qc-status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.qc-item.qc-passed .qc-status {
+  background: #10b981;
+  color: white;
+}
+
+.qc-item.qc-pending .qc-status {
+  background: #f59e0b;
+  color: white;
+}
+
+.qc-item.qc-failed .qc-status {
+  background: #ef4444;
+  color: white;
+}
+
+.qc-time {
+  color: #64748b;
+  font-size: 13px;
+}
+
+/* Equipment Status */
+.equipment-status {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.equipment-status h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 20px;
+}
+
+.equipment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.equipment-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.equipment-card.status-online {
+  background: #f0fdf4;
+  border-color: #10b981;
+}
+
+.equipment-card.status-maintenance {
+  background: #fefbeb;
+  border-color: #f59e0b;
+}
+
+.equipment-card.status-offline {
+  background: #fef2f2;
+  border-color: #ef4444;
+}
+
+.equipment-icon {
+  font-size: 24px;
+}
+
+.equipment-info {
+  flex: 1;
+}
+
+.equipment-name {
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.equipment-status {
+  font-size: 14px;
+  color: #64748b;
+}
+
+/* Forms and Inputs */
+.form-section {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.form-section h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 16px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.form-input,
+.form-select {
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.tests-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.test-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.test-checkbox:hover {
+  background: #f8fafc;
+}
+
+.test-checkbox input[type="checkbox"] {
+  margin: 0;
+}
+
+/* Buttons */
+.btn-save,
+.btn-print,
+.btn-clear,
+.btn-receive,
+.btn-process,
+.btn-test,
+.btn-work,
+.btn-assign,
+.btn-view,
+.btn-order,
+.btn-dispose,
+.btn-save-results,
+.btn-validate,
+.btn-flag,
+.btn-import,
+.btn-calibrate,
+.btn-maintenance,
+.btn-service,
+.btn-log,
+.btn-urgent,
+.btn-retry {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-save {
+  background: #10b981;
+  color: white;
+}
+
+.btn-save:hover {
+  background: #059669;
+}
+
+.btn-print {
+  background: #6366f1;
+  color: white;
+}
+
+.btn-print:hover {
+  background: #4f46e5;
+}
+
+.btn-clear {
+  background: #64748b;
+  color: white;
+}
+
+.btn-clear:hover {
+  background: #475569;
+}
+
+.btn-receive,
+.btn-validate {
+  background: #10b981;
+  color: white;
+}
+
+.btn-receive:hover,
+.btn-validate:hover {
+  background: #059669;
+}
+
+.btn-process,
+.btn-work {
+  background: #f59e0b;
+  color: white;
+}
+
+.btn-process:hover,
+.btn-work:hover {
+  background: #d97706;
+}
+
+.btn-test,
+.btn-import {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-test:hover,
+.btn-import:hover {
+  background: #1d4ed8;
+}
+
+.btn-flag {
+  background: #ef4444;
+  color: white;
+}
+
+.btn-flag:hover {
+  background: #dc2626;
+}
+
+.btn-assign {
+  background: #8b5cf6;
+  color: white;
+}
+
+.btn-assign:hover {
+  background: #7c3aed;
+}
+
+.btn-view {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.btn-view:hover {
+  background: #e2e8f0;
+}
+
+/* Tables */
+.data-table {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.data-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  background: #f8fafc;
+  padding: 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.data-table td {
+  padding: 16px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+}
+
+.data-table tr:hover {
+  background: #f9fafb;
+}
+
+/* Status badges */
+.status {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-passed,
+.status.active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-failed,
+.status.inactive {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-pending,
+.status.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .medtech-sidebar {
+    width: 250px;
+  }
+  
+  .medtech-main {
+    margin-left: 250px;
+  }
+  
+  .medtech-stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+  
+  .quick-actions-grid {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .medtech-sidebar {
+    width: 100%;
+    position: relative;
+    height: auto;
+  }
+  
+  .medtech-main {
+    margin-left: 0;
+  }
+  
+  .medtech-content {
+    padding: 20px;
+  }
+  
+  .medtech-stats-grid,
+  .quick-actions-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .worklist-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .equipment-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .medtech-header {
+    padding: 15px 20px;
+  }
+  
+  .page-title {
+    font-size: 20px;
+  }
+  
+  .medtech-content {
+    padding: 15px;
+  }
+  
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
