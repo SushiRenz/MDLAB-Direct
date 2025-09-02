@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import '../design/Login.css';
 import mdlabLogo from '../assets/mdlab-logo.png';
+import { API_ENDPOINTS } from '../config/api';
 
 function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLogin }) {
   const [formData, setFormData] = useState({
@@ -38,7 +39,7 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
     try {
       console.log('Attempting login with:', formData.identifier);
       
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(API_ENDPOINTS.LOGIN, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

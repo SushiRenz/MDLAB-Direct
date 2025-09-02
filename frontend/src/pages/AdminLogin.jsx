@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import '../design/AdminLogin.css';
 import mdlabLogo from '../assets/mdlab-logo.png';
+import { API_ENDPOINTS } from '../config/api';
 
 function AdminLogin({ onNavigateToLogin, onNavigateToDashboard }) {
   const [formData, setFormData] = useState({
@@ -38,7 +39,7 @@ function AdminLogin({ onNavigateToLogin, onNavigateToDashboard }) {
     try {
       console.log('Admin login attempt with:', formData.identifier);
       
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(API_ENDPOINTS.LOGIN, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

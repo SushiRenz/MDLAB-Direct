@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import AdminLogin from './pages/AdminLogin';
 import MedTechDashboard from './pages/MedTechDashboard';
 import PathologistDashboard from './pages/PathologistDashboard';
+import { API_ENDPOINTS } from './config/api';
 
 function App() {
   const [currentView, setCurrentView] = useState('login');
@@ -23,7 +24,7 @@ function App() {
           const userData = JSON.parse(user);
           
           // Validate token with backend
-          const response = await fetch('http://localhost:5000/api/auth/me', {
+          const response = await fetch(API_ENDPOINTS.ME, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -94,7 +95,7 @@ function App() {
     console.log('User logged out and session cleared');
     
     // Optional: Call backend logout endpoint
-    fetch('http://localhost:5000/api/auth/logout', {
+    fetch(API_ENDPOINTS.LOGOUT, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`

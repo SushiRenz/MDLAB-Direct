@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import '../design/SignUp.css';
+import { API_BASE_URL, API_ENDPOINTS } from '../config/api';
 
 function SignUp({ onNavigateToLogin }) {
   const [formData, setFormData] = useState({
@@ -48,7 +49,7 @@ function SignUp({ onNavigateToLogin }) {
     
     setIsCheckingUsername(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/auth/check-username?username=${username}`);
+      const response = await fetch(`${API_BASE_URL}/api/auth/check-username?username=${username}`);
       if (response.status === 409) {
         setValidationErrors(prev => ({ ...prev, username: 'Username is already taken' }));
       } else {
@@ -66,7 +67,7 @@ function SignUp({ onNavigateToLogin }) {
     
     setIsCheckingEmail(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/auth/check-email?email=${email}`);
+      const response = await fetch(`${API_BASE_URL}/api/auth/check-email?email=${email}`);
       if (response.status === 409) {
         setValidationErrors(prev => ({ ...prev, email: 'Email is already registered' }));
       } else {
@@ -183,7 +184,7 @@ function SignUp({ onNavigateToLogin }) {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      const response = await fetch(API_ENDPOINTS.REGISTER, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -26,9 +26,15 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// CORS configuration
+// CORS configuration - Allow network access
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    /^http:\/\/192\.168\.\d+\.\d+:5174$/, // Allow any 192.168.x.x IP
+    /^http:\/\/10\.\d+\.\d+\.\d+:5174$/,   // Allow any 10.x.x.x IP  
+    /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+:5174$/ // Allow 172.16-31.x.x IPs
+  ],
   credentials: true
 }));
 
