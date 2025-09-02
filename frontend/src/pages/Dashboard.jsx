@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import '../design/Dashboard.css';
 
-function Dashboard({ onNavigateToLogin }) {
+function Dashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [userManagementOpen, setUserManagementOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
+
+  const user = currentUser;
 
   const handleSectionClick = (section) => {
     setActiveSection(section);
@@ -18,8 +20,19 @@ function Dashboard({ onNavigateToLogin }) {
     setFinanceOpen(!financeOpen);
   };
 
-  const handleLogout = () => {
-    onNavigateToLogin();
+  const handleLogout = async () => {
+    try {
+      // Clear local storage
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      
+      // Call the parent logout function
+      onLogout();
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force logout even if API call fails
+      onLogout();
+    }
   };
 
   const renderPageTitle = () => {
@@ -946,13 +959,14 @@ function Dashboard({ onNavigateToLogin }) {
         <div className="sidebar-footer">
           <div className="user-info">
             <div className="user-avatar">
-              <span>A</span>
+              <span>{user?.firstName?.charAt(0) || user?.username?.charAt(0) || 'U'}</span>
             </div>
             <div className="user-details">
-              <span className="user-role">ADMIN</span>
-              <span className="user-email">example@gmail.com</span>
+              <span className="user-role">{user?.role?.toUpperCase() || 'USER'}</span>
+              <span className="user-email">{user?.email || 'user@example.com'}</span>
+              <span className="user-name">{user?.fullName || `${user?.firstName} ${user?.lastName}` || user?.username}</span>
             </div>
-            <button className="logout-btn" onClick={handleLogout}>
+            <button className="logout-btn" onClick={handleLogout} title="Logout">
               🚪
             </button>
           </div>

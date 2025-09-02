@@ -3,20 +3,103 @@ import '../design/Login.css';
 import mdlabLogo from '../assets/mdlab-logo.png';
 
 function Login({ onNavigateToSignUp, onNavigateToDashboard }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [formData, setFormData] = useState({
+    identifier: '', // Can be username or email
+    password: ''
+  });
   const [rememberMe, setRememberMe] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+    
+    // Clear error when user starts typing
+    if (error) setError('');
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Login attempt:', { username, password, rememberMe });
-    // Simulate successful login
-    onNavigateToDashboard();
+    setError('');
+
+    // Basic validation
+    if (!formData.identifier || !formData.password) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      console.log('Attempting login with:', formData.identifier);
+      
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          identifier: formData.identifier.trim(),
+          password: formData.password
+        }),
+      });
+
+      const data = await response.json();
+      console.log('Login response status:', response.status);
+      console.log('Login response data:', data);
+
+      if (!response.ok) {
+        // Handle different error status codes - ALL should show error without reload
+        let errorMessage = 'Login failed. Please try again.';
+        
+        if (response.status === 401) {
+          // This covers both "user not found" AND "wrong password"
+          errorMessage = 'Invalid username/email or password. Please check your credentials and try again.';
+        } else if (response.status === 423) {
+          errorMessage = 'Account is temporarily locked due to too many failed attempts. Please try again later.';
+        } else if (response.status === 403) {
+          errorMessage = 'Account has been deactivated. Please contact administrator.';
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
+        
+        console.log('Setting error message:', errorMessage);
+        setError(errorMessage);
+        setLoading(false);
+        return; // Important: return here to prevent further execution
+      }
+
+      // Success - store user data and redirect
+      if (data.success && data.token) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        
+        console.log('Login successful:', data.user);
+        
+        // Small delay to show success, then redirect
+        setTimeout(() => {
+          setLoading(false);
+          onNavigateToDashboard();
+        }, 500);
+      } else {
+        console.log('Login response missing token or success flag');
+        setError('Login failed. Please try again.');
+        setLoading(false);
+      }
+
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Network error. Please check if the server is running and try again.');
+      setLoading(false);
+    }
   };
 
   const handleGoogleLogin = () => {
-    console.log('Google login clicked');
-    // Add Google login logic here
+    setError('Google login is not yet implemented');
   };
 
   const handleLogoClick = () => {
@@ -26,6 +109,19 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard }) {
   const handleSignUpClick = (e) => {
     e.preventDefault();
     onNavigateToSignUp();
+  };
+
+  // Quick login buttons for testing (remove in production)
+  const quickLogin = (role) => {
+    if (role === 'admin') {
+      setFormData({ identifier: 'admin@mdlab.com', password: 'Admin123!' });
+    } else if (role === 'medtech') {
+      setFormData({ identifier: 'medtech@mdlab.com', password: 'MedTech123!' });
+    } else if (role === 'pathologist') {
+      setFormData({ identifier: 'pathologist@mdlab.com', password: 'Pathologist123!' });
+    } else if (role === 'patient') {
+      setFormData({ identifier: 'patient@example.com', password: 'Patient123!' });
+    }
   };
 
   return (
@@ -43,23 +139,44 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard }) {
         <div className="login-box">
           <h1 className="login-title">LOGIN</h1>
           
+          {/* Error message display */}
+          {error && (
+            <div style={{
+              background: '#fee',
+              border: '2px solid #f00',
+              color: '#c33',
+              padding: '15px',
+              borderRadius: '4px',
+              marginBottom: '15px',
+              fontSize: '14px',
+              textAlign: 'center',
+              fontWeight: 'bold'
+            }}>
+              ⚠️ {error}
+            </div>
+          )}
+          
           <form className="login-form" onSubmit={handleSubmit}>
             <input
               type="text"
-              placeholder="Username"
+              name="identifier"
+              placeholder="Username or Email"
               className="login-input"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={formData.identifier}
+              onChange={handleInputChange}
               required
+              disabled={loading}
             />
             
             <input
               type="password"
+              name="password"
               placeholder="Password"
               className="login-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={formData.password}
+              onChange={handleInputChange}
               required
+              disabled={loading}
             />
             
             <div className="login-options">
@@ -68,16 +185,60 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard }) {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
+                  disabled={loading}
                 />
                 Remember me
               </label>
               <a href="#" className="forgot-link">Forgot password?</a>
             </div>
             
-            <button type="submit" className="login-btn">
-              Login
+            <button 
+              type="submit" 
+              className="login-btn"
+              disabled={loading}
+              style={{
+                opacity: loading ? 0.7 : 1,
+                cursor: loading ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {loading ? 'Signing In...' : 'Login'}
             </button>
           </form>
+          
+          {/* Quick login buttons for testing */}
+          {process.env.NODE_ENV === 'development' && (
+            <div style={{ marginTop: '20px', padding: '15px', background: '#f5f5f5', borderRadius: '5px' }}>
+              <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#666' }}>Development Tools:</p>
+              
+              {/* API Test Button */}
+              <div style={{ marginBottom: '10px' }}>
+                <button 
+                  type="button" 
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('http://localhost:5000/api/health');
+                      const data = await response.json();
+                      alert('Backend is working: ' + JSON.stringify(data));
+                    } catch (error) {
+                      alert('Backend connection failed: ' + error.message);
+                    }
+                  }}
+                  style={{ padding: '5px 10px', fontSize: '11px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}
+                >
+                  Test Backend Connection
+                </button>
+              </div>
+              
+              {/* Quick Login */}
+              <p style={{ margin: '10px 0 5px 0', fontSize: '11px', color: '#666' }}>Quick Login:</p>
+              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => quickLogin('admin')} style={{ padding: '5px 10px', fontSize: '11px', background: '#007bff', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Admin</button>
+                <button type="button" onClick={() => quickLogin('medtech')} style={{ padding: '5px 10px', fontSize: '11px', background: '#28a745', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>MedTech</button>
+                <button type="button" onClick={() => quickLogin('pathologist')} style={{ padding: '5px 10px', fontSize: '11px', background: '#17a2b8', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Pathologist</button>
+                <button type="button" onClick={() => quickLogin('patient')} style={{ padding: '5px 10px', fontSize: '11px', background: '#6c757d', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Patient</button>
+              </div>
+            </div>
+          )}
           
           <div className="google-login" onClick={handleGoogleLogin}>
             <svg className="google-icon" viewBox="0 0 24 24">
