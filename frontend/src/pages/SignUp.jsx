@@ -130,6 +130,13 @@ function SignUp({ onNavigateToLogin }) {
       } else {
         newErrors.password = '';
       }
+      
+      // Also validate confirmPassword when password changes
+      if (formData.confirmPassword && value !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+      } else if (formData.confirmPassword && value === formData.confirmPassword) {
+        newErrors.confirmPassword = '';
+      }
     }
 
     if (name === 'confirmPassword') {
@@ -215,6 +222,10 @@ function SignUp({ onNavigateToLogin }) {
           phone: '',
           role: 'patient'
         });
+        
+        // Clear any existing auth tokens to prevent conflicts
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
         
         // Redirect to login after 2 seconds
         setTimeout(() => {

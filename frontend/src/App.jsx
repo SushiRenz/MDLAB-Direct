@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import AdminLogin from './pages/AdminLogin';
 import MedTechDashboard from './pages/MedTechDashboard';
 import PathologistDashboard from './pages/PathologistDashboard';
+import PatientDashboard from './pages/PatientDashboard';
 import { API_ENDPOINTS } from './config/api';
 
 function App() {
@@ -108,6 +109,9 @@ function App() {
   };
 
   const handleNavigateToLogin = () => {
+    // Clear any existing authentication state when navigating to login
+    setIsAuthenticated(false);
+    setCurrentUser(null);
     setCurrentView('login');
   };
 
@@ -202,6 +206,13 @@ function App() {
       case 'pathologist-dashboard':
         return (
           <PathologistDashboard
+            currentUser={currentUser}
+            onLogout={handleLogout}
+          />
+        );
+      case 'patient-portal':
+        return (
+          <PatientDashboard
             currentUser={currentUser}
             onLogout={handleLogout}
           />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../design/Login.css';
 import mdlabLogo from '../assets/mdlab-logo.png';
 import { API_ENDPOINTS } from '../config/api';
@@ -12,6 +12,19 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Reset component state when component mounts (useful when navigating from SignUp)
+  useEffect(() => {
+    console.log('Login component mounted/reset');
+    setFormData({
+      identifier: '',
+      password: ''
+    });
+    setRememberMe(false);
+    setLoading(false);
+    setError('');
+    setShowPassword(false);
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -85,19 +98,12 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
         // Check user role and redirect accordingly
         const userRole = data.user.role;
         
-        if (userRole === 'admin' || userRole === 'pathologist' || userRole === 'medtech') {
-          // These roles go to dashboard
+        if (userRole === 'admin' || userRole === 'pathologist' || userRole === 'medtech' || userRole === 'patient') {
+          // All roles can now access their respective dashboards
           setTimeout(() => {
             setLoading(false);
             onNavigateToDashboard();
           }, 500);
-        } else if (userRole === 'patient') {
-          // Patients get a different message for now (until you create their interface)
-          setLoading(false);
-          setError('Patient portal is not yet available. Please contact the laboratory for assistance.');
-          // Clear the stored data since patients can't access anything yet
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
         } else {
           // Unknown role
           setLoading(false);
@@ -188,6 +194,13 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
           alt="MDLAB Logo" 
           className="login-logo"
           onClick={handleLogoClick}
+          onError={(e) => {
+            console.error('Logo failed to load:', e.target.src);
+            e.target.style.display = 'block'; // Ensure it's still visible even if image fails
+          }}
+          onLoad={() => {
+            console.log('Logo loaded successfully');
+          }}
         />
       </div>
       
