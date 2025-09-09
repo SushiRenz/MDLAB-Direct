@@ -54,6 +54,24 @@ router.get('/me', protect, getMe);
 router.put('/profile', protect, validateUpdateProfile, updateProfile);
 router.put('/change-password', protect, validateChangePassword, changePassword);
 
+// Check if username exists
+router.get('/check-username', async (req, res) => {
+  const { username } = req.query;
+  if (!username) return res.status(400).json({ message: 'Username required' });
+  const exists = await User.findOne({ username });
+  if (exists) return res.status(409).json({ message: 'Username taken' });
+  res.status(200).json({ available: true });
+});
+
+// Check if email exists
+router.get('/check-email', async (req, res) => {
+  const { email } = req.query;
+  if (!email) return res.status(400).json({ message: 'Email required' });
+  const exists = await User.findOne({ email });
+  if (exists) return res.status(409).json({ message: 'Email taken' });
+  res.status(200).json({ available: true });
+});
+
 // Development only: Reset all login attempts and locks
 router.post('/dev-reset-attempts', async (req, res) => {
   if (process.env.NODE_ENV !== 'development') {
