@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import BookAppointmentModal from './BookAppointmentModal';
 import PatientProfile from './PatientProfile'; 
 import MobileLabScheduleModal from './MobileLabScheduleModal';
@@ -16,10 +16,21 @@ function PatientDashboard(props) {
   const [timeFilter, setTimeFilter] = useState('3months');
   const [sortBy, setSortBy] = useState('date');
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+
+  // Sync currentUser state with props
+  useEffect(() => {
+    setCurrentUser(props.currentUser);
+  }, [props.currentUser]);
 
   const handleSectionClick = (section) => setActiveSection(section);
 
   const handleLogout = async () => {
+    // Show custom logout modal
+    setIsLogoutModalOpen(true);
+  };
+
+  const confirmLogout = async () => {
     try {
       // Clear local storage
       localStorage.removeItem('token');
@@ -32,6 +43,10 @@ function PatientDashboard(props) {
       // Force logout even if API call fails
       props.onLogout();
     }
+  };
+
+  const cancelLogout = () => {
+    setIsLogoutModalOpen(false);
   };
 
   const handleProfileUpdate = (updatedUser) => {
@@ -139,15 +154,15 @@ function PatientDashboard(props) {
           </div>
           <div className="welcome-stats">
             <div className="stat-item">
-              <div className="stat-number">3</div>
+              <div className="stat-number">0</div>
               <div className="stat-label">Upcoming Appointments</div>
-            </div>
+              </div>
             <div className="stat-item">
-              <div className="stat-number">2</div>
+              <div className="stat-number">0</div>
               <div className="stat-label">New Results</div>
             </div>
             <div className="stat-item">
-              <div className="stat-number">12</div>
+              <div className="stat-number">0</div>
               <div className="stat-label">Total Tests</div>
             </div>
           </div>
@@ -160,21 +175,36 @@ function PatientDashboard(props) {
         <div className="action-cards">
           {/* Existing action cards */}
           <div className="action-card" onClick={() => handleSectionClick('appointments')}>
-            <div className="action-icon">📅</div>
+            <div className="action-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
             <div className="action-content">
               <h4>Book Appointment</h4>
               <p>Schedule your next lab test</p>
             </div>
           </div>
           <div className="action-card" onClick={() => handleSectionClick('results')}>
-            <div className="action-icon">📋</div>
+            <div className="action-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
             <div className="action-content">
               <h4>View Results</h4>
               <p>Check your latest test results</p>
             </div>
           </div>
           <div className="action-card" onClick={() => handleSectionClick('mobile')}>
-            <div className="action-icon">🚐</div>
+            <div className="action-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 17h2m0 0a2 2 0 104 0m-4 0a2 2 0 014 0m0 0h4m0 0a2 2 0 104 0m-4 0a2 2 0 014 0m0 0h2M3 12h1l2-4h12l2 4h1v3a1 1 0 01-1 1h-1m-14 0H4a1 1 0 01-1-1v-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="8" cy="17" r="2" stroke="currentColor" strokeWidth="2"/>
+                <circle cx="16" cy="17" r="2" stroke="currentColor" strokeWidth="2"/>
+                <path d="M7 12h10" stroke="currentColor" strokeWidth="1.5"/>
+              </svg>
+            </div>
             <div className="action-content">
               <h4>Mobile Lab</h4>
               <p>Check community visit schedule</p>
@@ -182,7 +212,11 @@ function PatientDashboard(props) {
           </div>
           {/* Add this for Profile */}
           <div className="action-card" onClick={() => handleSectionClick('profile')}>
-            <div className="action-icon">👤</div>
+            <div className="action-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
             <div className="action-content">
               <h4>My Profile</h4>
               <p>View your profile</p>
@@ -196,21 +230,36 @@ function PatientDashboard(props) {
         <h3>Recent Activities</h3>
         <div className="activity-list">
           <div className="activity-item">
-            <div className="activity-icon">✅</div>
+            <div className="activity-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
             <div className="activity-content">
-              <div className="activity-title">Blood Test Results Available</div>
+              <div className="activity-title">Blood TestResults Available</div>
               <div className="activity-date">September 2, 2025</div>
             </div>
           </div>
           <div className="activity-item">
-            <div className="activity-icon">📅</div>
+            <div className="activity-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
             <div className="activity-content">
               <div className="activity-title">Appointment Scheduled</div>
               <div className="activity-date">August 30, 2025</div>
             </div>
           </div>
           <div className="activity-item">
-            <div className="activity-icon">🚐</div>
+            <div className="activity-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 17h2m0 0a2 2 0 104 0m-4 0a2 2 0 014 0m0 0h4m0 0a2 2 0 104 0m-4 0a2 2 0 014 0m0 0h2M3 12h1l2-4h12l2 4h1v3a1 1 0 01-1 1h-1m-14 0H4a1 1 0 01-1-1v-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="8" cy="17" r="2" stroke="currentColor" strokeWidth="2"/>
+                <circle cx="16" cy="17" r="2" stroke="currentColor" strokeWidth="2"/>
+                <path d="M7 12h10" stroke="currentColor" strokeWidth="1.5"/>
+              </svg>
+            </div>
             <div className="activity-content">
               <div className="activity-title">Mobile Lab Service Completed</div>
               <div className="activity-date">August 25, 2025</div>
@@ -232,7 +281,10 @@ function PatientDashboard(props) {
           className="book-appointment-btn" 
           onClick={() => setIsBookingModalOpen(true)}
         >
-          📅 Book New Appointment
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '18px', height: '18px', marginRight: '8px'}}>
+            <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Book New Appointment
         </button>
       </div>
 
@@ -255,9 +307,26 @@ function PatientDashboard(props) {
               </div>
               <div className="appointment-details">
                 <h4>{appointment.testType}</h4>
-                <div className="appointment-time">⏰ {appointment.time}</div>
-                <div className="appointment-location">📍 {appointment.location}</div>
-                <div className="appointment-doctor">👨‍⚕️ {appointment.doctor}</div>
+                <div className="appointment-time">
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                    <polyline points="12,6 12,12 16,14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  {appointment.time}
+                </div>
+                <div className="appointment-location">
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" stroke="currentColor" strokeWidth="2"/>
+                    <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="2"/>
+                  </svg>
+                  {appointment.location}
+                </div>
+                <div className="appointment-doctor">
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
+                    <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  {appointment.doctor}
+                </div>
               </div>
               <div className="appointment-actions">
                 <button 
@@ -297,7 +366,7 @@ function PatientDashboard(props) {
               </div>
             </div>
             <div className="appointment-result">
-              <span className="result-status completed">✅ Results Available</span>
+              <span className="result-status completed">Results Available</span>
             </div>
           </div>
 
@@ -313,7 +382,7 @@ function PatientDashboard(props) {
               </div>
             </div>
             <div className="appointment-result">
-              <span className="result-status completed">✅ Results Available</span>
+              <span className="result-status completed">Results Available</span>
             </div>
           </div>
 
@@ -329,7 +398,7 @@ function PatientDashboard(props) {
               </div>
             </div>
             <div className="appointment-result">
-              <span className="result-status completed">✅ Results Available</span>
+              <span className="result-status completed">Results Available</span>
             </div>
           </div>
         </div>
@@ -407,7 +476,12 @@ function PatientDashboard(props) {
       <div className="results-grid">
         <div className="result-card new">
           <div className="result-header">
-            <div className="result-status">🆕 New Result</div>
+            <div className="result-status">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="2" fill="currentColor"/>
+              </svg>
+              New Result
+            </div>
             <div className="result-date">September 2, 2025</div>
           </div>
           <div className="result-content">
@@ -427,18 +501,23 @@ function PatientDashboard(props) {
               </div>
             </div>
             <div className="result-overall">
-              <span className="overall-status normal">✅ Overall: Normal Results</span>
+              <span className="overall-status normal">Overall: Normal Results</span>
             </div>
           </div>
           <div className="result-actions">
-            <button className="btn-view">👁️ View Full Report</button>
-            <button className="btn-download">⬇️ Download PDF</button>
+            <button className="btn-view">View Full Report</button>
+            <button className="btn-download">Download PDF</button>
           </div>
         </div>
 
         <div className="result-card">
           <div className="result-header">
-            <div className="result-status">📋 Available</div>
+            <div className="result-status">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Available
+            </div>
             <div className="result-date">August 25, 2025</div>
           </div>
           <div className="result-content">
@@ -454,18 +533,23 @@ function PatientDashboard(props) {
               </div>
             </div>
             <div className="result-overall">
-              <span className="overall-status normal">✅ Overall: Normal Results</span>
+              <span className="overall-status normal">Overall: Normal Results</span>
             </div>
           </div>
           <div className="result-actions">
-            <button className="btn-view">👁️ View Full Report</button>
-            <button className="btn-download">⬇️ Download PDF</button>
+            <button className="btn-view">View Full Report</button>
+            <button className="btn-download">Download PDF</button>
           </div>
         </div>
 
         <div className="result-card">
           <div className="result-header">
-            <div className="result-status">📋 Available</div>
+            <div className="result-status">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Available
+            </div>
             <div className="result-date">August 15, 2025</div>
           </div>
           <div className="result-content">
@@ -485,12 +569,12 @@ function PatientDashboard(props) {
               </div>
             </div>
             <div className="result-overall">
-              <span className="overall-status normal">✅ Overall: Normal Results</span>
+              <span className="overall-status normal">Overall: Normal Results</span>
             </div>
           </div>
           <div className="result-actions">
-            <button className="btn-view">👁️ View Full Report</button>
-            <button className="btn-download">⬇️ Download PDF</button>
+            <button className="btn-view">View Full Report</button>
+            <button className="btn-download">Download PDF</button>
           </div>
         </div>
       </div>
@@ -508,14 +592,25 @@ function PatientDashboard(props) {
           className="request-service-btn"
           onClick={() => setIsScheduleModalOpen(true)}
         >
-          🗓️ Check Schedule & Location
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '18px', height: '18px', marginRight: '8px'}}>
+            <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Check Schedule & Location
         </button>
       </div>
 
       {/* Service Information */}
       <div className="service-info">
         <div className="info-card">
-          <div className="info-icon">🚐</div>
+          <div className="info-icon">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 17h2m0 0a2 2 0 104 0m-4 0a2 2 0 014 0m0 0h4m0 0a2 2 0 104 0m-4 0a2 2 0 014 0m0 0h2M3 12h1l2-4h12l2 4h1v3a1 1 0 01-1 1h-1m-14 0H4a1 1 0 01-1-1v-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="8" cy="17" r="2" stroke="currentColor" strokeWidth="2"/>
+              <circle cx="16" cy="17" r="2" stroke="currentColor" strokeWidth="2"/>
+              <path d="M7 12h10" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M9 10h2m4 0h2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+            </svg>
+          </div>
           <div className="info-content">
             <h3>What is Mobile Lab Service?</h3>
             <p>Our mobile laboratory unit visits different barangays and public spaces throughout Nueva Vizcaya on scheduled days. Community members can come to the designated location for professional lab testing without traveling to our main facility!</p>
@@ -524,19 +619,37 @@ function PatientDashboard(props) {
 
         <div className="service-features">
           <div className="feature-item">
-            <div className="feature-icon">📍</div>
+            <div className="feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" stroke="currentColor" strokeWidth="2"/>
+                <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+            </div>
             <div className="feature-text">Scheduled Community Visits</div>
           </div>
           <div className="feature-item">
-            <div className="feature-icon">👨‍⚕️</div>
+            <div className="feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
             <div className="feature-text">Professional Medical Staff</div>
           </div>
           <div className="feature-item">
-            <div className="feature-icon">🔬</div>
+            <div className="feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+                <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+            </div>
             <div className="feature-text">Complete Lab Testing</div>
           </div>
           <div className="feature-item">
-            <div className="feature-icon">🏘️</div>
+            <div className="feature-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
             <div className="feature-text">Covers All Nueva Vizcaya</div>
           </div>
         </div>
@@ -619,15 +732,29 @@ function PatientDashboard(props) {
         <h3>Mobile Lab Service Information</h3>
         <div className="contact-details">
           <div className="contact-item">
-            <div className="contact-icon">📞</div>
+            <div className="contact-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+            </div>
             <div className="contact-text">Inquiries: +63 912 345 6789</div>
           </div>
           <div className="contact-item">
-            <div className="contact-icon">�</div>
+            <div className="contact-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+            </div>
             <div className="contact-text">Check our weekly schedule for locations</div>
           </div>
           <div className="contact-item">
-            <div className="contact-icon">⏰</div>
+            <div className="contact-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12,6 12,12 16,14"/>
+              </svg>
+            </div>
             <div className="contact-text">Walk-in available during scheduled hours</div>
           </div>
         </div>
@@ -651,7 +778,11 @@ function PatientDashboard(props) {
             className={`nav-item ${activeSection === 'overview' ? 'active' : ''}`}
             onClick={() => handleSectionClick('overview')}
           >
-            <span className="nav-icon">🏠</span>
+            <span className="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </span>
             <span className="nav-text">Overview</span>
           </div>
 
@@ -659,7 +790,11 @@ function PatientDashboard(props) {
             className={`nav-item ${activeSection === 'appointments' ? 'active' : ''}`}
             onClick={() => handleSectionClick('appointments')}
           >
-            <span className="nav-icon">📅</span>
+            <span className="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </span>
             <span className="nav-text">Appointments</span>
           </div>
 
@@ -667,7 +802,11 @@ function PatientDashboard(props) {
             className={`nav-item ${activeSection === 'results' ? 'active' : ''}`}
             onClick={() => handleSectionClick('results')}
           >
-            <span className="nav-icon">📋</span>
+            <span className="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </span>
             <span className="nav-text">Test Results</span>
           </div>
 
@@ -675,7 +814,14 @@ function PatientDashboard(props) {
             className={`nav-item ${activeSection === 'mobile' ? 'active' : ''}`}
             onClick={() => handleSectionClick('mobile')}
           >
-            <span className="nav-icon">🚐</span>
+            <span className="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 17h2m0 0a2 2 0 104 0m-4 0a2 2 0 014 0m0 0h4m0 0a2 2 0 104 0m-4 0a2 2 0 014 0m0 0h2M3 12h1l2-4h12l2 4h1v3a1 1 0 01-1 1h-1m-14 0H4a1 1 0 01-1-1v-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="8" cy="17" r="2" stroke="currentColor" strokeWidth="2"/>
+                <circle cx="16" cy="17" r="2" stroke="currentColor" strokeWidth="2"/>
+                <path d="M7 12h10" stroke="currentColor" strokeWidth="1.5"/>
+              </svg>
+            </span>
             <span className="nav-text">Mobile Lab</span>
           </div>
 
@@ -683,7 +829,11 @@ function PatientDashboard(props) {
             className={`nav-item ${activeSection === 'profile' ? 'active' : ''}`}
             onClick={() => handleSectionClick('profile')}
           >
-            <span className="nav-icon">👤</span>
+            <span className="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </span>
             <span className="nav-text">My Profile</span>
           </div>
         </nav>
@@ -698,9 +848,6 @@ function PatientDashboard(props) {
               <span className="user-email">{currentUser?.email}</span>
               <span className="user-role">Patient</span>
             </div>
-            <button className="logout-btn" onClick={handleLogout} title="Logout">
-              🚪
-            </button>
           </div>
         </div>
       </div>
@@ -709,6 +856,12 @@ function PatientDashboard(props) {
       <div className="patient-main">
         <div className="patient-header">
           <h1 className="page-title">{renderPageTitle()}</h1>
+          <button className="modern-logout-btn" onClick={handleLogout}>
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '18px', height: '18px', marginRight: '8px'}}>
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4m7 14l5-5-5-5m5 5H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Logout
+          </button>
         </div>
 
         <div className="patient-content">
@@ -725,6 +878,34 @@ function PatientDashboard(props) {
         isOpen={isScheduleModalOpen}
         onClose={() => setIsScheduleModalOpen(false)}
       />
+      
+      {/* Logout Confirmation Modal */}
+      {isLogoutModalOpen && (
+        <div className="logout-modal-overlay">
+          <div className="logout-modal">
+            <div className="logout-modal-header">
+              <div className="logout-icon">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4m7 14l5-5-5-5m5 5H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <h3>Confirm Logout</h3>
+            </div>
+            <div className="logout-modal-body">
+              <p>Are you sure you want to log out?</p>
+              <p className="logout-warning">You will need to log in again to access your account.</p>
+            </div>
+            <div className="logout-modal-actions">
+              <button className="logout-cancel-btn" onClick={cancelLogout}>
+                Cancel
+              </button>
+              <button className="logout-confirm-btn" onClick={confirmLogout}>
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

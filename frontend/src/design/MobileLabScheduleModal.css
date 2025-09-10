@@ -77,17 +77,19 @@
 }
 
 .location-status {
-  display: inline-block;
-  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
   border-radius: 20px;
   font-size: 0.9rem;
   margin-bottom: 12px;
-  font-weight: 500;
+  font-weight: 600;
+  gap: 6px;
 }
 
 .location-status.active {
-  background-color: #dcffe4;
-  color: #0d522b;
+  background-color: #dcfce7;
+  color: #166534;
 }
 
 .location-info {
@@ -178,26 +180,52 @@
   font-size: 0.85rem;
   font-weight: 500;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-indicator.active {
+  background-color: #10b981;
+}
+
+.status-indicator.next {
+  background-color: #3b82f6;
+}
+
+.status-indicator.scheduled {
+  background-color: #6b7280;
+}
+
+.status-indicator.on-call {
+  background-color: #f59e0b;
 }
 
 .schedule-status.active {
-  background-color: #ebf8ff;
-  color: #2b6cb0;
+  background-color: #dcfce7;
+  color: #166534;
 }
 
 .schedule-status.next-location {
-  background-color: #e6fffa;
-  color: #2c7a7b;
+  background-color: #dbeafe;
+  color: #1e40af;
 }
 
 .schedule-status.scheduled {
-  background-color: #f7fafc;
-  color: #4a5568;
+  background-color: #f1f5f9;
+  color: #475569;
 }
 
 .schedule-status.on-call {
-  background-color: #fffaf0;
-  color: #c05621;
+  background-color: #fef3c7;
+  color: #92400e;
 }
 
 @media (max-width: 768px) {

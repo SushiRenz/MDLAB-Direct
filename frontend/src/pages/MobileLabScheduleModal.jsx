@@ -97,16 +97,28 @@ function MobileLabScheduleModal({ isOpen, onClose }) {
           <div className="current-location-section">
             <h3>Current Location</h3>
             <div className="current-location-card">
-              <div className="location-status active">🟢 Now Serving</div>
+              <div className="location-status active">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="#10b981"/>
+                </svg>
+                Now Serving
+              </div>
               <h4>{currentLocation.location}</h4>
-              <p>⏰ {currentLocation.time}</p>
+              <p>Time: {currentLocation.time}</p>
               <div className="location-info">
-                <span>📍 GPS: {currentLocation.coordinates.lat}° N, {currentLocation.coordinates.lng}° E</span>
+                <span>GPS: {currentLocation.coordinates.lat}° N, {currentLocation.coordinates.lng}° E</span>
                 <button 
                   className="directions-btn"
                   onClick={handleGetDirections}
                 >
-                  🗺️ Get Directions
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <polyline points="10,9 9,9 8,9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Get Directions
                 </button>
               </div>
             </div>
@@ -121,13 +133,13 @@ function MobileLabScheduleModal({ isOpen, onClose }) {
                   <div className="schedule-day">{schedule.day}</div>
                   <div className="schedule-details">
                     <h4>{schedule.location}</h4>
-                    <p>⏰ {schedule.time}</p>
+                    <p>Time: {schedule.time}</p>
                   </div>
                   <div className={`schedule-status ${schedule.status.toLowerCase().replace(' ', '-')}`}>
-                    {schedule.status === 'Active' && '🟢'}
-                    {schedule.status === 'Next Location' && '🔵'}
-                    {schedule.status === 'Scheduled' && '⚪'}
-                    {schedule.status === 'On Call' && '🟡'}
+                    {schedule.status === 'Active' && <span className="status-indicator active"></span>}
+                    {schedule.status === 'Next Location' && <span className="status-indicator next"></span>}
+                    {schedule.status === 'Scheduled' && <span className="status-indicator scheduled"></span>}
+                    {schedule.status === 'On Call' && <span className="status-indicator on-call"></span>}
                     {schedule.status}
                   </div>
                 </div>

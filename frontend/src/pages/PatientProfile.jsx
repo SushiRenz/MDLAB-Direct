@@ -6,8 +6,8 @@ function PatientProfile({ user, onProfileUpdate }) {
   const [editMode, setEditMode] = useState(false);
   const [profileData, setProfileData] = useState({
     gender: user?.gender || '',
-    dateOfBirth: user?.dateOfBirth ? user.dateOfBirth.split('T')[0] : '',
-    address: user?.address || '',
+    dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).split('T')[0] : '',
+    address: typeof user?.address === 'object' && user?.address ? JSON.stringify(user.address) : user?.address || '',
     profilePic: user?.profilePic || null,
   });
   const [previewPic, setPreviewPic] = useState(null);
@@ -17,8 +17,8 @@ function PatientProfile({ user, onProfileUpdate }) {
     // Update profile data when entering edit mode
     setProfileData({
       gender: user?.gender || '',
-      dateOfBirth: user?.dateOfBirth ? user.dateOfBirth.split('T')[0] : '',
-      address: user?.address || '',
+      dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).split('T')[0] : '',
+      address: typeof user?.address === 'object' && user?.address ? JSON.stringify(user.address) : user?.address || '',
       profilePic: user?.profilePic || null,
     });
     setEditMode(true);
@@ -30,8 +30,8 @@ function PatientProfile({ user, onProfileUpdate }) {
     // Reset to original user data
     setProfileData({
       gender: user?.gender || '',
-      dateOfBirth: user?.dateOfBirth ? user.dateOfBirth.split('T')[0] : '',
-      address: user?.address || '',
+      dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).split('T')[0] : '',
+      address: typeof user?.address === 'object' && user?.address ? JSON.stringify(user.address) : user?.address || '',
       profilePic: user?.profilePic || null,
     });
   };
@@ -113,6 +113,17 @@ function PatientProfile({ user, onProfileUpdate }) {
     return user?.firstName?.charAt(0) || user?.username?.charAt(0) || 'P';
   };
 
+  // Debug logging
+  console.log('PatientProfile - user prop:', user);
+  console.log('PatientProfile - user exists:', !!user);
+  console.log('PatientProfile - user.firstName:', user?.firstName, typeof user?.firstName);
+  console.log('PatientProfile - user.lastName:', user?.lastName, typeof user?.lastName);
+  console.log('PatientProfile - user.email:', user?.email, typeof user?.email);
+  console.log('PatientProfile - user.dateOfBirth:', user?.dateOfBirth, typeof user?.dateOfBirth);
+  console.log('PatientProfile - user.gender:', user?.gender, typeof user?.gender);
+  console.log('PatientProfile - user.address:', user?.address, typeof user?.address);
+  console.log('PatientProfile - profileData:', profileData);
+
   if (!user) {
     return (
       <div className="profile-container">
@@ -133,7 +144,7 @@ function PatientProfile({ user, onProfileUpdate }) {
         </div>
         {!editMode && (
           <button className="edit-profile-btn" onClick={() => setEditMode(true)}>
-            ✏️ Edit
+            Edit
           </button>
         )}
       </div>
@@ -196,11 +207,11 @@ function PatientProfile({ user, onProfileUpdate }) {
           <div className="field-group">
             <div className="field-item">
               <label>Full Name</label>
-              <div className="field-value">{user?.firstName} {user?.lastName}</div>
+              <div className="field-value">{`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Not provided'}</div>
             </div>
             <div className="field-item">
               <label>Email Address</label>
-              <div className="field-value">{user?.email}</div>
+              <div className="field-value">{user?.email || 'Not provided'}</div>
             </div>
           </div>
 
@@ -233,7 +244,7 @@ function PatientProfile({ user, onProfileUpdate }) {
                 />
               ) : (
                 <div className="field-value">
-                  {user?.dateOfBirth ? user.dateOfBirth.split('T')[0] : 'Not provided'}
+                  {user?.dateOfBirth ? String(user.dateOfBirth).split('T')[0] : 'Not provided'}
                 </div>
               )}
             </div>
@@ -250,7 +261,12 @@ function PatientProfile({ user, onProfileUpdate }) {
                   onChange={handleChange}
                 />
               ) : (
-                <div className="field-value">{user?.address || 'Not provided'}</div>
+                <div className="field-value">
+                  {typeof user?.address === 'object' && user?.address ? 
+                    JSON.stringify(user.address) : 
+                    user?.address || 'Not provided'
+                  }
+                </div>
               )}
             </div>
           </div>
