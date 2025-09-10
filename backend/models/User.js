@@ -47,6 +47,10 @@ const userSchema = new mongoose.Schema({
     trim: true,
     maxlength: [50, 'Last name cannot exceed 50 characters']
   },
+    profilePic: {
+    type: String,  
+    default: null
+  },
   phone: {
     type: String,
     trim: true,

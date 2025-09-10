@@ -1,14 +1,23 @@
 import React, { useState } from 'react';
+import BookAppointmentModal from './BookAppointmentModal';
+import PatientProfile from './PatientProfile'; 
+import MobileLabScheduleModal from './MobileLabScheduleModal';
 import '../design/PatientDashboard.css';
+import '../design/BookAppointmentModal.css';
 
-function PatientDashboard({ currentUser, onLogout }) {
+function PatientDashboard(props) {
   const [activeSection, setActiveSection] = useState('overview');
+  const [currentUser, setCurrentUser] = useState(props.currentUser);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [appointments, setAppointments] = useState([]);
+  const [isReschedulingModalOpen, setIsReschedulingModalOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [testTypeFilter, setTestTypeFilter] = useState('all');
+  const [timeFilter, setTimeFilter] = useState('3months');
+  const [sortBy, setSortBy] = useState('date');
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
-  const user = currentUser;
-
-  const handleSectionClick = (section) => {
-    setActiveSection(section);
-  };
+  const handleSectionClick = (section) => setActiveSection(section);
 
   const handleLogout = async () => {
     try {
@@ -17,11 +26,77 @@ function PatientDashboard({ currentUser, onLogout }) {
       localStorage.removeItem('user');
       
       // Call the parent logout function
-      onLogout();
+      props.onLogout();
     } catch (error) {
       console.error('Logout error:', error);
       // Force logout even if API call fails
-      onLogout();
+      props.onLogout();
+    }
+  };
+
+  const handleProfileUpdate = (updatedUser) => {
+    setCurrentUser({ ...updatedUser }); // Create a new object to force re-render
+  };
+
+  const handleAppointmentSubmit = async (appointmentData) => {
+    try {
+      // Create a new appointment object
+      const newAppointment = {
+        id: Date.now(), // temporary ID for demo
+        date: appointmentData.date,
+        time: appointmentData.time,
+        testType: appointmentData.testType,
+        location: appointmentData.location === 'main' ? 'MDLAB Direct - Main Branch' : 'Mobile Lab Service',
+        status: 'Confirmed',
+        doctor: 'Dr. Maria Santos' // You can make this dynamic later
+      };
+
+      // Add the new appointment to the state
+      setAppointments([...appointments, newAppointment]);
+      
+      // Close the modal
+      setIsBookingModalOpen(false);
+      
+      // Show success message
+      alert('Appointment booked successfully!');
+      
+      // TODO: Send appointment data to backend
+      // const response = await axios.post('/api/appointments', appointmentData);
+      
+    } catch (error) {
+      console.error('Error booking appointment:', error);
+      alert('Failed to book appointment');
+    }
+  };
+
+  const handleReschedule = (appointment) => {
+    setSelectedAppointment(appointment);
+    setIsReschedulingModalOpen(true);
+  };
+
+  const handleRescheduleSubmit = (updatedData) => {
+    const updatedAppointments = appointments.map(apt => 
+      apt.id === selectedAppointment.id 
+        ? { 
+            ...apt, 
+            date: updatedData.date,
+            time: updatedData.time,
+            doctor: updatedData.doctor
+          } 
+        : apt
+    );
+    
+    setAppointments(updatedAppointments);
+    setIsReschedulingModalOpen(false);
+    setSelectedAppointment(null);
+    alert('Appointment rescheduled successfully!');
+  };
+
+  const handleCancel = (appointmentId) => {
+    if (window.confirm('Are you sure you want to cancel this appointment?')) {
+      const updatedAppointments = appointments.filter(apt => apt.id !== appointmentId);
+      setAppointments(updatedAppointments);
+      alert('Appointment cancelled successfully!');
     }
   };
 
@@ -37,11 +112,19 @@ function PatientDashboard({ currentUser, onLogout }) {
 
   const renderContent = () => {
     switch (activeSection) {
-      case 'appointments': return renderAppointments();
-      case 'results': return renderResults();
-      case 'mobile': return renderMobileService();
-      case 'profile': return renderProfile();
-      default: return renderOverview();
+      case 'appointments':
+        return renderAppointments();
+      case 'results':
+        return renderResults();
+      case 'mobile':
+        return renderMobileService();
+      case 'profile':
+        return <PatientProfile 
+          user={currentUser} 
+          onProfileUpdate={handleProfileUpdate}
+        />;
+      default:
+        return renderOverview();
     }
   };
 
@@ -51,7 +134,7 @@ function PatientDashboard({ currentUser, onLogout }) {
       <div className="welcome-section">
         <div className="welcome-card">
           <div className="welcome-content">
-            <h2>Welcome back, {user?.firstName || user?.username}!</h2>
+            <h2>Welcome back, {currentUser?.firstName || currentUser?.username}!</h2>
             <p>Here's a quick overview of your health journey with MDLAB Direct</p>
           </div>
           <div className="welcome-stats">
@@ -75,6 +158,7 @@ function PatientDashboard({ currentUser, onLogout }) {
       <div className="quick-actions">
         <h3>Quick Actions</h3>
         <div className="action-cards">
+          {/* Existing action cards */}
           <div className="action-card" onClick={() => handleSectionClick('appointments')}>
             <div className="action-icon">📅</div>
             <div className="action-content">
@@ -94,6 +178,14 @@ function PatientDashboard({ currentUser, onLogout }) {
             <div className="action-content">
               <h4>Mobile Lab</h4>
               <p>Check community visit schedule</p>
+            </div>
+          </div>
+          {/* Add this for Profile */}
+          <div className="action-card" onClick={() => handleSectionClick('profile')}>
+            <div className="action-icon">👤</div>
+            <div className="action-content">
+              <h4>My Profile</h4>
+              <p>View your profile</p>
             </div>
           </div>
         </div>
@@ -136,52 +228,56 @@ function PatientDashboard({ currentUser, onLogout }) {
           <h2>My Appointments</h2>
           <p>Manage your upcoming and past appointments</p>
         </div>
-        <button className="book-appointment-btn">📅 Book New Appointment</button>
+        <button 
+          className="book-appointment-btn" 
+          onClick={() => setIsBookingModalOpen(true)}
+        >
+          📅 Book New Appointment
+        </button>
       </div>
 
       {/* Upcoming Appointments */}
       <div className="appointments-section">
         <h3>Upcoming Appointments</h3>
         <div className="appointments-grid">
-          <div className="appointment-card upcoming">
-            <div className="appointment-header">
-              <div className="appointment-date">
-                <div className="date-day">06</div>
-                <div className="date-month">SEP</div>
+          {appointments.map(appointment => (
+            <div key={appointment.id} className="appointment-card upcoming">
+              <div className="appointment-header">
+                <div className="appointment-date">
+                  <div className="date-day">
+                    {new Date(appointment.date).getDate().toString().padStart(2, '0')}
+                  </div>
+                  <div className="date-month">
+                    {new Date(appointment.date).toLocaleString('default', { month: 'short' }).toUpperCase()}
+                  </div>
+                </div>
+                <div className="appointment-status">{appointment.status}</div>
               </div>
-              <div className="appointment-status">Confirmed</div>
+              <div className="appointment-details">
+                <h4>{appointment.testType}</h4>
+                <div className="appointment-time">⏰ {appointment.time}</div>
+                <div className="appointment-location">📍 {appointment.location}</div>
+                <div className="appointment-doctor">👨‍⚕️ {appointment.doctor}</div>
+              </div>
+              <div className="appointment-actions">
+                <button 
+                  className="btn-reschedule"
+                  onClick={() => handleReschedule(appointment)}
+                >
+                  Reschedule
+                </button>
+                <button 
+                  className="btn-cancel"
+                  onClick={() => handleCancel(appointment.id)}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-            <div className="appointment-details">
-              <h4>Complete Blood Count (CBC)</h4>
-              <div className="appointment-time">⏰ 9:00 AM - 10:00 AM</div>
-              <div className="appointment-location">📍 MDLAB Direct - Main Branch</div>
-              <div className="appointment-doctor">👨‍⚕️ Dr. Maria Santos</div>
-            </div>
-            <div className="appointment-actions">
-              <button className="btn-reschedule">Reschedule</button>
-              <button className="btn-cancel">Cancel</button>
-            </div>
-          </div>
+          ))}
 
-          <div className="appointment-card upcoming">
-            <div className="appointment-header">
-              <div className="appointment-date">
-                <div className="date-day">10</div>
-                <div className="date-month">SEP</div>
-              </div>
-              <div className="appointment-status">Confirmed</div>
-            </div>
-            <div className="appointment-details">
-              <h4>Lipid Profile</h4>
-              <div className="appointment-time">⏰ 8:00 AM - 9:00 AM</div>
-              <div className="appointment-location">📍 Mobile Lab Service</div>
-              <div className="appointment-doctor">👨‍⚕️ Dr. Juan Rodriguez</div>
-            </div>
-            <div className="appointment-actions">
-              <button className="btn-reschedule">Reschedule</button>
-              <button className="btn-cancel">Cancel</button>
-            </div>
-          </div>
+          {/* Show existing hardcoded appointments if needed */}
+          {/* ...existing appointment cards... */}
         </div>
       </div>
 
@@ -238,6 +334,20 @@ function PatientDashboard({ currentUser, onLogout }) {
           </div>
         </div>
       </div>
+
+      {/* Rescheduling Modal - Add this section */}
+      {isReschedulingModalOpen && (
+        <BookAppointmentModal
+          isOpen={isReschedulingModalOpen}
+          onClose={() => {
+            setIsReschedulingModalOpen(false);
+            setSelectedAppointment(null);
+          }}
+          onSubmit={handleRescheduleSubmit}
+          initialData={selectedAppointment}
+          isRescheduling={true}
+        />
+      )}
     </div>
   );
 
@@ -249,19 +359,48 @@ function PatientDashboard({ currentUser, onLogout }) {
           <p>View and download your laboratory test results</p>
         </div>
         <div className="results-filters">
-          <select className="filter-select">
-            <option>All Results</option>
-            <option>Blood Tests</option>
-            <option>Urine Tests</option>
-            <option>X-Ray</option>
-            <option>Ultrasound</option>
-          </select>
-          <select className="filter-select">
-            <option>Last 3 Months</option>
-            <option>Last 6 Months</option>
-            <option>Last Year</option>
-            <option>All Time</option>
-          </select>
+          <div className="filter-group">
+            <label>Test Type:</label>
+            <select 
+              className="filter-select"
+              value={testTypeFilter}
+              onChange={(e) => setTestTypeFilter(e.target.value)}
+            >
+              <option value="all">All Results</option>
+              <option value="blood">Blood Tests</option>
+              <option value="urine">Urine Tests</option>
+              <option value="xray">X-Ray</option>
+              <option value="ultrasound">Ultrasound</option>
+            </select>
+          </div>
+          
+          <div className="filter-group">
+            <label>Time Period:</label>
+            <select 
+              className="filter-select"
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value)}
+            >
+              <option value="3months">Last 3 Months</option>
+              <option value="6months">Last 6 Months</option>
+              <option value="1year">Last Year</option>
+              <option value="all">All Time</option>
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label>Sort By:</label>
+            <select 
+              className="filter-select"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <option value="date">Date (Newest First)</option>
+              <option value="dateAsc">Date (Oldest First)</option>
+              <option value="type">Test Type</option>
+              <option value="status">Status</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -365,7 +504,12 @@ function PatientDashboard({ currentUser, onLogout }) {
           <h2>Mobile Lab Service</h2>
           <p>Community laboratory testing in different barangays across Nueva Vizcaya</p>
         </div>
-        <button className="request-service-btn">� Check Schedule & Location</button>
+        <button 
+          className="request-service-btn"
+          onClick={() => setIsScheduleModalOpen(true)}
+        >
+          🗓️ Check Schedule & Location
+        </button>
       </div>
 
       {/* Service Information */}
@@ -491,75 +635,6 @@ function PatientDashboard({ currentUser, onLogout }) {
     </div>
   );
 
-  const renderProfile = () => (
-    <div className="profile-container">
-      <div className="profile-header">
-        <div className="header-content">
-          <h2>My Profile</h2>
-          <p>Manage your personal information and preferences</p>
-        </div>
-        <button className="edit-profile-btn">✏️ Edit Profile</button>
-      </div>
-
-      <div className="profile-content">
-        <div className="profile-card">
-          <div className="profile-info">
-            <div className="profile-avatar">
-              <span>{user?.firstName?.charAt(0) || user?.username?.charAt(0) || 'P'}</span>
-            </div>
-            <div className="profile-details">
-              <h3>{user?.firstName} {user?.lastName}</h3>
-              <p>{user?.email}</p>
-              <span className="profile-role">Patient</span>
-            </div>
-          </div>
-
-          <div className="profile-fields">
-            <div className="field-group">
-              <div className="field-item">
-                <label>First Name</label>
-                <div className="field-value">{user?.firstName || 'Not provided'}</div>
-              </div>
-              <div className="field-item">
-                <label>Last Name</label>
-                <div className="field-value">{user?.lastName || 'Not provided'}</div>
-              </div>
-            </div>
-
-            <div className="field-group">
-              <div className="field-item">
-                <label>Email Address</label>
-                <div className="field-value">{user?.email || 'Not provided'}</div>
-              </div>
-              <div className="field-item">
-                <label>Phone Number</label>
-                <div className="field-value">{user?.phone || 'Not provided'}</div>
-              </div>
-            </div>
-
-            <div className="field-group">
-              <div className="field-item">
-                <label>Date of Birth</label>
-                <div className="field-value">{user?.dateOfBirth || 'Not provided'}</div>
-              </div>
-              <div className="field-item">
-                <label>Gender</label>
-                <div className="field-value">{user?.gender || 'Not provided'}</div>
-              </div>
-            </div>
-
-            <div className="field-group">
-              <div className="field-item full-width">
-                <label>Address</label>
-                <div className="field-value">{user?.address || 'Not provided'}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div className="patient-dashboard-container">
       {/* Sidebar */}
@@ -616,11 +691,11 @@ function PatientDashboard({ currentUser, onLogout }) {
         <div className="sidebar-footer">
           <div className="user-info">
             <div className="user-avatar">
-              <span>{user?.firstName?.charAt(0) || user?.username?.charAt(0) || 'P'}</span>
+              <span>{currentUser?.firstName?.charAt(0) || currentUser?.username?.charAt(0) || 'P'}</span>
             </div>
             <div className="user-details">
-              <span className="user-name">{user?.firstName} {user?.lastName}</span>
-              <span className="user-email">{user?.email}</span>
+              <span className="user-name">{currentUser?.firstName} {currentUser?.lastName}</span>
+              <span className="user-email">{currentUser?.email}</span>
               <span className="user-role">Patient</span>
             </div>
             <button className="logout-btn" onClick={handleLogout} title="Logout">
@@ -640,6 +715,16 @@ function PatientDashboard({ currentUser, onLogout }) {
           {renderContent()}
         </div>
       </div>
+
+      <BookAppointmentModal
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        onSubmit={handleAppointmentSubmit}
+      />
+      <MobileLabScheduleModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+      />
     </div>
   );
 }

@@ -264,4 +264,17 @@ export const authUtils = {
   },
 };
 
+export async function updateUserProfile(data, token) {
+  const res = await fetch('/api/users/me', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to update profile');
+  return res.json();
+}
+
 export default api;

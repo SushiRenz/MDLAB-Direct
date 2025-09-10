@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 require('dotenv').config();
 
 // Import routes
@@ -46,6 +47,9 @@ app.use(express.urlencoded({ extended: true }));
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
+
+// Serve static files for profile pictures
+app.use('/profile-pics', express.static(path.join(__dirname, 'public/profile-pics')));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

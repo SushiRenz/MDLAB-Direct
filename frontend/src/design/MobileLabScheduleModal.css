@@ -1,0 +1,222 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.mobile-schedule-modal {
+  background-color: #fff;
+  border-radius: 12px;
+  max-width: 800px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-header h2 {
+  color: #2d3748;
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #718096;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.close-button:hover {
+  background-color: #f7fafc;
+  color: #4a5568;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.current-location-section {
+  background-color: #f7fafc;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  border: 1px solid #e2e8f0;
+}
+
+.current-location-card {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.current-location-card h4 {
+  font-size: 1.2rem;
+  margin: 8px 0;
+  color: #2c3e50;
+}
+
+.location-status {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.location-status.active {
+  background-color: #dcffe4;
+  color: #0d522b;
+}
+
+.location-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.location-info span {
+  color: #4a5568;
+  font-size: 0.95rem;
+}
+
+.directions-btn {
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.directions-btn:hover {
+  background-color: #357abd;
+  transform: translateY(-1px);
+}
+
+.schedule-section {
+  background-color: #f7fafc;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+}
+
+.schedule-section h3 {
+  color: #2c3e50;
+  margin-bottom: 16px;
+}
+
+.schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.schedule-item {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.schedule-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.schedule-day {
+  width: 100px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.schedule-details {
+  flex: 1;
+}
+
+.schedule-details h4 {
+  margin: 0 0 4px 0;
+  color: #2c3e50;
+}
+
+.schedule-details p {
+  margin: 0;
+  color: #64748b;
+}
+
+.schedule-status {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.schedule-status.active {
+  background-color: #ebf8ff;
+  color: #2b6cb0;
+}
+
+.schedule-status.next-location {
+  background-color: #e6fffa;
+  color: #2c7a7b;
+}
+
+.schedule-status.scheduled {
+  background-color: #f7fafc;
+  color: #4a5568;
+}
+
+.schedule-status.on-call {
+  background-color: #fffaf0;
+  color: #c05621;
+}
+
+@media (max-width: 768px) {
+  .schedule-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .schedule-day {
+    width: 100%;
+  }
+
+  .schedule-status {
+    align-self: flex-start;
+  }
+
+  .location-info {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
