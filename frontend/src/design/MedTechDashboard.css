@@ -527,6 +527,162 @@
   font-size: 13px;
 }
 
+/* Quick Actions */
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.quick-action-card {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  text-align: center;
+  border: 2px solid #f0f0f0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.quick-action-card:hover {
+  border-color: #21AEA8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(33, 174, 168, 0.15);
+}
+
+.action-icon {
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+  display: block;
+}
+
+.action-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.action-description {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+/* Pending Samples Styles */
+.pending-samples {
+  margin-bottom: 30px;
+}
+
+.pending-samples h3 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.samples-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sample-item {
+  display: grid;
+  grid-template-columns: 120px 200px 1fr 100px;
+  gap: 15px;
+  align-items: center;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 4px solid transparent;
+}
+
+.sample-item:hover {
+  background: #e9ecef;
+  transform: translateX(2px);
+}
+
+.sample-item.selected {
+  background: #e8f4f3;
+  border-left-color: #21AEA8;
+  box-shadow: 0 2px 8px rgba(33, 174, 168, 0.15);
+}
+
+.sample-id {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.patient-name {
+  font-weight: 500;
+  color: #333;
+}
+
+.test-type {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.priority {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.priority-normal {
+  background: #d4edda;
+  color: #155724;
+}
+
+.priority-urgent {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.priority-stat {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* Saved Results Styles */
+.saved-results {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 2px solid #e9ecef;
+}
+
+.saved-results h3 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.saved-item {
+  display: grid;
+  grid-template-columns: 120px 200px 1fr 100px;
+  gap: 15px;
+  align-items: center;
+  padding: 12px 15px;
+  background: #d4edda;
+  border-radius: 6px;
+  border-left: 4px solid #28a745;
+}
+
+.saved-time {
+  font-size: 0.8rem;
+  color: #666;
+}
+
 /* Equipment Status */
 .equipment-status {
   background: white;

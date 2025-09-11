@@ -375,78 +375,218 @@ function MedTechDashboard({ currentUser, onLogout }) {
     </div>
   );
 
-  const renderResultEntry = () => (
-    <div className="result-entry-container">
-      <div className="entry-header">
-        <h2>Manual Result Entry</h2>
-        <div className="entry-search">
-          <input type="text" placeholder="Search by Sample ID or Patient Name" className="search-input" />
-          <button className="search-btn">🔍</button>
+  const renderResultEntry = () => {
+    const [selectedSample, setSelectedSample] = useState(null);
+    const [testResults, setTestResults] = useState({
+      hemoglobin: '',
+      hematocrit: '',
+      wbc: '',
+      rbc: '',
+      platelets: ''
+    });
+    const [savedResults, setSavedResults] = useState([]);
+
+    const pendingSamples = [
+      { id: 'S001-2024', patient: 'Maria Santos', testType: 'Complete Blood Count', priority: 'Normal', patientId: 'patient1' },
+      { id: 'S002-2024', patient: 'Juan Cruz', testType: 'Blood Glucose', priority: 'Urgent', patientId: 'patient2' },
+      { id: 'S003-2024', patient: 'Pedro Garcia', testType: 'Lipid Profile', priority: 'Normal', patientId: 'patient3' }
+    ];
+
+    const handleSampleSelect = (sample) => {
+      setSelectedSample(sample);
+      setTestResults({
+        hemoglobin: '',
+        hematocrit: '',
+        wbc: '',
+        rbc: '',
+        platelets: ''
+      });
+    };
+
+    const handleResultChange = (field, value) => {
+      setTestResults(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    };
+
+    const handleSaveResults = () => {
+      if (!selectedSample) return;
+
+      const resultData = {
+        sampleId: selectedSample.id,
+        patient: selectedSample.patient,
+        patientId: selectedSample.patientId,
+        testType: selectedSample.testType,
+        results: testResults,
+        date: new Date().toISOString(),
+        status: 'completed',
+        technician: currentUser?.username || 'medtech1'
+      };
+
+      // Save to localStorage for demo purposes
+      const existingResults = JSON.parse(localStorage.getItem('testResults') || '[]');
+      existingResults.push(resultData);
+      localStorage.setItem('testResults', JSON.stringify(existingResults));
+
+      setSavedResults([...savedResults, resultData]);
+      alert(`Results saved for ${selectedSample.patient}!`);
+      setSelectedSample(null);
+      setTestResults({
+        hemoglobin: '',
+        hematocrit: '',
+        wbc: '',
+        rbc: '',
+        platelets: ''
+      });
+    };
+
+    return (
+      <div className="result-entry-container">
+        <div className="entry-header">
+          <h2>Manual Result Entry</h2>
+          <div className="entry-search">
+            <input type="text" placeholder="Search by Sample ID or Patient Name" className="search-input" />
+            <button className="search-btn">🔍</button>
+          </div>
         </div>
+
+        {/* Pending Samples List */}
+        <div className="pending-samples">
+          <h3>Pending Samples</h3>
+          <div className="samples-list">
+            {pendingSamples.map(sample => (
+              <div 
+                key={sample.id} 
+                className={`sample-item ${selectedSample?.id === sample.id ? 'selected' : ''}`}
+                onClick={() => handleSampleSelect(sample)}
+              >
+                <span className="sample-id">{sample.id}</span>
+                <span className="patient-name">{sample.patient}</span>
+                <span className="test-type">{sample.testType}</span>
+                <span className={`priority priority-${sample.priority.toLowerCase()}`}>{sample.priority}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {selectedSample && (
+          <div className="result-form">
+            <div className="sample-info">
+              <h3>Sample Information</h3>
+              <div className="info-grid">
+                <div className="info-item">
+                  <label>Sample ID:</label>
+                  <span>{selectedSample.id}</span>
+                </div>
+                <div className="info-item">
+                  <label>Patient:</label>
+                  <span>{selectedSample.patient}</span>
+                </div>
+                <div className="info-item">
+                  <label>Test Type:</label>
+                  <span>{selectedSample.testType}</span>
+                </div>
+                <div className="info-item">
+                  <label>Priority:</label>
+                  <span className={`priority-${selectedSample.priority.toLowerCase()}`}>{selectedSample.priority}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="test-results">
+              <h3>Test Results</h3>
+              <div className="results-grid">
+                <div className="result-field">
+                  <label>Hemoglobin (g/dL)</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    placeholder="12.0-15.5" 
+                    className="result-input"
+                    value={testResults.hemoglobin}
+                    onChange={(e) => handleResultChange('hemoglobin', e.target.value)}
+                  />
+                  <span className="reference-range">12.0-15.5</span>
+                </div>
+                <div className="result-field">
+                  <label>Hematocrit (%)</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    placeholder="36-46" 
+                    className="result-input"
+                    value={testResults.hematocrit}
+                    onChange={(e) => handleResultChange('hematocrit', e.target.value)}
+                  />
+                  <span className="reference-range">36-46</span>
+                </div>
+                <div className="result-field">
+                  <label>WBC Count (×10³/μL)</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    placeholder="4.5-11.0" 
+                    className="result-input"
+                    value={testResults.wbc}
+                    onChange={(e) => handleResultChange('wbc', e.target.value)}
+                  />
+                  <span className="reference-range">4.5-11.0</span>
+                </div>
+                <div className="result-field">
+                  <label>RBC Count (×10⁶/μL)</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    placeholder="4.2-5.4" 
+                    className="result-input"
+                    value={testResults.rbc}
+                    onChange={(e) => handleResultChange('rbc', e.target.value)}
+                  />
+                  <span className="reference-range">4.2-5.4</span>
+                </div>
+                <div className="result-field">
+                  <label>Platelet Count (×10³/μL)</label>
+                  <input 
+                    type="number" 
+                    step="1" 
+                    placeholder="150-400" 
+                    className="result-input"
+                    value={testResults.platelets}
+                    onChange={(e) => handleResultChange('platelets', e.target.value)}
+                  />
+                  <span className="reference-range">150-400</span>
+                </div>
+              </div>
+
+              <div className="result-actions">
+                <button className="btn-save-results" onClick={handleSaveResults}>💾 Save Results</button>
+                <button className="btn-validate">✅ Validate & Submit</button>
+                <button className="btn-flag">🚩 Flag for Review</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Recently Saved Results */}
+        {savedResults.length > 0 && (
+          <div className="saved-results">
+            <h3>Recently Saved Results</h3>
+            <div className="saved-list">
+              {savedResults.map((result, index) => (
+                <div key={index} className="saved-item">
+                  <span>{result.sampleId}</span>
+                  <span>{result.patient}</span>
+                  <span>{result.testType}</span>
+                  <span className="saved-time">{new Date(result.date).toLocaleTimeString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-
-      <div className="result-form">
-        <div className="sample-info">
-          <h3>Sample Information</h3>
-          <div className="info-grid">
-            <div className="info-item">
-              <label>Sample ID:</label>
-              <span>S001-2024</span>
-            </div>
-            <div className="info-item">
-              <label>Patient:</label>
-              <span>Maria Santos</span>
-            </div>
-            <div className="info-item">
-              <label>Test Type:</label>
-              <span>Complete Blood Count</span>
-            </div>
-            <div className="info-item">
-              <label>Priority:</label>
-              <span className="priority-normal">Normal</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="test-results">
-          <h3>Test Results</h3>
-          <div className="results-grid">
-            <div className="result-field">
-              <label>Hemoglobin (g/dL)</label>
-              <input type="number" step="0.1" placeholder="12.0-15.5" className="result-input" />
-              <span className="reference-range">12.0-15.5</span>
-            </div>
-            <div className="result-field">
-              <label>Hematocrit (%)</label>
-              <input type="number" step="0.1" placeholder="36-46" className="result-input" />
-              <span className="reference-range">36-46</span>
-            </div>
-            <div className="result-field">
-              <label>WBC Count (×10³/μL)</label>
-              <input type="number" step="0.1" placeholder="4.5-11.0" className="result-input" />
-              <span className="reference-range">4.5-11.0</span>
-            </div>
-            <div className="result-field">
-              <label>RBC Count (×10⁶/μL)</label>
-              <input type="number" step="0.1" placeholder="4.2-5.4" className="result-input" />
-              <span className="reference-range">4.2-5.4</span>
-            </div>
-            <div className="result-field">
-              <label>Platelet Count (×10³/μL)</label>
-              <input type="number" step="1" placeholder="150-400" className="result-input" />
-              <span className="reference-range">150-400</span>
-            </div>
-          </div>
-
-          <div className="result-actions">
-            <button className="btn-save-results">💾 Save Results</button>
-            <button className="btn-validate">✅ Validate & Submit</button>
-            <button className="btn-flag">🚩 Flag for Review</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderQualityControl = () => (
     <div className="qc-container">

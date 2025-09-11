@@ -17,11 +17,140 @@ function PatientDashboard(props) {
   const [sortBy, setSortBy] = useState('date');
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  
+  // Test Results state - moved to component level
+  const [testResults, setTestResults] = useState([]);
+  const [filteredResults, setFilteredResults] = useState([]);
 
   // Sync currentUser state with props
   useEffect(() => {
     setCurrentUser(props.currentUser);
   }, [props.currentUser]);
+
+  // Load test results from localStorage
+  useEffect(() => {
+    const loadResults = () => {
+      try {
+        const savedResults = JSON.parse(localStorage.getItem('testResults') || '[]');
+        
+        // Add some default demo results if none exist
+        const defaultResults = [
+          {
+            sampleId: 'S001-DEMO',
+            patient: currentUser?.firstName + ' ' + currentUser?.lastName || 'Demo Patient',
+            patientId: 'current-user',
+            testType: 'Complete Blood Count (CBC)',
+            results: {
+              hemoglobin: '13.8',
+              hematocrit: '41.2',
+              wbc: '6.5',
+              rbc: '4.2',
+              platelets: '280'
+            },
+            date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
+            status: 'completed',
+            technician: 'medtech1',
+            isNew: true
+          },
+          {
+            sampleId: 'S002-DEMO',
+            patient: currentUser?.firstName + ' ' + currentUser?.lastName || 'Demo Patient',
+            patientId: 'current-user',
+            testType: 'Blood Sugar Test',
+            results: {
+              glucose: '95',
+              hba1c: '5.4'
+            },
+            date: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(), // 20 days ago
+            status: 'completed',
+            technician: 'medtech1',
+            isNew: false
+          }
+        ];
+
+        // Filter results for current user (in real app, this would be done by backend)
+        const currentUserResults = savedResults.filter(result => 
+          result.patientId === 'current-user' || 
+          result.patient === (currentUser?.firstName + ' ' + currentUser?.lastName)
+        );
+
+        const allResults = [...defaultResults, ...currentUserResults];
+        setTestResults(allResults);
+      } catch (error) {
+        console.error('Error loading test results:', error);
+        setTestResults([]);
+      }
+    };
+
+    loadResults();
+    
+    // Set up interval to check for new results
+    const interval = setInterval(loadResults, 5000); // Check every 5 seconds
+    
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
+  // Filter results based on current filters
+  useEffect(() => {
+    let filtered = [...testResults];
+
+    // Apply test type filter
+    if (testTypeFilter !== 'all') {
+      filtered = filtered.filter(result => {
+        const testType = result.testType.toLowerCase();
+        switch (testTypeFilter) {
+          case 'blood':
+            return testType.includes('blood') || testType.includes('cbc') || testType.includes('glucose') || testType.includes('sugar');
+          case 'urine':
+            return testType.includes('urine');
+          case 'xray':
+            return testType.includes('x-ray') || testType.includes('xray');
+          case 'ultrasound':
+            return testType.includes('ultrasound');
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Apply time filter
+    if (timeFilter !== 'all') {
+      const now = new Date();
+      filtered = filtered.filter(result => {
+        const resultDate = new Date(result.date);
+        const diffMonths = (now.getFullYear() - resultDate.getFullYear()) * 12 + (now.getMonth() - resultDate.getMonth());
+        
+        switch (timeFilter) {
+          case '3months':
+            return diffMonths <= 3;
+          case '6months':
+            return diffMonths <= 6;
+          case '1year':
+            return diffMonths <= 12;
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'date':
+          return new Date(b.date) - new Date(a.date);
+        case 'dateAsc':
+          return new Date(a.date) - new Date(b.date);
+        case 'type':
+          return a.testType.localeCompare(b.testType);
+        case 'status':
+          return a.status.localeCompare(b.status);
+        default:
+          return 0;
+      }
+    });
+
+    setFilteredResults(filtered);
+  }, [testResults, testTypeFilter, timeFilter, sortBy]);
 
   const handleSectionClick = (section) => setActiveSection(section);
 
@@ -420,166 +549,173 @@ function PatientDashboard(props) {
     </div>
   );
 
-  const renderResults = () => (
-    <div className="results-container">
-      <div className="results-header">
-        <div className="header-content">
-          <h2>Test Results</h2>
-          <p>View and download your laboratory test results</p>
-        </div>
-        <div className="results-filters">
-          <div className="filter-group">
-            <label>Test Type:</label>
-            <select 
-              className="filter-select"
-              value={testTypeFilter}
-              onChange={(e) => setTestTypeFilter(e.target.value)}
-            >
-              <option value="all">All Results</option>
-              <option value="blood">Blood Tests</option>
-              <option value="urine">Urine Tests</option>
-              <option value="xray">X-Ray</option>
-              <option value="ultrasound">Ultrasound</option>
-            </select>
-          </div>
-          
-          <div className="filter-group">
-            <label>Time Period:</label>
-            <select 
-              className="filter-select"
-              value={timeFilter}
-              onChange={(e) => setTimeFilter(e.target.value)}
-            >
-              <option value="3months">Last 3 Months</option>
-              <option value="6months">Last 6 Months</option>
-              <option value="1year">Last Year</option>
-              <option value="all">All Time</option>
-            </select>
-          </div>
+  const renderResults = () => {
+    const formatResultValue = (key, value, testType) => {
+      if (!value) return 'Not Available';
+      
+      // Define normal ranges
+      const ranges = {
+        hemoglobin: { min: 12.0, max: 15.5, unit: 'g/dL' },
+        hematocrit: { min: 36, max: 46, unit: '%' },
+        wbc: { min: 4.5, max: 11.0, unit: '×10³/μL' },
+        rbc: { min: 4.2, max: 5.4, unit: '×10⁶/μL' },
+        platelets: { min: 150, max: 400, unit: '×10³/μL' },
+        glucose: { min: 70, max: 100, unit: 'mg/dL' },
+        hba1c: { min: 4.0, max: 5.6, unit: '%' }
+      };
 
-          <div className="filter-group">
-            <label>Sort By:</label>
-            <select 
-              className="filter-select"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-            >
-              <option value="date">Date (Newest First)</option>
-              <option value="dateAsc">Date (Oldest First)</option>
-              <option value="type">Test Type</option>
-              <option value="status">Status</option>
-            </select>
+      const range = ranges[key];
+      if (range) {
+        const numValue = parseFloat(value);
+        const isNormal = numValue >= range.min && numValue <= range.max;
+        return {
+          value: `${value} ${range.unit}`,
+          isNormal,
+          status: isNormal ? 'Normal' : 'Abnormal'
+        };
+      }
+
+      return {
+        value: value,
+        isNormal: true,
+        status: 'Normal'
+      };
+    };
+
+    const getOverallStatus = (results, testType) => {
+      const resultKeys = Object.keys(results);
+      let hasAbnormal = false;
+
+      for (const key of resultKeys) {
+        const formatted = formatResultValue(key, results[key], testType);
+        if (!formatted.isNormal) {
+          hasAbnormal = true;
+          break;
+        }
+      }
+
+      return hasAbnormal ? 'Has Abnormal Values' : 'Normal Results';
+    };
+
+    return (
+      <div className="results-container">
+        <div className="results-header">
+          <div className="header-content">
+            <h2>Test Results</h2>
+            <p>View and download your laboratory test results</p>
           </div>
+          <div className="results-filters">
+            <div className="filter-group">
+              <label>Test Type:</label>
+              <select 
+                className="filter-select"
+                value={testTypeFilter}
+                onChange={(e) => setTestTypeFilter(e.target.value)}
+              >
+                <option value="all">All Results</option>
+                <option value="blood">Blood Tests</option>
+                <option value="urine">Urine Tests</option>
+                <option value="xray">X-Ray</option>
+                <option value="ultrasound">Ultrasound</option>
+              </select>
+            </div>
+            
+            <div className="filter-group">
+              <label>Time Period:</label>
+              <select 
+                className="filter-select"
+                value={timeFilter}
+                onChange={(e) => setTimeFilter(e.target.value)}
+              >
+                <option value="3months">Last 3 Months</option>
+                <option value="6months">Last 6 Months</option>
+                <option value="1year">Last Year</option>
+                <option value="all">All Time</option>
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label>Sort By:</label>
+              <select 
+                className="filter-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="date">Date (Newest First)</option>
+                <option value="dateAsc">Date (Oldest First)</option>
+                <option value="type">Test Type</option>
+                <option value="status">Status</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="results-grid">
+          {filteredResults.length === 0 ? (
+            <div className="no-results">
+              <div className="no-results-icon">📋</div>
+              <h3>No Test Results Found</h3>
+              <p>No test results match your current filters, or you haven't had any tests yet.</p>
+              <button 
+                className="btn-book-test"
+                onClick={() => handleSectionClick('appointments')}
+              >
+                Book a Test
+              </button>
+            </div>
+          ) : (
+            filteredResults.map((result, index) => (
+              <div key={index} className={`result-card ${result.isNew ? 'new' : ''}`}>
+                <div className="result-header">
+                  <div className="result-status">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
+                      {result.isNew ? (
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="2" fill="currentColor"/>
+                      ) : (
+                        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      )}
+                    </svg>
+                    {result.isNew ? 'New Result' : 'Available'}
+                  </div>
+                  <div className="result-date">{new Date(result.date).toLocaleDateString()}</div>
+                </div>
+                <div className="result-content">
+                  <h4>{result.testType}</h4>
+                  <div className="result-summary">
+                    {Object.entries(result.results).map(([key, value]) => {
+                      const formatted = formatResultValue(key, value, result.testType);
+                      return (
+                        <div key={key} className="summary-item">
+                          <span>{key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}:</span>
+                          <span className={formatted.isNormal ? 'normal' : 'abnormal'}>
+                            {formatted.value} ({formatted.status})
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="result-overall">
+                    <span className={`overall-status ${getOverallStatus(result.results, result.testType).includes('Normal') ? 'normal' : 'abnormal'}`}>
+                      Overall: {getOverallStatus(result.results, result.testType)}
+                    </span>
+                  </div>
+                  {result.technician && (
+                    <div className="result-tech">
+                      <small>Processed by: {result.technician}</small>
+                    </div>
+                  )}
+                </div>
+                <div className="result-actions">
+                  <button className="btn-view">View Full Report</button>
+                  <button className="btn-download">Download PDF</button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
-
-      <div className="results-grid">
-        <div className="result-card new">
-          <div className="result-header">
-            <div className="result-status">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="2" fill="currentColor"/>
-              </svg>
-              New Result
-            </div>
-            <div className="result-date">September 2, 2025</div>
-          </div>
-          <div className="result-content">
-            <h4>Complete Blood Count (CBC)</h4>
-            <div className="result-summary">
-              <div className="summary-item">
-                <span>White Blood Cells:</span>
-                <span className="normal">6,500/µL (Normal)</span>
-              </div>
-              <div className="summary-item">
-                <span>Red Blood Cells:</span>
-                <span className="normal">4.2 million/µL (Normal)</span>
-              </div>
-              <div className="summary-item">
-                <span>Hemoglobin:</span>
-                <span className="normal">13.8 g/dL (Normal)</span>
-              </div>
-            </div>
-            <div className="result-overall">
-              <span className="overall-status normal">Overall: Normal Results</span>
-            </div>
-          </div>
-          <div className="result-actions">
-            <button className="btn-view">View Full Report</button>
-            <button className="btn-download">Download PDF</button>
-          </div>
-        </div>
-
-        <div className="result-card">
-          <div className="result-header">
-            <div className="result-status">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
-                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Available
-            </div>
-            <div className="result-date">August 25, 2025</div>
-          </div>
-          <div className="result-content">
-            <h4>Blood Sugar Test</h4>
-            <div className="result-summary">
-              <div className="summary-item">
-                <span>Fasting Glucose:</span>
-                <span className="normal">95 mg/dL (Normal)</span>
-              </div>
-              <div className="summary-item">
-                <span>HbA1c:</span>
-                <span className="normal">5.4% (Normal)</span>
-              </div>
-            </div>
-            <div className="result-overall">
-              <span className="overall-status normal">Overall: Normal Results</span>
-            </div>
-          </div>
-          <div className="result-actions">
-            <button className="btn-view">View Full Report</button>
-            <button className="btn-download">Download PDF</button>
-          </div>
-        </div>
-
-        <div className="result-card">
-          <div className="result-header">
-            <div className="result-status">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
-                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Available
-            </div>
-            <div className="result-date">August 15, 2025</div>
-          </div>
-          <div className="result-content">
-            <h4>Urinalysis</h4>
-            <div className="result-summary">
-              <div className="summary-item">
-                <span>Specific Gravity:</span>
-                <span className="normal">1.020 (Normal)</span>
-              </div>
-              <div className="summary-item">
-                <span>Protein:</span>
-                <span className="normal">Negative (Normal)</span>
-              </div>
-              <div className="summary-item">
-                <span>Glucose:</span>
-                <span className="normal">Negative (Normal)</span>
-              </div>
-            </div>
-            <div className="result-overall">
-              <span className="overall-status normal">Overall: Normal Results</span>
-            </div>
-          </div>
-          <div className="result-actions">
-            <button className="btn-view">View Full Report</button>
-            <button className="btn-download">Download PDF</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderMobileService = () => (
     <div className="mobile-service-container">
