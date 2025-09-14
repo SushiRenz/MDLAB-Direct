@@ -2,8 +2,19 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { protect } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 const User = require('../models/User');
+const {
+  getUsers,
+  getUser,
+  createUser,
+  updateUser,
+  deleteUser,
+  deactivateUser,
+  activateUser,
+  getUserStats
+} = require('../controllers/userController');
+const { body } = require('express-validator');
 
 // Create router instance
 const router = express.Router();
@@ -37,7 +48,41 @@ const upload = multer({
   }
 });
 
-// Update profile route
+// Validation middleware for user creation
+const validateUser = [
+  body('username').isLength({ min: 3 }).trim().withMessage('Username must be at least 3 characters long'),
+  body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
+  body('firstName').notEmpty().trim().withMessage('First name is required'),
+  body('lastName').notEmpty().trim().withMessage('Last name is required'),
+  body('role').isIn(['patient', 'medtech', 'pathologist', 'admin']).withMessage('Invalid role'),
+];
+
+const validateUserUpdate = [
+  body('firstName').optional().notEmpty().trim().withMessage('First name cannot be empty'),
+  body('lastName').optional().notEmpty().trim().withMessage('Last name cannot be empty'),
+  body('role').optional().isIn(['patient', 'medtech', 'pathologist', 'admin']).withMessage('Invalid role'),
+];
+
+// Admin-only routes for user management
+router.route('/stats')
+  .get(protect, authorize('admin'), getUserStats);
+
+router.route('/')
+  .get(protect, authorize('admin'), getUsers)
+  .post(protect, authorize('admin'), validateUser, createUser);
+
+router.route('/:id')
+  .get(protect, authorize('admin'), getUser)
+  .put(protect, authorize('admin'), validateUserUpdate, updateUser)
+  .delete(protect, authorize('admin'), deleteUser);
+
+router.route('/:id/activate')
+  .put(protect, authorize('admin'), activateUser);
+
+router.route('/:id/deactivate')
+  .put(protect, authorize('admin'), deactivateUser);
+
+// Update profile route for current user
 router.put('/me', protect, upload.single('profilePic'), async (req, res) => {
   try {
     const updates = {};

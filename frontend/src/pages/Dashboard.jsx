@@ -1,10 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../design/Dashboard.css';
+import { userAPI } from '../services/api';
 
 function Dashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [userManagementOpen, setUserManagementOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
+  
+  // User management state
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterRole, setFilterRole] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [userStats, setUserStats] = useState(null);
 
   const user = currentUser;
 
@@ -34,6 +46,133 @@ function Dashboard({ currentUser, onLogout }) {
       onLogout();
     }
   };
+
+  // User Management Functions
+  const fetchUsers = async (role = '') => {
+    setLoading(true);
+    setError('');
+    try {
+      const params = {};
+      if (role) params.role = role;
+      if (searchTerm) params.search = searchTerm;
+      if (filterStatus) params.isActive = filterStatus === 'active';
+      
+      const data = await userAPI.getUsers(params);
+      if (data.success) {
+        setUsers(data.users || []);
+      } else {
+        setError(data.message || 'Failed to fetch users');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to fetch users');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUserStats = async () => {
+    try {
+      const data = await userAPI.getUserStats();
+      if (data.success) {
+        setUserStats(data.stats);
+      }
+    } catch (err) {
+      console.error('Failed to fetch user stats:', err);
+    }
+  };
+
+  const handleCreateUser = async (userData) => {
+    try {
+      const data = await userAPI.createUser(userData);
+      if (data.success) {
+        setShowUserModal(false);
+        setEditingUser(null);
+        fetchUsers(getCurrentRole());
+        fetchUserStats();
+      } else {
+        setError(data.message || 'Failed to create user');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to create user');
+    }
+  };
+
+  const handleUpdateUser = async (userId, userData) => {
+    try {
+      const data = await userAPI.updateUser(userId, userData);
+      if (data.success) {
+        setShowUserModal(false);
+        setEditingUser(null);
+        fetchUsers(getCurrentRole());
+        fetchUserStats();
+      } else {
+        setError(data.message || 'Failed to update user');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to update user');
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (window.confirm('Are you sure you want to delete this user?')) {
+      try {
+        const data = await userAPI.deleteUser(userId);
+        if (data.success) {
+          fetchUsers(getCurrentRole());
+          fetchUserStats();
+        } else {
+          setError(data.message || 'Failed to delete user');
+        }
+      } catch (err) {
+        setError(err.message || 'Failed to delete user');
+      }
+    }
+  };
+
+  const handleToggleUserStatus = async (userId, isActive) => {
+    try {
+      const data = isActive 
+        ? await userAPI.deactivateUser(userId)
+        : await userAPI.activateUser(userId);
+      
+      if (data.success) {
+        fetchUsers(getCurrentRole());
+        fetchUserStats();
+      } else {
+        setError(data.message || 'Failed to update user status');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to update user status');
+    }
+  };
+
+  const getCurrentRole = () => {
+    switch (activeSection) {
+      case 'patient': return 'patient';
+      case 'staff': return 'medtech';
+      case 'pathologist': return 'pathologist';
+      case 'mobile-account': return '';
+      default: return '';
+    }
+  };
+
+  const openUserModal = (user = null) => {
+    setEditingUser(user);
+    setShowUserModal(true);
+  };
+
+  const closeUserModal = () => {
+    setEditingUser(null);
+    setShowUserModal(false);
+  };
+
+  // Effect to fetch users when section changes
+  useEffect(() => {
+    if (['patient', 'staff', 'pathologist', 'mobile-account'].includes(activeSection)) {
+      fetchUsers(getCurrentRole());
+      fetchUserStats();
+    }
+  }, [activeSection, searchTerm, filterStatus]);
 
   const renderPageTitle = () => {
     switch (activeSection) {
@@ -78,14 +217,7 @@ function Dashboard({ currentUser, onLogout }) {
       {/* Top Row Stats */}
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Total Appointments</div>
             <div className="stat-value">1,234</div>
@@ -93,12 +225,7 @@ function Dashboard({ currentUser, onLogout }) {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12,6 12,12 16,14"></polyline>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Pending Test Results</div>
             <div className="stat-value">45</div>
@@ -106,11 +233,7 @@ function Dashboard({ currentUser, onLogout }) {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="20,6 9,17 4,12"></polyline>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Completed Reports</div>
             <div className="stat-value">892</div>
@@ -118,13 +241,7 @@ function Dashboard({ currentUser, onLogout }) {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 20V10"></path>
-              <path d="M12 20V4"></path>
-              <path d="M6 20v-6"></path>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Patient Visits</div>
             <div className="stat-value">567</div>
@@ -257,446 +374,688 @@ function Dashboard({ currentUser, onLogout }) {
     </>
   );
 
-  const renderPatientManagement = () => (
-    <div className="management-container">
-      <div className="management-header">
-        <div className="management-title">
-          <h2>Patient Management</h2>
-          <p>Manage patient records, view appointments, and track medical history</p>
+  const renderPatientManagement = () => {
+    const patients = users.filter(user => user.role === 'patient');
+    const patientStats = userStats?.byRole?.find(stat => stat._id === 'patient') || { count: 0, active: 0 };
+    
+    return (
+      <div className="management-container">
+        {error && (
+          <div className="error-message" style={{
+            background: '#fee', 
+            color: '#c33', 
+            padding: '10px', 
+            borderRadius: '4px', 
+            marginBottom: '20px'
+          }}>
+            {error}
+          </div>
+        )}
+        
+        <div className="management-header">
+          <div className="management-title">
+            <h2>Patient Management</h2>
+            <p>Manage patient records, view appointments, and track medical history</p>
+          </div>
+          <button className="add-btn" onClick={() => openUserModal()}>
+            + Add New Patient
+          </button>
         </div>
-        <button className="add-btn">+ Add New Patient</button>
-      </div>
 
-      <div className="management-stats">
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
+        <div className="management-stats">
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Total Patients</div>
+              <div className="stat-value">{patientStats.count}</div>
+            </div>
           </div>
-          <div className="stat-info">
-            <div className="stat-label">Total Patients</div>
-            <div className="stat-value">1,234</div>
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Active Patients</div>
+              <div className="stat-value">{patientStats.active}</div>
+            </div>
           </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2L2 7v10l10 5 10-5V7l-10-5z"></path>
-              <polyline points="2,7 12,12 22,7"></polyline>
-              <polyline points="12,12 12,22"></polyline>
-            </svg>
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">New This Month</div>
+              <div className="stat-value">{
+                users.filter(user => 
+                  user.role === 'patient' && 
+                  new Date(user.createdAt) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+                ).length
+              }</div>
+            </div>
           </div>
-          <div className="stat-info">
-            <div className="stat-label">New This Month</div>
-            <div className="stat-value">45</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-          </div>
-          <div className="stat-info">
-            <div className="stat-label">Appointments Today</div>
-            <div className="stat-value">28</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"></polyline>
-            </svg>
-          </div>
-          <div className="stat-info">
-            <div className="stat-label">Pending Tests</div>
-            <div className="stat-value">12</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="management-content">
-        <div className="content-header">
-          <div className="search-filter">
-            <input type="text" placeholder="Search patients..." className="search-input" />
-            <select className="filter-select">
-              <option>All Patients</option>
-              <option>Active</option>
-              <option>Inactive</option>
-              <option>Recent</option>
-            </select>
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Filtered Results</div>
+              <div className="stat-value">{patients.length}</div>
+            </div>
           </div>
         </div>
 
-        <div className="data-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Patient ID</th>
-                <th>Name</th>
-                <th>Age</th>
-                <th>Gender</th>
-                <th>Contact</th>
-                <th>Last Visit</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>P001</td>
-                <td>Juan dela Cruz</td>
-                <td>32</td>
-                <td>Male</td>
-                <td>+639123456789</td>
-                <td>2024-08-28</td>
-                <td><span className="status active">Active</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view">View</button>
-                    <button className="btn-edit">Edit</button>
-                    <button className="btn-delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td>P002</td>
-                <td>Maria Santos</td>
-                <td>28</td>
-                <td>Female</td>
-                <td>+639987654321</td>
-                <td>2024-08-30</td>
-                <td><span className="status active">Active</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view">View</button>
-                    <button className="btn-edit">Edit</button>
-                    <button className="btn-delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td>P003</td>
-                <td>Pedro Rodriguez</td>
-                <td>45</td>
-                <td>Male</td>
-                <td>+639555444333</td>
-                <td>2024-08-25</td>
-                <td><span className="status pending">Pending</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view">View</button>
-                    <button className="btn-edit">Edit</button>
-                    <button className="btn-delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
+        <div className="management-content">
+          <div className="content-header">
+            <div className="search-filter">
+              <input 
+                type="text" 
+                placeholder="Search patients..." 
+                className="search-input"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <select 
+                className="filter-select"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="">All Patients</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
 
-  const renderStaffManagement = () => (
-    <div className="management-container">
-      <div className="management-header">
-        <div className="management-title">
-          <h2>Staff Management</h2>
-          <p>Manage laboratory staff, schedules, and performance</p>
-        </div>
-        <button className="add-btn">+ Add New Staff</button>
-      </div>
-
-      <div className="management-stats">
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-          </div>
-          <div className="stat-info">
-            <div className="stat-label">Total Staff</div>
-            <div className="stat-value">24</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="20,6 9,17 4,12"></polyline>
-            </svg>
-          </div>
-          <div className="stat-info">
-            <div className="stat-label">On Duty</div>
-            <div className="stat-value">18</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-          </div>
-          <div className="stat-info">
-            <div className="stat-label">On Leave</div>
-            <div className="stat-value">3</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12,6 12,12 16,14"></polyline>
-            </svg>
-          </div>
-          <div className="stat-info">
-            <div className="stat-label">Overtime Hours</div>
-            <div className="stat-value">45</div>
+          <div className="data-table">
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>Loading patients...</div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Patient ID</th>
+                    <th>Name</th>
+                    <th>Age</th>
+                    <th>Gender</th>
+                    <th>Contact</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {patients.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '20px' }}>
+                        No patients found
+                      </td>
+                    </tr>
+                  ) : (
+                    patients.map((patient) => (
+                      <tr key={patient.id}>
+                        <td>P{patient.id.slice(-6)}</td>
+                        <td>{patient.firstName} {patient.lastName}</td>
+                        <td>{
+                          patient.dateOfBirth ? 
+                          Math.floor((Date.now() - new Date(patient.dateOfBirth)) / (365.25 * 24 * 60 * 60 * 1000)) :
+                          'N/A'
+                        }</td>
+                        <td>{patient.gender || 'N/A'}</td>
+                        <td>{patient.phone || 'N/A'}</td>
+                        <td>{patient.email}</td>
+                        <td>
+                          <span className={`status ${patient.isActive ? 'active' : 'inactive'}`}>
+                            {patient.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="action-buttons">
+                            <button 
+                              className="btn-view"
+                              onClick={() => alert(`View patient details for ${patient.firstName} ${patient.lastName}`)}
+                            >
+                              View
+                            </button>
+                            <button 
+                              className="btn-edit"
+                              onClick={() => openUserModal(patient)}
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              className="btn-delete"
+                              onClick={() => handleDeleteUser(patient.id)}
+                            >
+                              Delete
+                            </button>
+                            <button 
+                              className={`btn-toggle ${patient.isActive ? 'btn-deactivate' : 'btn-activate'}`}
+                              onClick={() => handleToggleUserStatus(patient.id, patient.isActive)}
+                            >
+                              {patient.isActive ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>
+    );
+  };
 
-      <div className="management-content">
-        <div className="content-header">
-          <div className="search-filter">
-            <input type="text" placeholder="Search staff..." className="search-input" />
-            <select className="filter-select">
-              <option>All Staff</option>
-              <option>Lab Technicians</option>
-              <option>Nurses</option>
-              <option>Administrators</option>
-              <option>Security</option>
-            </select>
+  const renderStaffManagement = () => {
+    const staff = users.filter(user => user.role === 'medtech');
+    const staffStats = userStats?.byRole?.find(stat => stat._id === 'medtech') || { count: 0, active: 0 };
+    
+    return (
+      <div className="management-container">
+        {error && (
+          <div className="error-message" style={{
+            background: '#fee', 
+            color: '#c33', 
+            padding: '10px', 
+            borderRadius: '4px', 
+            marginBottom: '20px'
+          }}>
+            {error}
+          </div>
+        )}
+        
+        <div className="management-header">
+          <div className="management-title">
+            <h2>Staff Management</h2>
+            <p>Manage laboratory staff, schedules, and performance</p>
+          </div>
+          <button className="add-btn" onClick={() => openUserModal()}>
+            + Add New Staff
+          </button>
+        </div>
+
+        <div className="management-stats">
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Total Staff</div>
+              <div className="stat-value">{staffStats.count}</div>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Active Staff</div>
+              <div className="stat-value">{staffStats.active}</div>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">New This Month</div>
+              <div className="stat-value">{
+                users.filter(user => 
+                  user.role === 'medtech' && 
+                  new Date(user.createdAt) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+                ).length
+              }</div>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Filtered Results</div>
+              <div className="stat-value">{staff.length}</div>
+            </div>
           </div>
         </div>
 
-        <div className="data-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Staff ID</th>
-                <th>Name</th>
-                <th>Position</th>
-                <th>Department</th>
-                <th>Contact</th>
-                <th>Status</th>
-                <th>Schedule</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>S001</td>
-                <td>Dr. Ana Reyes</td>
-                <td>Senior Lab Technician</td>
-                <td>Hematology</td>
-                <td>+639111222333</td>
-                <td><span className="status active">On Duty</span></td>
-                <td>8:00 AM - 5:00 PM</td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view">View</button>
-                    <button className="btn-edit">Edit</button>
-                    <button className="btn-delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td>S002</td>
-                <td>Mark Johnson</td>
-                <td>Lab Technician</td>
-                <td>Chemistry</td>
-                <td>+639444555666</td>
-                <td><span className="status active">On Duty</span></td>
-                <td>9:00 AM - 6:00 PM</td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view">View</button>
-                    <button className="btn-edit">Edit</button>
-                    <button className="btn-delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td>S003</td>
-                <td>Lisa Garcia</td>
-                <td>Nurse</td>
-                <td>Sample Collection</td>
-                <td>+639777888999</td>
-                <td><span className="status leave">On Leave</span></td>
-                <td>7:00 AM - 4:00 PM</td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view">View</button>
-                    <button className="btn-edit">Edit</button>
-                    <button className="btn-delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="management-content">
+          <div className="content-header">
+            <div className="search-filter">
+              <input 
+                type="text" 
+                placeholder="Search staff..." 
+                className="search-input"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <select 
+                className="filter-select"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="">All Staff</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="data-table">
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>Loading staff...</div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Staff ID</th>
+                    <th>Name</th>
+                    <th>Position</th>
+                    <th>Email</th>
+                    <th>Contact</th>
+                    <th>Created</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {staff.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '20px' }}>
+                        No staff found
+                      </td>
+                    </tr>
+                  ) : (
+                    staff.map((member) => (
+                      <tr key={member.id}>
+                        <td>S{member.id.slice(-6)}</td>
+                        <td>{member.firstName} {member.lastName}</td>
+                        <td>Lab Technician</td>
+                        <td>{member.email}</td>
+                        <td>{member.phone || 'N/A'}</td>
+                        <td>{new Date(member.createdAt).toLocaleDateString()}</td>
+                        <td>
+                          <span className={`status ${member.isActive ? 'active' : 'inactive'}`}>
+                            {member.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="action-buttons">
+                            <button 
+                              className="btn-view"
+                              onClick={() => alert(`View staff details for ${member.firstName} ${member.lastName}`)}
+                            >
+                              View
+                            </button>
+                            <button 
+                              className="btn-edit"
+                              onClick={() => openUserModal(member)}
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              className="btn-delete"
+                              onClick={() => handleDeleteUser(member.id)}
+                            >
+                              Delete
+                            </button>
+                            <button 
+                              className={`btn-toggle ${member.isActive ? 'btn-deactivate' : 'btn-activate'}`}
+                              onClick={() => handleToggleUserStatus(member.id, member.isActive)}
+                            >
+                              {member.isActive ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
-  const renderPathologistManagement = () => (
-    <div className="management-container">
-      <div className="management-header">
-        <div className="management-title">
-          <h2>Pathologist Management</h2>
-          <p>Manage pathologists, specializations, and case assignments</p>
+  const renderPathologistManagement = () => {
+    const pathologists = users.filter(user => user.role === 'pathologist');
+    const pathologistStats = userStats?.byRole?.find(stat => stat._id === 'pathologist') || { count: 0, active: 0 };
+    
+    return (
+      <div className="management-container">
+        {error && (
+          <div className="error-message" style={{
+            background: '#fee', 
+            color: '#c33', 
+            padding: '10px', 
+            borderRadius: '4px', 
+            marginBottom: '20px'
+          }}>
+            {error}
+          </div>
+        )}
+        
+        <div className="management-header">
+          <div className="management-title">
+            <h2>Pathologist Management</h2>
+            <p>Manage pathologists, specializations, and case assignments</p>
+          </div>
+          <button className="add-btn" onClick={() => openUserModal()}>
+            + Add New Pathologist
+          </button>
         </div>
-        <button className="add-btn">+ Add New Pathologist</button>
+
+        <div className="management-stats">
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Total Pathologists</div>
+              <div className="stat-value">{pathologistStats.count}</div>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Active Pathologists</div>
+              <div className="stat-value">{pathologistStats.active}</div>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">New This Month</div>
+              <div className="stat-value">{
+                users.filter(user => 
+                  user.role === 'pathologist' && 
+                  new Date(user.createdAt) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+                ).length
+              }</div>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Filtered Results</div>
+              <div className="stat-value">{pathologists.length}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="management-content">
+          <div className="content-header">
+            <div className="search-filter">
+              <input 
+                type="text" 
+                placeholder="Search pathologists..." 
+                className="search-input"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <select 
+                className="filter-select"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="">All Pathologists</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="data-table">
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>Loading pathologists...</div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Pathologist ID</th>
+                    <th>Name</th>
+                    <th>Specialization</th>
+                    <th>Email</th>
+                    <th>Contact</th>
+                    <th>Created</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pathologists.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '20px' }}>
+                        No pathologists found
+                      </td>
+                    </tr>
+                  ) : (
+                    pathologists.map((pathologist) => (
+                      <tr key={pathologist.id}>
+                        <td>PATH{pathologist.id.slice(-4)}</td>
+                        <td>{pathologist.firstName} {pathologist.lastName}</td>
+                        <td>General Pathology</td>
+                        <td>{pathologist.email}</td>
+                        <td>{pathologist.phone || 'N/A'}</td>
+                        <td>{new Date(pathologist.createdAt).toLocaleDateString()}</td>
+                        <td>
+                          <span className={`status ${pathologist.isActive ? 'active' : 'inactive'}`}>
+                            {pathologist.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="action-buttons">
+                            <button 
+                              className="btn-view"
+                              onClick={() => alert(`View pathologist details for ${pathologist.firstName} ${pathologist.lastName}`)}
+                            >
+                              View
+                            </button>
+                            <button 
+                              className="btn-edit"
+                              onClick={() => openUserModal(pathologist)}
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              className="btn-delete"
+                              onClick={() => handleDeleteUser(pathologist.id)}
+                            >
+                              Delete
+                            </button>
+                            <button 
+                              className={`btn-toggle ${pathologist.isActive ? 'btn-deactivate' : 'btn-activate'}`}
+                              onClick={() => handleToggleUserStatus(pathologist.id, pathologist.isActive)}
+                            >
+                              {pathologist.isActive ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
       </div>
+    );
+  };
 
-      <div className="management-stats">
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
+  const renderMobileAccountManagement = () => {
+    const allUsers = users; // Show all users for mobile account management
+    
+    return (
+      <div className="management-container">
+        {error && (
+          <div className="error-message" style={{
+            background: '#fee', 
+            color: '#c33', 
+            padding: '10px', 
+            borderRadius: '4px', 
+            marginBottom: '20px'
+          }}>
+            {error}
           </div>
-          <div className="stat-info">
-            <div className="stat-label">Total Pathologists</div>
-            <div className="stat-value">8</div>
+        )}
+        
+        <div className="management-header">
+          <div className="management-title">
+            <h2>Mobile Account Management</h2>
+            <p>Manage all user accounts and mobile access permissions</p>
+          </div>
+          <button className="add-btn" onClick={() => openUserModal()}>
+            + Add New User
+          </button>
+        </div>
+
+        <div className="management-stats">
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Total Users</div>
+              <div className="stat-value">{userStats?.total || 0}</div>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Active Users</div>
+              <div className="stat-value">{userStats?.active || 0}</div>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Patients</div>
+              <div className="stat-value">{userStats?.byRole?.find(r => r._id === 'patient')?.count || 0}</div>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Staff</div>
+              <div className="stat-value">{
+                (userStats?.byRole?.find(r => r._id === 'medtech')?.count || 0) +
+                (userStats?.byRole?.find(r => r._id === 'pathologist')?.count || 0) +
+                (userStats?.byRole?.find(r => r._id === 'admin')?.count || 0)
+              }</div>
+            </div>
           </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14,2 14,8 20,8"></polyline>
-              <line x1="16" y1="13" x2="8" y2="13"></line>
-              <line x1="16" y1="17" x2="8" y2="17"></line>
-              <polyline points="10,9 9,9 8,9"></polyline>
-            </svg>
+
+        <div className="management-content">
+          <div className="content-header">
+            <div className="search-filter">
+              <input 
+                type="text" 
+                placeholder="Search users..." 
+                className="search-input"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <select 
+                className="filter-select"
+                value={filterRole}
+                onChange={(e) => setFilterRole(e.target.value)}
+              >
+                <option value="">All Roles</option>
+                <option value="patient">Patients</option>
+                <option value="medtech">Medical Technicians</option>
+                <option value="pathologist">Pathologists</option>
+                <option value="admin">Admins</option>
+              </select>
+              <select 
+                className="filter-select"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
           </div>
-          <div className="stat-info">
-            <div className="stat-label">Active Cases</div>
-            <div className="stat-value">32</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="20,6 9,17 4,12"></polyline>
-            </svg>
-          </div>
-          <div className="stat-info">
-            <div className="stat-label">Completed Today</div>
-            <div className="stat-value">15</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12,6 12,12 16,14"></polyline>
-            </svg>
-          </div>
-          <div className="stat-info">
-            <div className="stat-label">Pending Review</div>
-            <div className="stat-value">7</div>
+
+          <div className="data-table">
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>Loading users...</div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>User ID</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Email</th>
+                    <th>Contact</th>
+                    <th>Created</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '20px' }}>
+                        No users found
+                      </td>
+                    </tr>
+                  ) : (
+                    allUsers
+                      .filter(user => {
+                        const matchesRole = !filterRole || user.role === filterRole;
+                        const matchesStatus = !filterStatus || (filterStatus === 'active' ? user.isActive : !user.isActive);
+                        const matchesSearch = !searchTerm || 
+                          user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          user.email.toLowerCase().includes(searchTerm.toLowerCase());
+                        return matchesRole && matchesStatus && matchesSearch;
+                      })
+                      .map((user) => (
+                        <tr key={user.id}>
+                          <td>{user.id.slice(-6)}</td>
+                          <td>{user.firstName} {user.lastName}</td>
+                          <td>
+                            <span className={`role-badge role-${user.role}`}>
+                              {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                            </span>
+                          </td>
+                          <td>{user.email}</td>
+                          <td>{user.phone || 'N/A'}</td>
+                          <td>{new Date(user.createdAt).toLocaleDateString()}</td>
+                          <td>
+                            <span className={`status ${user.isActive ? 'active' : 'inactive'}`}>
+                              {user.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="action-buttons">
+                              <button 
+                                className="btn-view"
+                                onClick={() => alert(`View user details for ${user.firstName} ${user.lastName}`)}
+                              >
+                                View
+                              </button>
+                              <button 
+                                className="btn-edit"
+                                onClick={() => openUserModal(user)}
+                              >
+                                Edit
+                              </button>
+                              <button 
+                                className="btn-delete"
+                                onClick={() => handleDeleteUser(user.id)}
+                              >
+                                Delete
+                              </button>
+                              <button 
+                                className={`btn-toggle ${user.isActive ? 'btn-deactivate' : 'btn-activate'}`}
+                                onClick={() => handleToggleUserStatus(user.id, user.isActive)}
+                              >
+                                {user.isActive ? 'Deactivate' : 'Activate'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>
-
-      <div className="management-content">
-        <div className="content-header">
-          <div className="search-filter">
-            <input type="text" placeholder="Search pathologists..." className="search-input" />
-            <select className="filter-select">
-              <option>All Pathologists</option>
-              <option>Anatomical Pathology</option>
-              <option>Clinical Pathology</option>
-              <option>Cytopathology</option>
-              <option>Molecular Pathology</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="data-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Pathologist ID</th>
-                <th>Name</th>
-                <th>Specialization</th>
-                <th>License No.</th>
-                <th>Contact</th>
-                <th>Cases Assigned</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>PATH001</td>
-                <td>Dr. Roberto Cruz</td>
-                <td>Anatomical Pathology</td>
-                <td>PRC-123456</td>
-                <td>+639111222333</td>
-                <td>8</td>
-                <td><span className="status active">Available</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view">View</button>
-                    <button className="btn-edit">Edit</button>
-                    <button className="btn-delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td>PATH002</td>
-                <td>Dr. Carmen Lopez</td>
-                <td>Clinical Pathology</td>
-                <td>PRC-654321</td>
-                <td>+639444555666</td>
-                <td>12</td>
-                <td><span className="status busy">Busy</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view">View</button>
-                    <button className="btn-edit">Edit</button>
-                    <button className="btn-delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td>PATH003</td>
-                <td>Dr. Michael Wong</td>
-                <td>Cytopathology</td>
-                <td>PRC-789012</td>
-                <td>+639777888999</td>
-                <td>5</td>
-                <td><span className="status active">Available</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view">View</button>
-                    <button className="btn-edit">Edit</button>
-                    <button className="btn-delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderAdminManagement = () => (
     <div className="management-container">
@@ -819,152 +1178,6 @@ function Dashboard({ currentUser, onLogout }) {
     </div>
   );
 
-  const renderMobileAccountManagement = () => (
-    <div className="management-container">
-      <div className="management-header">
-        <div className="management-title">
-          <h2>Mobile Account Management</h2>
-          <p>Manage mobile app users and device registrations</p>
-        </div>
-        <button className="add-btn">+ Add Mobile User</button>
-      </div>
-
-      <div className="management-stats">
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-              <line x1="12" y1="18" x2="12.01" y2="18"></line>
-            </svg>
-          </div>
-          <div className="stat-info">
-            <div className="stat-label">Mobile Users</div>
-            <div className="stat-value">456</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m15.5-6.5l-4.24 4.24M7.76 7.76 3.52 3.52m0 16.96 4.24-4.24m8.48-8.48 4.24-4.24"></path>
-            </svg>
-          </div>
-          <div className="stat-info">
-            <div className="stat-label">Active Sessions</div>
-            <div className="stat-value">89</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 20V10"></path>
-              <path d="M12 20V4"></path>
-              <path d="M6 20v-6"></path>
-            </svg>
-          </div>
-          <div className="stat-info">
-            <div className="stat-label">App Downloads</div>
-            <div className="stat-value">1,234</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="1 4 1 10 7 10"></polyline>
-              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-            </svg>
-          </div>
-          <div className="stat-info">
-            <div className="stat-label">Sync Requests</div>
-            <div className="stat-value">145</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="management-content">
-        <div className="content-header">
-          <div className="search-filter">
-            <input type="text" placeholder="Search mobile users..." className="search-input" />
-            <select className="filter-select">
-              <option>All Users</option>
-              <option>Active</option>
-              <option>Inactive</option>
-              <option>Verified</option>
-              <option>Unverified</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="data-table">
-          <table>
-            <thead>
-              <tr>
-                <th>User ID</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Device</th>
-                <th>Last Sync</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>M001</td>
-                <td>Carlos Mendoza</td>
-                <td>carlos@email.com</td>
-                <td>+639123456789</td>
-                <td>iPhone 13</td>
-                <td>2024-09-01 09:15</td>
-                <td><span className="status active">Active</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view">View</button>
-                    <button className="btn-edit">Edit</button>
-                    <button className="btn-delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td>M002</td>
-                <td>Elena Vasquez</td>
-                <td>elena@email.com</td>
-                <td>+639987654321</td>
-                <td>Samsung Galaxy</td>
-                <td>2024-08-31 18:30</td>
-                <td><span className="status active">Active</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view">View</button>
-                    <button className="btn-edit">Edit</button>
-                    <button className="btn-delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td>M003</td>
-                <td>David Kim</td>
-                <td>david@email.com</td>
-                <td>+639555444333</td>
-                <td>Google Pixel</td>
-                <td>2024-08-28 14:20</td>
-                <td><span className="status inactive">Inactive</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view">View</button>
-                    <button className="btn-edit">Edit</button>
-                    <button className="btn-delete">Delete</button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-
   // Finance Management Functions
   const renderBillsManagement = () => (
     <div className="management-container">
@@ -978,48 +1191,28 @@ function Dashboard({ currentUser, onLogout }) {
 
       <div className="management-stats">
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="1" x2="12" y2="23"></line>
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Total Outstanding</div>
             <div className="stat-value">₱245,670</div>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12,6 12,12 16,14"></polyline>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Pending Bills</div>
             <div className="stat-value">23</div>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="20,6 9,17 4,12"></polyline>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Paid This Month</div>
             <div className="stat-value">156</div>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-              <line x1="12" y1="9" x2="12" y2="13"></line>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Overdue</div>
             <div className="stat-value">8</div>
@@ -1130,58 +1323,34 @@ function Dashboard({ currentUser, onLogout }) {
             </svg>
             Export Report
           </button>
-          <button className="filter-btn">🔍 Advanced Filter</button>
+          <button className="filter-btn">Advanced Filter</button>
         </div>
       </div>
 
       <div className="management-stats">
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="1" x2="12" y2="23"></line>
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Today's Revenue</div>
             <div className="stat-value">₱48,500</div>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 20V10"></path>
-              <path d="M12 20V4"></path>
-              <path d="M6 20v-6"></path>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">This Week</div>
             <div className="stat-value">₱325,670</div>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="1" y="3" width="15" height="13"></rect>
-              <path d="M16 8h4a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-4"></path>
-              <circle cx="9" cy="9" r="2"></circle>
-              <path d="m7 21 2-4 2 4"></path>
-              <path d="m7 21-2-4 2-4"></path>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Cash Payments</div>
             <div className="stat-value">₱125,000</div>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-              <line x1="1" y1="10" x2="23" y2="10"></line>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Card Payments</div>
             <div className="stat-value">₱200,670</div>
@@ -1248,7 +1417,7 @@ function Dashboard({ currentUser, onLogout }) {
                   <div className="action-buttons">
                     <button className="btn-view" title="View">View</button>
                     <button className="btn-print" title="Print Receipt">Print</button>
-                    <button className="btn-details" title="Payment Details">💳</button>
+                    <button className="btn-details" title="Payment Details">Details</button>
                   </div>
                 </td>
               </tr>
@@ -1290,49 +1459,28 @@ function Dashboard({ currentUser, onLogout }) {
 
       <div className="management-stats">
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="1" x2="12" y2="23"></line>
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Total Collected</div>
             <div className="stat-value">₱1,245,670</div>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12,6 12,12 16,14"></polyline>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Pending Verification</div>
             <div className="stat-value">12</div>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="1 4 1 10 7 10"></polyline>
-              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Refunds Processed</div>
             <div className="stat-value">3</div>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 20V10"></path>
-              <path d="M12 20V4"></path>
-              <path d="M6 20v-6"></path>
-            </svg>
-          </div>
+          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Collection Rate</div>
             <div className="stat-value">94.5%</div>
@@ -1943,53 +2091,28 @@ function Dashboard({ currentUser, onLogout }) {
       <div className="feedback-overview">
         <div className="feedback-stats">
           <div className="stat-card">
-            <div className="stat-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"></polygon>
-              </svg>
-            </div>
+            <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">Average Rating</div>
               <div className="stat-value">4.8/5.0</div>
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14,2 14,8 20,8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-                <polyline points="10,9 9,9 8,9"></polyline>
-              </svg>
-            </div>
+            <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">Total Reviews</div>
               <div className="stat-value">1,247</div>
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
-                <line x1="9" y1="9" x2="9.01" y2="9"></line>
-                <line x1="15" y1="9" x2="15.01" y2="9"></line>
-              </svg>
-            </div>
+            <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">Satisfaction Rate</div>
               <div className="stat-value">96.3%</div>
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 20V10"></path>
-                <path d="M12 20V4"></path>
-                <path d="M6 20v-6"></path>
-              </svg>
-            </div>
+            <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">Response Rate</div>
               <div className="stat-value">78.5%</div>
@@ -2209,55 +2332,28 @@ function Dashboard({ currentUser, onLogout }) {
       <div className="logs-overview">
         <div className="log-stats">
           <div className="stat-card">
-            <div className="stat-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14,2 14,8 20,8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-                <polyline points="10,9 9,9 8,9"></polyline>
-              </svg>
-            </div>
+            <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">Total Events Today</div>
               <div className="stat-value">1,247</div>
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-            </div>
+            <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">Active Users</div>
               <div className="stat-value">23</div>
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                <line x1="12" y1="9" x2="12" y2="13"></line>
-                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-              </svg>
-            </div>
+            <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">Security Alerts</div>
               <div className="stat-value">2</div>
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                <line x1="8" y1="21" x2="16" y2="21"></line>
-                <line x1="12" y1="17" x2="12" y2="21"></line>
-              </svg>
-            </div>
+            <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">System Uptime</div>
               <div className="stat-value">99.9%</div>
@@ -2367,6 +2463,195 @@ function Dashboard({ currentUser, onLogout }) {
     </div>
   );
 
+  // User Modal Component
+  const renderUserModal = () => {
+    if (!showUserModal) return null;
+    
+    const isEditing = Boolean(editingUser);
+    const currentRole = getCurrentRole() || 'patient';
+    
+    return (
+      <div className="modal-overlay" onClick={closeUserModal}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h3>{isEditing ? 'Edit User' : 'Add New User'}</h3>
+            <button className="modal-close" onClick={closeUserModal}>×</button>
+          </div>
+          
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const userData = {
+              firstName: formData.get('firstName'),
+              lastName: formData.get('lastName'),
+              email: formData.get('email'),
+              username: formData.get('username'),
+              phone: formData.get('phone'),
+              role: formData.get('role') || currentRole,
+              gender: formData.get('gender'),
+              dateOfBirth: formData.get('dateOfBirth'),
+              address: {
+                street: formData.get('street'),
+                city: formData.get('city'),
+                province: formData.get('province'),
+                zipCode: formData.get('zipCode')
+              }
+            };
+            
+            if (!isEditing) {
+              userData.password = formData.get('password');
+            }
+            
+            if (isEditing) {
+              handleUpdateUser(editingUser.id, userData);
+            } else {
+              handleCreateUser(userData);
+            }
+          }}>
+            <div className="modal-body">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>First Name</label>
+                  <input 
+                    type="text" 
+                    name="firstName" 
+                    required 
+                    defaultValue={editingUser?.firstName || ''}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Last Name</label>
+                  <input 
+                    type="text" 
+                    name="lastName" 
+                    required 
+                    defaultValue={editingUser?.lastName || ''}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Email</label>
+                  <input 
+                    type="email" 
+                    name="email" 
+                    required 
+                    defaultValue={editingUser?.email || ''}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Username</label>
+                  <input 
+                    type="text" 
+                    name="username" 
+                    required 
+                    defaultValue={editingUser?.username || ''}
+                  />
+                </div>
+                
+                {!isEditing && (
+                  <div className="form-group">
+                    <label>Password</label>
+                    <input 
+                      type="password" 
+                      name="password" 
+                      required 
+                      minLength="6"
+                    />
+                  </div>
+                )}
+                
+                <div className="form-group">
+                  <label>Phone</label>
+                  <input 
+                    type="tel" 
+                    name="phone" 
+                    defaultValue={editingUser?.phone || ''}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Role</label>
+                  <select name="role" defaultValue={editingUser?.role || currentRole}>
+                    <option value="patient">Patient</option>
+                    <option value="medtech">Medical Technician</option>
+                    <option value="pathologist">Pathologist</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                
+                <div className="form-group">
+                  <label>Gender</label>
+                  <select name="gender" defaultValue={editingUser?.gender || ''}>
+                    <option value="">Select Gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                
+                <div className="form-group">
+                  <label>Date of Birth</label>
+                  <input 
+                    type="date" 
+                    name="dateOfBirth" 
+                    defaultValue={editingUser?.dateOfBirth ? new Date(editingUser.dateOfBirth).toISOString().split('T')[0] : ''}
+                  />
+                </div>
+                
+                <div className="form-group full-width">
+                  <label>Street Address</label>
+                  <input 
+                    type="text" 
+                    name="street" 
+                    defaultValue={editingUser?.address?.street || ''}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>City</label>
+                  <input 
+                    type="text" 
+                    name="city" 
+                    defaultValue={editingUser?.address?.city || ''}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Province</label>
+                  <input 
+                    type="text" 
+                    name="province" 
+                    defaultValue={editingUser?.address?.province || ''}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Zip Code</label>
+                  <input 
+                    type="text" 
+                    name="zipCode" 
+                    defaultValue={editingUser?.address?.zipCode || ''}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={closeUserModal}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary">
+                {isEditing ? 'Update User' : 'Create User'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="dashboard-container">
       {/* Sidebar */}
@@ -2429,12 +2714,6 @@ function Dashboard({ currentUser, onLogout }) {
                   onClick={() => handleSectionClick('pathologist')}
                 >
                   Pathologist
-                </div>
-                <div 
-                  className={`nav-subitem ${activeSection === 'admin' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('admin')}
-                >
-                  Staff
                 </div>
                 <div 
                   className={`nav-subitem ${activeSection === 'mobile-account' ? 'active' : ''}`}
@@ -2572,6 +2851,9 @@ function Dashboard({ currentUser, onLogout }) {
           {renderContent()}
         </div>
       </div>
+      
+      {/* User Modal */}
+      {renderUserModal()}
     </div>
   );
 }
