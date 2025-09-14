@@ -17,65 +17,15 @@ function App() {
   // Check if user is already authenticated on app start
   useEffect(() => {
     const validateStoredSession = async () => {
-      const token = localStorage.getItem('token');
-      const user = localStorage.getItem('user');
+      // Always start at login - disable automatic session restoration
+      // Clear any existing session data on app startup
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+      setCurrentView('login');
       
-      if (token && user) {
-        try {
-          const userData = JSON.parse(user);
-          
-          // Validate token with backend
-          const response = await fetch(API_ENDPOINTS.ME, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success && data.user) {
-              // Valid session - use fresh user data from backend
-              setCurrentUser(data.user);
-              setIsAuthenticated(true);
-              
-              // Route to appropriate dashboard based on role
-              switch (data.user.role) {
-                case 'admin':
-                  setCurrentView('dashboard');
-                  break;
-                case 'medtech':
-                  setCurrentView('medtech-dashboard');
-                  break;
-                case 'pathologist':
-                  setCurrentView('pathologist-dashboard');
-                  break;
-                case 'patient':
-                  setCurrentView('patient-portal');
-                  break;
-                default:
-                  setCurrentView('login');
-              }
-              
-              console.log('Valid session restored for user:', data.user);
-            } else {
-              throw new Error('Invalid session data from backend');
-            }
-          } else {
-            throw new Error('Token validation failed');
-          }
-        } catch (error) {
-          console.error('Session validation failed:', error);
-          // Clear invalid session data
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          setCurrentUser(null);
-          setIsAuthenticated(false);
-          setCurrentView('login');
-        }
-      } else {
-        // No stored session
-        setCurrentView('login');
-      }
+      console.log('App started - redirected to login page');
     };
     
     validateStoredSession();
