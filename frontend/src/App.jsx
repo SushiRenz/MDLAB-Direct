@@ -17,24 +17,132 @@ function App() {
   // Check if user is already authenticated on app start
   useEffect(() => {
     const validateStoredSession = async () => {
-      // Always start at login - disable automatic session restoration
-      // Clear any existing session data on app startup
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      setCurrentUser(null);
-      setIsAuthenticated(false);
-      setCurrentView('login');
+      // Check if this is a fresh browser session or just a page reload
+      const isNewSession = !sessionStorage.getItem('mdlab_session_active');
       
-      console.log('App started - redirected to login page');
+      if (isNewSession) {
+        // Fresh browser session - clear everything and go to login
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+        setCurrentView('login');
+        
+        // Mark session as active
+        sessionStorage.setItem('mdlab_session_active', 'true');
+        
+        console.log('Fresh browser session - redirected to login page');
+      } else {
+        // Page reload - try to restore previous state
+        const token = localStorage.getItem('token');
+        const user = localStorage.getItem('user');
+        
+        if (token && user) {
+          try {
+            const userData = JSON.parse(user);
+            
+            // Validate token with backend
+            const response = await fetch(API_ENDPOINTS.ME, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (response.ok) {
+              // Token is valid - restore user session
+              setCurrentUser(userData);
+              setIsAuthenticated(true);
+              
+              // Route to appropriate dashboard based on role
+              switch (userData.role) {
+                case 'admin':
+                  setCurrentView('dashboard');
+                  break;
+                case 'medtech':
+                  setCurrentView('medtech-dashboard');
+                  break;
+                case 'pathologist':
+                  setCurrentView('pathologist-dashboard');
+                  break;
+                case 'patient':
+                  setCurrentView('patient-portal');
+                  break;
+                default:
+                  setCurrentView('dashboard');
+              }
+              
+              console.log('Session restored after page reload for user:', userData.role);
+            } else {
+              // Token is invalid - clear and go to login
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              setCurrentUser(null);
+              setIsAuthenticated(false);
+              setCurrentView('login');
+              console.log('Invalid token - redirected to login');
+            }
+          } catch (error) {
+            // Error validating token or parsing user data - go to login
+            console.error('Error validating session:', error);
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setCurrentUser(null);
+            setIsAuthenticated(false);
+            setCurrentView('login');
+          }
+        } else {
+          // No stored credentials - go to login
+          setCurrentView('login');
+          console.log('No stored credentials - redirected to login');
+        }
+      }
     };
     
     validateStoredSession();
   }, []);
 
+  // Update document title based on current view
+  useEffect(() => {
+    const updateTitle = () => {
+      switch (currentView) {
+        case 'login':
+          document.title = 'MDLAB Direct - Login';
+          break;
+        case 'signup':
+          document.title = 'MDLAB Direct - Sign Up';
+          break;
+        case 'admin-login':
+          document.title = 'MDLAB Direct - Staff Portal';
+          break;
+        case 'dashboard':
+          document.title = 'MDLAB Direct - Admin Dashboard';
+          break;
+        case 'medtech-dashboard':
+          document.title = 'MDLAB Direct - MedTech Dashboard';
+          break;
+        case 'pathologist-dashboard':
+          document.title = 'MDLAB Direct - Pathologist Dashboard';
+          break;
+        case 'patient-portal':
+          document.title = 'MDLAB Direct - Patient Portal';
+          break;
+        default:
+          document.title = 'MDLAB Direct';
+      }
+    };
+
+    updateTitle();
+  }, [currentView]);
+
   const handleLogout = () => {
     // Clear localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    
+    // Clear sessionStorage to ensure fresh session on next visit
+    sessionStorage.removeItem('mdlab_session_active');
     
     // Clear session state
     setIsAuthenticated(false);

@@ -72,8 +72,13 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
         let errorMessage = 'Login failed. Please try again.';
         
         if (response.status === 401) {
-          // This covers both "user not found" AND "wrong password"
-          errorMessage = 'Invalid username/email or password. Please check your credentials and try again.';
+          // Check if the message specifically mentions deactivation
+          if (data.message && data.message.toLowerCase().includes('deactivated')) {
+            errorMessage = data.message;
+          } else {
+            // This covers both "user not found" AND "wrong password"
+            errorMessage = 'Invalid username/email or password. Please check your credentials and try again.';
+          }
         } else if (response.status === 423) {
           errorMessage = 'Account is temporarily locked due to too many failed attempts. Please try again later.';
         } else if (response.status === 403) {

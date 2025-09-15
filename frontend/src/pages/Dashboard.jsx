@@ -151,7 +151,6 @@ function Dashboard({ currentUser, onLogout }) {
       case 'patient': return 'patient';
       case 'staff': return 'medtech';
       case 'pathologist': return 'pathologist';
-      case 'mobile-account': return '';
       default: return '';
     }
   };
@@ -168,7 +167,7 @@ function Dashboard({ currentUser, onLogout }) {
 
   // Effect to fetch users when section changes
   useEffect(() => {
-    if (['patient', 'staff', 'pathologist', 'mobile-account'].includes(activeSection)) {
+    if (['patient', 'staff', 'pathologist'].includes(activeSection)) {
       fetchUsers(getCurrentRole());
       fetchUserStats();
     }
@@ -180,7 +179,6 @@ function Dashboard({ currentUser, onLogout }) {
       case 'staff': return 'Staff Management';
       case 'pathologist': return 'Pathologist Management';
       case 'admin': return 'Staff Management';
-      case 'mobile-account': return 'Mobile Account Management';
       case 'bills': return 'Bills Management';
       case 'transaction': return 'Transaction History';
       case 'payments': return 'Payment Records';
@@ -199,7 +197,6 @@ function Dashboard({ currentUser, onLogout }) {
       case 'staff': return renderStaffManagement();
       case 'pathologist': return renderPathologistManagement();
       case 'admin': return renderAdminManagement();
-      case 'mobile-account': return renderMobileAccountManagement();
       case 'bills': return renderBillsManagement();
       case 'transaction': return renderTransactionHistory();
       case 'payments': return renderPaymentRecords();
@@ -860,193 +857,6 @@ function Dashboard({ currentUser, onLogout }) {
                         </td>
                       </tr>
                     ))
-                  )}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderMobileAccountManagement = () => {
-    const allUsers = users; // Show all users for mobile account management
-    
-    return (
-      <div className="management-container">
-        {error && (
-          <div className="error-message" style={{
-            background: '#fee', 
-            color: '#c33', 
-            padding: '10px', 
-            borderRadius: '4px', 
-            marginBottom: '20px'
-          }}>
-            {error}
-          </div>
-        )}
-        
-        <div className="management-header">
-          <div className="management-title">
-            <h2>Mobile Account Management</h2>
-            <p>Manage all user accounts and mobile access permissions</p>
-          </div>
-          <button className="add-btn" onClick={() => openUserModal()}>
-            + Add New User
-          </button>
-        </div>
-
-        <div className="management-stats">
-          <div className="stat-card">
-            <div className="stat-icon"></div>
-            <div className="stat-info">
-              <div className="stat-label">Total Users</div>
-              <div className="stat-value">{userStats?.total || 0}</div>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon"></div>
-            <div className="stat-info">
-              <div className="stat-label">Active Users</div>
-              <div className="stat-value">{userStats?.active || 0}</div>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon"></div>
-            <div className="stat-info">
-              <div className="stat-label">Patients</div>
-              <div className="stat-value">{userStats?.byRole?.find(r => r._id === 'patient')?.count || 0}</div>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon"></div>
-            <div className="stat-info">
-              <div className="stat-label">Staff</div>
-              <div className="stat-value">{
-                (userStats?.byRole?.find(r => r._id === 'medtech')?.count || 0) +
-                (userStats?.byRole?.find(r => r._id === 'pathologist')?.count || 0) +
-                (userStats?.byRole?.find(r => r._id === 'admin')?.count || 0)
-              }</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="management-content">
-          <div className="content-header">
-            <div className="search-filter">
-              <input 
-                type="text" 
-                placeholder="Search users..." 
-                className="search-input"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <select 
-                className="filter-select"
-                value={filterRole}
-                onChange={(e) => setFilterRole(e.target.value)}
-              >
-                <option value="">All Roles</option>
-                <option value="patient">Patients</option>
-                <option value="medtech">Medical Technicians</option>
-                <option value="pathologist">Pathologists</option>
-                <option value="admin">Admins</option>
-              </select>
-              <select 
-                className="filter-select"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-              >
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="data-table">
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: '20px' }}>Loading users...</div>
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>User ID</th>
-                    <th>Name</th>
-                    <th>Role</th>
-                    <th>Email</th>
-                    <th>Contact</th>
-                    <th>Created</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allUsers.length === 0 ? (
-                    <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '20px' }}>
-                        No users found
-                      </td>
-                    </tr>
-                  ) : (
-                    allUsers
-                      .filter(user => {
-                        const matchesRole = !filterRole || user.role === filterRole;
-                        const matchesStatus = !filterStatus || (filterStatus === 'active' ? user.isActive : !user.isActive);
-                        const matchesSearch = !searchTerm || 
-                          user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          user.email.toLowerCase().includes(searchTerm.toLowerCase());
-                        return matchesRole && matchesStatus && matchesSearch;
-                      })
-                      .map((user) => (
-                        <tr key={user.id}>
-                          <td>{user.id.slice(-6)}</td>
-                          <td>{user.firstName} {user.lastName}</td>
-                          <td>
-                            <span className={`role-badge role-${user.role}`}>
-                              {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                            </span>
-                          </td>
-                          <td>{user.email}</td>
-                          <td>{user.phone || 'N/A'}</td>
-                          <td>{new Date(user.createdAt).toLocaleDateString()}</td>
-                          <td>
-                            <span className={`status ${user.isActive ? 'active' : 'inactive'}`}>
-                              {user.isActive ? 'Active' : 'Inactive'}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="action-buttons">
-                              <button 
-                                className="btn-view"
-                                onClick={() => alert(`View user details for ${user.firstName} ${user.lastName}`)}
-                              >
-                                View
-                              </button>
-                              <button 
-                                className="btn-edit"
-                                onClick={() => openUserModal(user)}
-                              >
-                                Edit
-                              </button>
-                              <button 
-                                className="btn-delete"
-                                onClick={() => handleDeleteUser(user.id)}
-                              >
-                                Delete
-                              </button>
-                              <button 
-                                className={`btn-toggle ${user.isActive ? 'btn-deactivate' : 'btn-activate'}`}
-                                onClick={() => handleToggleUserStatus(user.id, user.isActive)}
-                              >
-                                {user.isActive ? 'Deactivate' : 'Activate'}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
                   )}
                 </tbody>
               </table>
@@ -2714,12 +2524,6 @@ function Dashboard({ currentUser, onLogout }) {
                   onClick={() => handleSectionClick('pathologist')}
                 >
                   Pathologist
-                </div>
-                <div 
-                  className={`nav-subitem ${activeSection === 'mobile-account' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('mobile-account')}
-                >
-                  Mobile Account
                 </div>
               </div>
             )}

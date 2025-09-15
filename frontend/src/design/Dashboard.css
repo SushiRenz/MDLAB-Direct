@@ -2587,46 +2587,52 @@ select:focus {
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .modal-content {
   background: white;
-  border-radius: 8px;
-  width: 90%;
-  max-width: 800px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 900px !important;
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  border: 2px solid #21AEA8;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
+  padding: 24px 24px 16px 24px;
   border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
 }
 
 .modal-header h3 {
   margin: 0;
   color: #1f2937;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 600;
 }
 
 .modal-close {
   background: none;
   border: none;
-  font-size: 24px;
+  font-size: 20px;
   cursor: pointer;
   color: #6b7280;
-  padding: 0;
-  width: 30px;
-  height: 30px;
+  padding: 8px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: 6px;
   transition: all 0.2s ease;
 }
 
@@ -2636,7 +2642,10 @@ select:focus {
 }
 
 .modal-body {
-  padding: 20px;
+  padding: 32px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .form-grid {
@@ -2655,21 +2664,23 @@ select:focus {
 }
 
 .form-group label {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   font-weight: 500;
   color: #374151;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
 }
 
 .form-group input,
 .form-group select {
-  padding: 12px 16px !important;
+  padding: 10px 12px !important;
   border: 1px solid #d1d5db !important;
   border-radius: 6px !important;
-  font-size: 0.9rem !important;
+  font-size: 0.875rem !important;
   background: white !important;
   color: #374151 !important;
   transition: all 0.2s ease !important;
+  height: 40px !important;
+  box-sizing: border-box !important;
 }
 
 .form-group input:focus,
@@ -2683,9 +2694,10 @@ select:focus {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  padding: 20px;
+  padding: 16px 24px;
   border-top: 1px solid #e5e7eb;
   background-color: #f9fafb;
+  flex-shrink: 0;
 }
 
 .btn-primary,
@@ -2759,17 +2771,54 @@ select:focus {
 
 /* Responsive design for modal */
 @media (max-width: 768px) {
+  .modal-overlay {
+    padding: 10px;
+  }
+  
   .modal-content {
-    width: 95%;
-    margin: 20px;
+    max-width: 90%;
+    max-height: calc(100vh - 20px);
+  }
+  
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding-left: 16px;
+    padding-right: 16px;
   }
   
   .form-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
   
   .form-group.full-width {
     grid-column: span 1;
+  }
+  
+  .modal-header h3 {
+    font-size: 1.125rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-overlay {
+    padding: 5px;
+  }
+  
+  .modal-content {
+    border-radius: 8px;
+  }
+  
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  
+  .form-grid {
+    gap: 10px;
   }
 }
 
