@@ -11,6 +11,8 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const financeRoutes = require('./routes/finance');
+const logsRoutes = require('./routes/logs');
+const servicesRoutes = require('./routes/services');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -84,6 +86,8 @@ app.get('/api/ping', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/finance', financeRoutes);
+app.use('/api/logs', logsRoutes);
+app.use('/api/services', servicesRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

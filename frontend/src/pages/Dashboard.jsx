@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import '../design/Dashboard.css';
-import { userAPI, financeAPI } from '../services/api';
+import { userAPI, financeAPI, logsAPI, servicesAPI } from '../services/api';
 
 function Dashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [userManagementOpen, setUserManagementOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
+  const [logsOpen, setLogsOpen] = useState(false);
   
   // User management state
   const [users, setUsers] = useState([]);
@@ -146,6 +147,68 @@ function Dashboard({ currentUser, onLogout }) {
   const [reportExportFormat, setReportExportFormat] = useState('pdf');
   const [reportViewMode, setReportViewMode] = useState('summary'); // 'summary', 'detailed', 'chart'
 
+  // Logs Management State
+  const [logs, setLogs] = useState([]);
+  const [logStats, setLogStats] = useState(null);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState('');
+  const [logFilters, setLogFilters] = useState({
+    level: '',
+    category: '',
+    userEmail: '',
+    status: '',
+    search: '',
+    startDate: '',
+    endDate: ''
+  });
+  const [activeLogTab, setActiveLogTab] = useState('all');
+  const [logPagination, setLogPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalLogs: 0,
+    limit: 50
+  });
+
+  // Services Management State
+  const [services, setServices] = useState([]);
+  const [serviceStats, setServiceStats] = useState(null);
+  const [servicesLoading, setServicesLoading] = useState(false);
+  const [servicesError, setServicesError] = useState('');
+  const [serviceFilters, setServiceFilters] = useState({
+    category: '',
+    isActive: '',
+    isPopular: '',
+    search: ''
+  });
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [editingService, setEditingService] = useState(null);
+  const [servicePagination, setServicePagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalServices: 0,
+    limit: 20
+  });
+
+  // Service Modal State
+  const [serviceModalOpen, setServiceModalOpen] = useState(false);
+  const [selectedService, setSelectedService] = useState(null);
+  const [serviceFormData, setServiceFormData] = useState({
+    serviceId: '',
+    serviceName: '',
+    category: '',
+    description: '',
+    price: '',
+    discountPrice: '',
+    duration: '',
+    sampleType: '',
+    fastingRequired: false,
+    ageRange: '',
+    prerequisites: '',
+    isActive: true,
+    isPopular: false,
+    homeVisitAvailable: false
+  });
+
   const user = currentUser;
 
   const handleSectionClick = (section) => {
@@ -158,6 +221,10 @@ function Dashboard({ currentUser, onLogout }) {
 
   const toggleFinance = () => {
     setFinanceOpen(!financeOpen);
+  };
+
+  const toggleLogs = () => {
+    setLogsOpen(!logsOpen);
   };
 
   const handleLogout = async () => {
@@ -541,7 +608,345 @@ function Dashboard({ currentUser, onLogout }) {
     if (['bills', 'transaction', 'payments', 'billing-rates'].includes(activeSection)) {
       fetchFinanceData();
     }
+    if (activeSection === 'logs') {
+      fetchLogs();
+      fetchLogStats();
+    }
+    if (activeSection === 'services') {
+      fetchServices();
+      fetchServiceStats();
+    }
   }, [activeSection, searchTerm, filterStatus]);
+
+  // Logs data fetching functions
+  const fetchLogs = async (page = 1) => {
+    setLogsLoading(true);
+    setLogsError('');
+    try {
+      const params = {
+        page,
+        limit: logPagination.limit,
+        ...logFilters
+      };
+
+      // Apply tab-based filtering
+      if (activeLogTab !== 'all') {
+        switch (activeLogTab) {
+          case 'user-actions':
+            params.category = 'user_action';
+            break;
+          case 'system-events':
+            params.category = 'system_event';
+            break;
+          case 'security':
+            params.category = 'security';
+            break;
+          case 'errors':
+            params.level = 'error';
+            break;
+        }
+      }
+
+      const data = await logsAPI.getLogs(params);
+      if (data.success) {
+        setLogs(data.data || []);
+        setLogPagination(data.pagination || logPagination);
+      } else {
+        setLogsError(data.message || 'Failed to fetch logs');
+      }
+    } catch (err) {
+      console.error('Failed to fetch logs:', err);
+      setLogsError(err.message || 'Failed to fetch logs');
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  const fetchLogStats = async () => {
+    try {
+      const data = await logsAPI.getLogStats();
+      if (data.success) {
+        setLogStats(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch log stats:', err);
+    }
+  };
+
+  const handleLogTabChange = (tab) => {
+    setActiveLogTab(tab);
+    // Reset filters when changing tabs
+    setLogFilters({
+      level: '',
+      category: '',
+      userEmail: '',
+      status: '',
+      search: '',
+      startDate: '',
+      endDate: ''
+    });
+    // Refetch logs with new tab
+    setTimeout(() => fetchLogs(1), 100);
+  };
+
+  const handleLogFilterChange = (filterName, value) => {
+    setLogFilters(prev => ({
+      ...prev,
+      [filterName]: value
+    }));
+    // Debounce the search
+    setTimeout(() => fetchLogs(1), 500);
+  };
+
+  const handleLogPageChange = (page) => {
+    fetchLogs(page);
+  };
+
+  const handleExportLogs = async (format = 'json') => {
+    try {
+      setLogsLoading(true);
+      const params = {
+        format,
+        ...logFilters,
+        limit: 1000 // Higher limit for export
+      };
+
+      if (activeLogTab !== 'all') {
+        switch (activeLogTab) {
+          case 'user-actions':
+            params.category = 'user_action';
+            break;
+          case 'system-events':
+            params.category = 'system_event';
+            break;
+          case 'security':
+            params.category = 'security';
+            break;
+          case 'errors':
+            params.level = 'error';
+            break;
+        }
+      }
+
+      if (format === 'csv') {
+        const blob = await logsAPI.exportLogs(params);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `system-logs-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        const data = await logsAPI.exportLogs(params);
+        if (data.success) {
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `system-logs-${new Date().toISOString().split('T')[0]}.json`;
+          a.click();
+          window.URL.revokeObjectURL(url);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to export logs:', error);
+      alert('Failed to export logs. Please try again.');
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  const handleClearLogs = async () => {
+    const confirmation = window.confirm(
+      'Are you sure you want to clear old logs?\n\n' +
+      'This will permanently delete logs older than 90 days.\n' +
+      'This action cannot be undone.'
+    );
+
+    if (confirmation) {
+      try {
+        setLogsLoading(true);
+        const result = await logsAPI.cleanupLogs(90);
+        if (result.success) {
+          alert(`Successfully deleted ${result.deletedCount} old log entries.`);
+          fetchLogs(1); // Refresh the logs
+          fetchLogStats(); // Refresh stats
+        }
+      } catch (error) {
+        console.error('Failed to clear logs:', error);
+        alert('Failed to clear logs. Please try again.');
+      } finally {
+        setLogsLoading(false);
+      }
+    }
+  };
+
+  // Services data fetching functions
+  const fetchServices = async (page = 1) => {
+    setServicesLoading(true);
+    setServicesError('');
+    try {
+      const params = {
+        page,
+        limit: servicePagination.limit,
+        ...serviceFilters
+      };
+
+      const data = await servicesAPI.getServices(params);
+      if (data.success) {
+        setServices(data.data || []);
+        setServicePagination(data.pagination || servicePagination);
+      } else {
+        setServicesError(data.message || 'Failed to fetch services');
+      }
+    } catch (err) {
+      console.error('Failed to fetch services:', err);
+      setServicesError(err.message || 'Failed to fetch services');
+    } finally {
+      setServicesLoading(false);
+    }
+  };
+
+  const fetchServiceStats = async () => {
+    try {
+      const data = await servicesAPI.getServiceStats();
+      if (data.success) {
+        setServiceStats(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch service stats:', err);
+    }
+  };
+
+  const handleCreateService = async (serviceData) => {
+    try {
+      const data = await servicesAPI.createService(serviceData);
+      if (data.success) {
+        setShowServiceModal(false);
+        setEditingService(null);
+        fetchServices();
+        fetchServiceStats();
+        alert('Service created successfully!');
+      } else {
+        setServicesError(data.message || 'Failed to create service');
+      }
+    } catch (err) {
+      setServicesError(err.message || 'Failed to create service');
+    }
+  };
+
+  const handleUpdateService = async (serviceId, serviceData) => {
+    try {
+      const data = await servicesAPI.updateService(serviceId, serviceData);
+      if (data.success) {
+        setShowServiceModal(false);
+        setEditingService(null);
+        fetchServices();
+        fetchServiceStats();
+        alert('Service updated successfully!');
+      } else {
+        setServicesError(data.message || 'Failed to update service');
+      }
+    } catch (err) {
+      setServicesError(err.message || 'Failed to update service');
+    }
+  };
+
+  const handleDeleteService = async (serviceId) => {
+    if (window.confirm('Are you sure you want to deactivate this service?')) {
+      try {
+        const data = await servicesAPI.deleteService(serviceId);
+        if (data.success) {
+          fetchServices();
+          fetchServiceStats();
+          alert('Service deactivated successfully');
+        } else {
+          setServicesError(data.message || 'Failed to delete service');
+        }
+      } catch (err) {
+        setServicesError(err.message || 'Failed to delete service');
+      }
+    }
+  };
+
+  const handleToggleServiceStatus = async (serviceId) => {
+    try {
+      const data = await servicesAPI.toggleServiceStatus(serviceId);
+      if (data.success) {
+        fetchServices();
+        fetchServiceStats();
+        alert('Service status updated successfully');
+      } else {
+        setServicesError(data.message || 'Failed to toggle service status');
+      }
+    } catch (err) {
+      setServicesError(err.message || 'Failed to toggle service status');
+    }
+  };
+
+  const openServiceModal = (service = null) => {
+    setSelectedService(service);
+    setServiceModalOpen(true);
+    
+    // Pre-populate form if editing
+    if (service) {
+      setServiceFormData({
+        serviceId: service.serviceId || '',
+        serviceName: service.serviceName || '',
+        category: service.category || '',
+        description: service.description || '',
+        price: service.price || '',
+        discountPrice: service.discountPrice || '',
+        duration: service.duration || '',
+        sampleType: service.sampleType || '',
+        fastingRequired: service.fastingRequired || false,
+        ageRange: service.ageRange || '',
+        prerequisites: service.prerequisites || '',
+        isActive: service.isActive !== undefined ? service.isActive : true,
+        isPopular: service.isPopular || false,
+        homeVisitAvailable: service.homeVisitAvailable || false
+      });
+    } else {
+      // Reset form for new service
+      setServiceFormData({
+        serviceId: '',
+        serviceName: '',
+        category: '',
+        description: '',
+        price: '',
+        discountPrice: '',
+        duration: '',
+        sampleType: '',
+        fastingRequired: false,
+        ageRange: '',
+        prerequisites: '',
+        isActive: true,
+        isPopular: false,
+        homeVisitAvailable: false
+      });
+    }
+  };
+
+  const closeServiceModal = () => {
+    setSelectedService(null);
+    setServiceModalOpen(false);
+    setServiceFormData({
+      serviceId: '',
+      serviceName: '',
+      category: '',
+      description: '',
+      price: '',
+      discountPrice: '',
+      duration: '',
+      sampleType: '',
+      fastingRequired: false,
+      ageRange: '',
+      prerequisites: '',
+      isActive: true,
+      isPopular: false,
+      homeVisitAvailable: false
+    });
+  };
 
   // Finance data fetching functions
   const fetchFinanceData = async () => {
@@ -1638,8 +2043,8 @@ function Dashboard({ currentUser, onLogout }) {
       case 'payments': return 'Payment Records';
       case 'billing-rates': return 'Billing Rates';
       case 'reports': return 'Financial Reports';
-      case 'feedbacks': return 'Customer Feedback';
       case 'logs': return 'System Logs';
+      case 'services': return 'Lab Services';
       default: return 'Dashboard';
     }
   };
@@ -1655,8 +2060,8 @@ function Dashboard({ currentUser, onLogout }) {
       case 'payments': return renderPaymentRecords();
       case 'billing-rates': return renderBillingRates();
       case 'reports': return renderFinancialReports();
-      case 'feedbacks': return renderCustomerFeedbacks();
       case 'logs': return renderSystemLogs();
+      case 'services': return renderServices();
       default: return renderDashboardHome();
     }
   };
@@ -2996,7 +3401,7 @@ function Dashboard({ currentUser, onLogout }) {
             </div>
 
             <div className="chart-container">
-              <h3>Report Generation Activity</h3>
+              <h3>Report Activity</h3>
               <div className="chart-placeholder">
                 <div className="activity-stats">
                   <div className="stat-item">
@@ -3110,276 +3515,58 @@ function Dashboard({ currentUser, onLogout }) {
     );
   };
 
-
-
-  // Customer Feedbacks Function
-  const renderCustomerFeedbacks = () => (
-    <div className="management-container">
-      <div className="management-header">
-        <div className="management-title">
-          <h2>Customer Feedbacks</h2>
-          <p>Monitor patient satisfaction and feedback analytics</p>
-        </div>
-        <div className="header-actions">
-          <button className="add-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14,2 14,8 20,8"></polyline>
-              <line x1="16" y1="13" x2="8" y2="13"></line>
-              <line x1="16" y1="17" x2="8" y2="17"></line>
-              <polyline points="10,9 9,9 8,9"></polyline>
-            </svg>
-            Send Survey
-          </button>
-          <button className="analytics-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 20V10"></path>
-              <path d="M12 20V4"></path>
-              <path d="M6 20v-6"></path>
-            </svg>
-            Feedback Analytics
-          </button>
-        </div>
-      </div>
-
-      <div className="feedback-overview">
-        <div className="feedback-stats">
-          <div className="stat-card">
-            <div className="stat-icon"></div>
-            <div className="stat-info">
-              <div className="stat-label">Average Rating</div>
-              <div className="stat-value">4.8/5.0</div>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon"></div>
-            <div className="stat-info">
-              <div className="stat-label">Total Reviews</div>
-              <div className="stat-value">1,247</div>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon"></div>
-            <div className="stat-info">
-              <div className="stat-label">Satisfaction Rate</div>
-              <div className="stat-value">96.3%</div>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon"></div>
-            <div className="stat-info">
-              <div className="stat-label">Response Rate</div>
-              <div className="stat-value">78.5%</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rating-breakdown">
-          <h3>Rating Distribution</h3>
-          <div className="rating-bars">
-            <div className="rating-row">
-              <span>5 ⭐</span>
-              <div className="rating-bar">
-                <div className="rating-fill" style={{width: '75%'}}></div>
-              </div>
-              <span>75%</span>
-            </div>
-            <div className="rating-row">
-              <span>4 ⭐</span>
-              <div className="rating-bar">
-                <div className="rating-fill" style={{width: '18%'}}></div>
-              </div>
-              <span>18%</span>
-            </div>
-            <div className="rating-row">
-              <span>3 ⭐</span>
-              <div className="rating-bar">
-                <div className="rating-fill" style={{width: '5%'}}></div>
-              </div>
-              <span>5%</span>
-            </div>
-            <div className="rating-row">
-              <span>2 ⭐</span>
-              <div className="rating-bar">
-                <div className="rating-fill" style={{width: '1.5%'}}></div>
-              </div>
-              <span>1.5%</span>
-            </div>
-            <div className="rating-row">
-              <span>1 ⭐</span>
-              <div className="rating-bar">
-                <div className="rating-fill" style={{width: '0.5%'}}></div>
-              </div>
-              <span>0.5%</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="feedbacks-list">
-        <div className="content-header">
-          <div className="search-filter">
-            <input type="text" placeholder="Search feedbacks..." className="search-input" />
-            <select className="filter-select">
-              <option>All Ratings</option>
-              <option>5 Stars</option>
-              <option>4 Stars</option>
-              <option>3 Stars</option>
-              <option>2 Stars</option>
-              <option>1 Star</option>
-            </select>
-            <select className="filter-select">
-              <option>All Departments</option>
-              <option>Laboratory</option>
-              <option>Radiology</option>
-              <option>Customer Service</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="feedback-cards">
-          <div className="feedback-card">
-            <div className="feedback-header">
-              <div className="patient-info">
-                <div className="patient-avatar">
-                  <span>JD</span>
-                </div>
-                <div className="patient-details">
-                  <h4>Juan dela Cruz</h4>
-                  <p>September 14, 2024</p>
-                </div>
-              </div>
-              <div className="feedback-rating">
-                <div className="stars">⭐⭐⭐⭐⭐</div>
-                <span>5.0</span>
-              </div>
-            </div>
-            <div className="feedback-content">
-              <p>"Excellent service! The staff was very professional and the results were ready quickly. The facility is clean and well-organized. Highly recommended!"</p>
-            </div>
-            <div className="feedback-tags">
-              <span className="tag">Laboratory</span>
-              <span className="tag">Customer Service</span>
-            </div>
-            <div className="feedback-actions">
-              <button className="respond-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                </svg>
-                Respond
-              </button>
-              <button className="flag-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>
-                  <line x1="4" y1="22" x2="4" y2="15"></line>
-                </svg>
-                Flag
-              </button>
-            </div>
-          </div>
-
-          <div className="feedback-card">
-            <div className="feedback-header">
-              <div className="patient-info">
-                <div className="patient-avatar">
-                  <span>MS</span>
-                </div>
-                <div className="patient-details">
-                  <h4>Maria Santos</h4>
-                  <p>September 13, 2024</p>
-                </div>
-              </div>
-              <div className="feedback-rating">
-                <div className="stars">⭐⭐⭐⭐⭐</div>
-                <span>5.0</span>
-              </div>
-            </div>
-            <div className="feedback-content">
-              <p>"Fast and accurate test results. The online booking system is very convenient. Staff explained everything clearly."</p>
-            </div>
-            <div className="feedback-tags">
-              <span className="tag">Online Booking</span>
-              <span className="tag">Communication</span>
-            </div>
-            <div className="feedback-actions">
-              <button className="respond-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                </svg>
-                Respond
-              </button>
-              <button className="feature-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"></polygon>
-                </svg>
-                Feature
-              </button>
-            </div>
-          </div>
-
-          <div className="feedback-card urgent">
-            <div className="feedback-header">
-              <div className="patient-info">
-                <div className="patient-avatar">
-                  <span>PR</span>
-                </div>
-                <div className="patient-details">
-                  <h4>Pedro Rodriguez</h4>
-                  <p>September 12, 2024</p>
-                </div>
-              </div>
-              <div className="feedback-rating">
-                <div className="stars">⭐⭐⭐</div>
-                <span>3.0</span>
-              </div>
-            </div>
-            <div className="feedback-content">
-              <p>"Service was okay but had to wait longer than expected. The staff could be more attentive to patient concerns."</p>
-            </div>
-            <div className="feedback-tags">
-              <span className="tag">Wait Time</span>
-              <span className="tag">Customer Service</span>
-            </div>
-            <div className="feedback-actions">
-              <button className="respond-btn urgent">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                  <line x1="12" y1="9" x2="12" y2="13"></line>
-                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                </svg>
-                Priority Response
-              </button>
-              <button className="follow-up-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                </svg>
-                Follow Up
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   // System Logs Function
   const renderSystemLogs = () => (
     <div className="management-container">
+      {logsError && (
+        <div className="error-message" style={{
+          background: '#fee', 
+          color: '#c33', 
+          padding: '10px', 
+          borderRadius: '4px', 
+          marginBottom: '20px'
+        }}>
+          {logsError}
+        </div>
+      )}
+      
       <div className="management-header">
         <div className="management-title">
           <h2>System Logs</h2>
           <p>Monitor system activities, user actions, and security events</p>
         </div>
         <div className="header-actions">
-          <button className="export-btn">
+          <button 
+            className="export-btn"
+            onClick={() => handleExportLogs('json')}
+            disabled={logsLoading}
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7,10 12,15 17,10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            Export Logs
+            Export JSON
           </button>
-          <button className="clear-btn">Clear Old Logs</button>
+          <button 
+            className="export-btn"
+            onClick={() => handleExportLogs('csv')}
+            disabled={logsLoading}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7,10 12,15 17,10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Export CSV
+          </button>
+          <button 
+            className="clear-btn"
+            onClick={handleClearLogs}
+            disabled={logsLoading}
+          >
+            Clear Old Logs
+          </button>
         </div>
       </div>
 
@@ -3389,39 +3576,64 @@ function Dashboard({ currentUser, onLogout }) {
             <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">Total Events Today</div>
-              <div className="stat-value">1,247</div>
+              <div className="stat-value">{logStats?.today?.totalEvents || 0}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">Active Users</div>
-              <div className="stat-value">23</div>
+              <div className="stat-value">{logStats?.today?.activeUsers || 0}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">Security Alerts</div>
-              <div className="stat-value">2</div>
+              <div className="stat-value">{logStats?.today?.securityAlerts || 0}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">System Uptime</div>
-              <div className="stat-value">99.9%</div>
+              <div className="stat-value">{logStats?.today?.systemUptime || '0%'}</div>
             </div>
           </div>
         </div>
 
         <div className="log-categories">
           <div className="category-tabs">
-            <button className="tab-btn active">All Logs</button>
-            <button className="tab-btn">User Actions</button>
-            <button className="tab-btn">System Events</button>
-            <button className="tab-btn">Security</button>
-            <button className="tab-btn">Errors</button>
+            <button 
+              className={`tab-btn ${activeLogTab === 'all' ? 'active' : ''}`}
+              onClick={() => handleLogTabChange('all')}
+            >
+              All Logs
+            </button>
+            <button 
+              className={`tab-btn ${activeLogTab === 'user-actions' ? 'active' : ''}`}
+              onClick={() => handleLogTabChange('user-actions')}
+            >
+              User Actions
+            </button>
+            <button 
+              className={`tab-btn ${activeLogTab === 'system-events' ? 'active' : ''}`}
+              onClick={() => handleLogTabChange('system-events')}
+            >
+              System Events
+            </button>
+            <button 
+              className={`tab-btn ${activeLogTab === 'security' ? 'active' : ''}`}
+              onClick={() => handleLogTabChange('security')}
+            >
+              Security
+            </button>
+            <button 
+              className={`tab-btn ${activeLogTab === 'errors' ? 'active' : ''}`}
+              onClick={() => handleLogTabChange('errors')}
+            >
+              Errors
+            </button>
           </div>
         </div>
       </div>
@@ -3429,87 +3641,317 @@ function Dashboard({ currentUser, onLogout }) {
       <div className="logs-content">
         <div className="content-header">
           <div className="search-filter">
-            <input type="text" placeholder="Search logs..." className="search-input" />
-            <select className="filter-select">
-              <option>All Levels</option>
-              <option>Info</option>
-              <option>Warning</option>
-              <option>Error</option>
-              <option>Critical</option>
+            <input 
+              type="text" 
+              placeholder="Search logs..." 
+              className="search-input" 
+              value={logFilters.search}
+              onChange={(e) => handleLogFilterChange('search', e.target.value)}
+            />
+            <select 
+              className="filter-select"
+              value={logFilters.level}
+              onChange={(e) => handleLogFilterChange('level', e.target.value)}
+            >
+              <option value="">All Levels</option>
+              <option value="info">Info</option>
+              <option value="warning">Warning</option>
+              <option value="error">Error</option>
+              <option value="critical">Critical</option>
             </select>
-            <input type="datetime-local" className="date-filter" />
-            <input type="datetime-local" className="date-filter" />
+            <input 
+              type="datetime-local" 
+              className="date-filter" 
+              value={logFilters.startDate}
+              onChange={(e) => handleLogFilterChange('startDate', e.target.value)}
+              placeholder="Start Date"
+            />
+            <input 
+              type="datetime-local" 
+              className="date-filter" 
+              value={logFilters.endDate}
+              onChange={(e) => handleLogFilterChange('endDate', e.target.value)}
+              placeholder="End Date"
+            />
           </div>
         </div>
 
         <div className="logs-table">
+          {logsLoading ? (
+            <div style={{ textAlign: 'center', padding: '20px' }}>Loading logs...</div>
+          ) : (
+            <>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Level</th>
+                    <th>User</th>
+                    <th>Action/Event</th>
+                    <th>Details</th>
+                    <th>IP Address</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '20px' }}>
+                        No logs found
+                      </td>
+                    </tr>
+                  ) : (
+                    logs.map((log) => (
+                      <tr 
+                        key={log._id} 
+                        className={log.level === 'critical' ? 'security-alert' : ''}
+                      >
+                        <td>{new Date(log.timestamp).toLocaleString()}</td>
+                        <td>
+                          <span className={`log-level ${log.level}`}>
+                            {log.level.toUpperCase()}
+                          </span>
+                        </td>
+                        <td>{log.userEmail}</td>
+                        <td>{log.action}</td>
+                        <td>{log.details}</td>
+                        <td>{log.ipAddress}</td>
+                        <td>
+                          <span className={`status ${log.status}`}>
+                            {log.status.charAt(0).toUpperCase() + log.status.slice(1)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+              
+              {/* Pagination */}
+              {logPagination.totalPages > 1 && (
+                <div className="pagination">
+                  <button 
+                    onClick={() => handleLogPageChange(logPagination.currentPage - 1)}
+                    disabled={logPagination.currentPage === 1}
+                    className="pagination-btn"
+                  >
+                    Previous
+                  </button>
+                  <span className="pagination-info">
+                    Page {logPagination.currentPage} of {logPagination.totalPages}
+                    ({logPagination.totalLogs} total logs)
+                  </span>
+                  <button 
+                    onClick={() => handleLogPageChange(logPagination.currentPage + 1)}
+                    disabled={logPagination.currentPage === logPagination.totalPages}
+                    className="pagination-btn"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Services Management Function
+  const renderServices = () => (
+    <div className="management-container">
+      <div className="management-header">
+        <div className="management-title">
+          <h2>Lab Services</h2>
+          <p>Manage laboratory services and test offerings</p>
+        </div>
+        <button className="add-btn" onClick={() => openServiceModal()}>
+          + Add New Service
+        </button>
+      </div>
+
+      <div className="management-stats">
+        <div className="stat-card">
+          <div className="stat-icon"></div>
+          <div className="stat-info">
+            <div className="stat-label">Total Services</div>
+            <div className="stat-value">{services.length}</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon"></div>
+          <div className="stat-info">
+            <div className="stat-label">Active Services</div>
+            <div className="stat-value">{services.filter(s => s.isActive).length}</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon"></div>
+          <div className="stat-info">
+            <div className="stat-label">Service Categories</div>
+            <div className="stat-value">{new Set(services.map(s => s.category)).size}</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon"></div>
+          <div className="stat-info">
+            <div className="stat-label">Popular Services</div>
+            <div className="stat-value">{services.filter(s => s.isPopular).length}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="management-content">
+        <div className="content-header">
+          <div className="search-filter">
+            <input 
+              type="text" 
+              placeholder="Search services..." 
+              className="search-input"
+              value={serviceFilters.search}
+              onChange={(e) => setServiceFilters(prev => ({ ...prev, search: e.target.value }))}
+            />
+            <select 
+              className="filter-select"
+              value={serviceFilters.category}
+              onChange={(e) => setServiceFilters(prev => ({ ...prev, category: e.target.value }))}
+            >
+              <option value="">All Categories</option>
+              <option value="blood_tests">Blood Tests</option>
+              <option value="urine_tests">Urine Tests</option>
+              <option value="imaging">Imaging</option>
+              <option value="pathology">Pathology</option>
+              <option value="special_tests">Special Tests</option>
+              <option value="package_deals">Package Deals</option>
+              <option value="emergency_tests">Emergency Tests</option>
+            </select>
+            <select 
+              className="filter-select"
+              value={serviceFilters.isActive}
+              onChange={(e) => setServiceFilters(prev => ({ ...prev, isActive: e.target.value }))}
+            >
+              <option value="">All Status</option>
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="data-table">
           <table>
             <thead>
               <tr>
-                <th>Timestamp</th>
-                <th>Level</th>
-                <th>User</th>
-                <th>Action/Event</th>
-                <th>Details</th>
-                <th>IP Address</th>
+                <th>Service ID</th>
+                <th>Service Name</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Duration</th>
                 <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>2024-09-14 10:30:15</td>
-                <td><span className="log-level info">INFO</span></td>
-                <td>admin@mdlab.com</td>
-                <td>User Login</td>
-                <td>Successful authentication</td>
-                <td>192.168.1.112</td>
-                <td><span className="status success">Success</span></td>
-              </tr>
-              <tr>
-                <td>2024-09-14 10:28:42</td>
-                <td><span className="log-level info">INFO</span></td>
-                <td>medtech1@mdlab.com</td>
-                <td>Test Result Entry</td>
-                <td>Updated CBC results for patient P001</td>
-                <td>192.168.1.115</td>
-                <td><span className="status success">Success</span></td>
-              </tr>
-              <tr>
-                <td>2024-09-14 10:25:18</td>
-                <td><span className="log-level warning">WARNING</span></td>
-                <td>system</td>
-                <td>Database Connection</td>
-                <td>Connection timeout, retried successfully</td>
-                <td>127.0.0.1</td>
-                <td><span className="status warning">Resolved</span></td>
-              </tr>
-              <tr>
-                <td>2024-09-14 10:20:55</td>
-                <td><span className="log-level error">ERROR</span></td>
-                <td>patient123@email.com</td>
-                <td>Login Attempt</td>
-                <td>Failed login - incorrect password</td>
-                <td>203.177.45.123</td>
-                <td><span className="status error">Failed</span></td>
-              </tr>
-              <tr>
-                <td>2024-09-14 10:15:33</td>
-                <td><span className="log-level info">INFO</span></td>
-                <td>pathologist1@mdlab.com</td>
-                <td>Report Generation</td>
-                <td>Generated pathology report for case C-2024-0891</td>
-                <td>192.168.1.118</td>
-                <td><span className="status success">Success</span></td>
-              </tr>
-              <tr className="security-alert">
-                <td>2024-09-14 09:45:22</td>
-                <td><span className="log-level critical">CRITICAL</span></td>
-                <td>unknown</td>
-                <td>Security Event</td>
-                <td>Multiple failed login attempts detected</td>
-                <td>45.133.247.89</td>
-                <td><span className="status blocked">Blocked</span></td>
-              </tr>
+              {servicesLoading ? (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '40px' }}>
+                    <div style={{ color: '#6c757d' }}>Loading services...</div>
+                  </td>
+                </tr>
+              ) : servicesError ? (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '40px' }}>
+                    <div style={{ color: '#dc3545' }}>{servicesError}</div>
+                  </td>
+                </tr>
+              ) : services.length === 0 ? (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '40px' }}>
+                    <div style={{ color: '#6c757d' }}>
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ margin: '0 auto 16px', display: 'block' }}>
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <path d="M9 9h6v6H9z"></path>
+                      </svg>
+                      <h3 style={{ margin: '0 0 8px 0', fontWeight: '500' }}>No Services Found</h3>
+                      <p style={{ margin: '0', fontSize: '0.9rem' }}>Start by adding your first lab service to manage your offerings.</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                services.map((service, index) => (
+                  <tr key={service._id || index}>
+                    <td>{service.serviceId}</td>
+                    <td>
+                      <div>
+                        <strong>{service.serviceName}</strong>
+                        {service.isPopular && (
+                          <span style={{ 
+                            backgroundColor: '#e74c3c', 
+                            color: 'white', 
+                            padding: '2px 6px', 
+                            borderRadius: '4px', 
+                            fontSize: '10px', 
+                            marginLeft: '8px' 
+                          }}>
+                            POPULAR
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <span style={{ 
+                        backgroundColor: '#3498db', 
+                        color: 'white', 
+                        padding: '3px 8px', 
+                        borderRadius: '4px', 
+                        fontSize: '12px' 
+                      }}>
+                        {service.category?.replace('_', ' ').toUpperCase()}
+                      </span>
+                    </td>
+                    <td>
+                      <div>
+                        <strong>₱{service.price?.toLocaleString()}</strong>
+                        {service.discountPrice && (
+                          <div style={{ fontSize: '12px', color: '#6c757d' }}>
+                            <span style={{ textDecoration: 'line-through' }}>₱{service.discountPrice.toLocaleString()}</span>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td>{service.duration} min</td>
+                    <td>
+                      <span className={`status ${service.isActive ? 'active' : 'inactive'}`}>
+                        {service.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="action-buttons">
+                        <button 
+                          className="action-btn edit"
+                          onClick={() => openServiceModal(service)}
+                          title="Edit Service"
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          className="action-btn toggle"
+                          onClick={() => handleToggleServiceStatus(service._id)}
+                          title="Toggle Status"
+                        >
+                          {service.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button 
+                          className="action-btn delete"
+                          onClick={() => handleDeleteService(service._id)}
+                          title="Delete Service"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -6798,6 +7240,187 @@ function Dashboard({ currentUser, onLogout }) {
     );
   };
 
+  // Service Modal Component
+  const ServiceModal = () => {
+    return serviceModalOpen ? (
+      <div className="modal-overlay" onClick={(e) => e.target.classList.contains('modal-overlay') && closeServiceModal()}>
+        <div className="modal-content">
+          <div className="modal-header">
+            <h3>{selectedService ? 'Edit Service' : 'Add New Service'}</h3>
+            <button className="modal-close" onClick={closeServiceModal}>&times;</button>
+          </div>
+          
+          <form onSubmit={handleCreateService} className="modal-form">
+            <div className="form-group">
+              <label>Service Name *</label>
+              <input
+                type="text"
+                value={serviceFormData.serviceName}
+                onChange={(e) => setServiceFormData(prev => ({ ...prev, serviceName: e.target.value }))}
+                placeholder="e.g., Complete Blood Count"
+                required
+              />
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Service Code *</label>
+                <input
+                  type="text"
+                  value={serviceFormData.serviceId}
+                  onChange={(e) => setServiceFormData(prev => ({ ...prev, serviceId: e.target.value }))}
+                  placeholder="e.g., CBC001"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Category *</label>
+                <select
+                  value={serviceFormData.category}
+                  onChange={(e) => setServiceFormData(prev => ({ ...prev, category: e.target.value }))}
+                  required
+                >
+                  <option value="">Select Category</option>
+                  <option value="blood_tests">Blood Tests</option>
+                  <option value="urine_tests">Urine Tests</option>
+                  <option value="imaging">Imaging</option>
+                  <option value="pathology">Pathology</option>
+                  <option value="special_tests">Special Tests</option>
+                  <option value="package_deals">Package Deals</option>
+                  <option value="emergency_tests">Emergency Tests</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Description</label>
+              <textarea
+                value={serviceFormData.description}
+                onChange={(e) => setServiceFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Describe the service..."
+                rows="3"
+              />
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Price (₱) *</label>
+                <input
+                  type="number"
+                  value={serviceFormData.price}
+                  onChange={(e) => setServiceFormData(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
+                  min="0"
+                  step="0.01"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Duration (minutes) *</label>
+                <input
+                  type="number"
+                  value={serviceFormData.duration}
+                  onChange={(e) => setServiceFormData(prev => ({ ...prev, duration: parseInt(e.target.value) }))}
+                  min="1"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Discount Price (₱)</label>
+                <input
+                  type="number"
+                  value={serviceFormData.discountPrice}
+                  onChange={(e) => setServiceFormData(prev => ({ ...prev, discountPrice: parseFloat(e.target.value) }))}
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              <div className="form-group">
+                <label>Age Range</label>
+                <input
+                  type="text"
+                  value={serviceFormData.ageRange}
+                  onChange={(e) => setServiceFormData(prev => ({ ...prev, ageRange: e.target.value }))}
+                  placeholder="e.g., 18-65"
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Sample Type</label>
+                <input
+                  type="text"
+                  value={serviceFormData.sampleType}
+                  onChange={(e) => setServiceFormData(prev => ({ ...prev, sampleType: e.target.value }))}
+                  placeholder="e.g., Blood, Urine"
+                />
+              </div>
+              <div className="form-group">
+                <label>Fasting Required</label>
+                <select
+                  value={serviceFormData.fastingRequired}
+                  onChange={(e) => setServiceFormData(prev => ({ ...prev, fastingRequired: e.target.value === 'true' }))}
+                >
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Prerequisites</label>
+              <input
+                type="text"
+                value={serviceFormData.prerequisites}
+                onChange={(e) => setServiceFormData(prev => ({ ...prev, prerequisites: e.target.value }))}
+                placeholder="Any special requirements..."
+              />
+            </div>
+
+            <div className="form-checkboxes">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={serviceFormData.isActive}
+                  onChange={(e) => setServiceFormData(prev => ({ ...prev, isActive: e.target.checked }))}
+                />
+                <span>Active Service</span>
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={serviceFormData.isPopular}
+                  onChange={(e) => setServiceFormData(prev => ({ ...prev, isPopular: e.target.checked }))}
+                />
+                <span>Popular Service</span>
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={serviceFormData.homeVisitAvailable}
+                  onChange={(e) => setServiceFormData(prev => ({ ...prev, homeVisitAvailable: e.target.checked }))}
+                />
+                <span>Home Visit Available</span>
+              </label>
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="btn-cancel" onClick={closeServiceModal}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-save" disabled={servicesLoading}>
+                {servicesLoading ? 'Saving...' : (selectedService ? 'Update Service' : 'Create Service')}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    ) : null;
+  };
+
   return (
     <div className="dashboard-container">
       {/* Sidebar */}
@@ -6918,51 +7541,50 @@ function Dashboard({ currentUser, onLogout }) {
             )}
           </div>
 
-          <div 
-            className={`nav-item ${activeSection === 'feedbacks' ? 'active' : ''}`}
-            onClick={() => handleSectionClick('feedbacks')}
-          >
-            <span className="nav-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-              </svg>
-            </span>
-            <span className="nav-text">Feedbacks</span>
-          </div>
-
-          <div 
-            className={`nav-item ${activeSection === 'logs' ? 'active' : ''}`}
-            onClick={() => handleSectionClick('logs')}
-          >
-            <span className="nav-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14,2 14,8 20,8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-                <polyline points="10,9 9,9 8,9"></polyline>
-              </svg>
-            </span>
-            <span className="nav-text">Logs</span>
+          <div className="dropdown">
+            <div className="nav-item-header" onClick={toggleLogs}>
+              <div className="nav-item-main">
+                <span className="nav-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14,2 14,8 20,8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10,9 9,9 8,9"></polyline>
+                  </svg>
+                </span>
+                <span className="nav-text">System</span>
+              </div>
+              <span className={`dropdown-arrow ${logsOpen ? 'open' : ''}`}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="6,9 12,15 18,9"></polyline>
+                </svg>
+              </span>
+            </div>
+            {logsOpen && (
+              <div className="nav-submenu">
+                <div 
+                  className={`nav-subitem ${activeSection === 'logs' ? 'active' : ''}`}
+                  onClick={() => handleSectionClick('logs')}
+                >
+                  System Logs
+                </div>
+                <div 
+                  className={`nav-subitem ${activeSection === 'services' ? 'active' : ''}`}
+                  onClick={() => handleSectionClick('services')}
+                >
+                  Services
+                </div>
+              </div>
+            )}
           </div>
         </nav>
 
         <div className="sidebar-footer">
-          <div className="user-info">
-            <div className="user-avatar">
-              <span>{user?.firstName?.charAt(0) || user?.username?.charAt(0) || 'U'}</span>
-            </div>
-            <div className="user-details">
-              <span className="user-role">{user?.role?.toUpperCase() || 'USER'}</span>
-              <span className="user-email">{user?.email || 'user@example.com'}</span>
-              <span className="user-name">{user?.fullName || `${user?.firstName} ${user?.lastName}` || user?.username}</span>
-            </div>
-            <button className="logout-btn" onClick={handleLogout} title="Logout">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                <polyline points="16,17 21,12 16,7"></polyline>
-                <line x1="21" y1="12" x2="9" y2="12"></line>
-              </svg>
+          <div className="owner-section">
+            <span className="owner-label">OWNER</span>
+            <button className="logout-btn-red" onClick={handleLogout} title="Logout">
+              Logout
             </button>
           </div>
         </div>
@@ -7019,6 +7641,9 @@ function Dashboard({ currentUser, onLogout }) {
       
       {/* Certification Management Modal */}
       {renderCertificationModal()}
+      
+      {/* Service Modal */}
+      {ServiceModal()}
     </div>
   );
 }

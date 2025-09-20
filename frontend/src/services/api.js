@@ -429,6 +429,180 @@ export const financeAPI = {
   }
 };
 
+// Logs API functions
+export const logsAPI = {
+  // Get system logs with filtering
+  getLogs: async (params = {}) => {
+    try {
+      const response = await api.get('/logs', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to fetch system logs' };
+    }
+  },
+
+  // Get log statistics
+  getLogStats: async () => {
+    try {
+      const response = await api.get('/logs/stats');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to fetch log statistics' };
+    }
+  },
+
+  // Create a new log entry
+  createLog: async (logData) => {
+    try {
+      const response = await api.post('/logs', logData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to create log entry' };
+    }
+  },
+
+  // Clean up old logs
+  cleanupLogs: async (daysOld = 90) => {
+    try {
+      const response = await api.delete('/logs/cleanup', {
+        data: { daysOld }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to cleanup logs' };
+    }
+  },
+
+  // Export logs
+  exportLogs: async (params = {}) => {
+    try {
+      const response = await api.get('/logs/export', { 
+        params,
+        responseType: params.format === 'csv' ? 'blob' : 'json'
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to export logs' };
+    }
+  }
+};
+
+// Services API functions
+export const servicesAPI = {
+  // Get all services with filtering and pagination
+  getServices: async (params = {}) => {
+    try {
+      const response = await api.get('/services', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to fetch services' };
+    }
+  },
+
+  // Get service statistics (admin only)
+  getServiceStats: async () => {
+    try {
+      const response = await api.get('/services/admin/stats');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to fetch service statistics' };
+    }
+  },
+
+  // Get popular services (public)
+  getPopularServices: async (limit = 10) => {
+    try {
+      const response = await api.get('/services/popular', { params: { limit } });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to fetch popular services' };
+    }
+  },
+
+  // Get service categories (public)
+  getServiceCategories: async () => {
+    try {
+      const response = await api.get('/services/categories');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to fetch service categories' };
+    }
+  },
+
+  // Get single service by ID (public)
+  getServiceById: async (serviceId) => {
+    try {
+      const response = await api.get(`/services/${serviceId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to fetch service' };
+    }
+  },
+
+  // Create new service (admin only)
+  createService: async (serviceData) => {
+    try {
+      const response = await api.post('/services', serviceData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to create service' };
+    }
+  },
+
+  // Update service (admin only)
+  updateService: async (serviceId, serviceData) => {
+    try {
+      const response = await api.put(`/services/${serviceId}`, serviceData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to update service' };
+    }
+  },
+
+  // Delete service (admin only) - performs soft delete
+  deleteService: async (serviceId) => {
+    try {
+      const response = await api.delete(`/services/${serviceId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to delete service' };
+    }
+  },
+
+  // Toggle service active status (admin only)
+  toggleServiceStatus: async (serviceId) => {
+    try {
+      const response = await api.patch(`/services/${serviceId}/toggle-status`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to toggle service status' };
+    }
+  },
+
+  // Toggle service popular status (admin only)
+  toggleServicePopular: async (serviceId) => {
+    try {
+      const response = await api.patch(`/services/${serviceId}/toggle-popular`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to toggle service popular status' };
+    }
+  },
+
+  // Bulk update services (admin only)
+  bulkUpdateServices: async (serviceIds, updateData) => {
+    try {
+      const response = await api.patch('/services/bulk-update', {
+        serviceIds,
+        updateData
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to bulk update services' };
+    }
+  }
+};
+
 // Utility functions
 export const authUtils = {
   // Check if user is logged in
