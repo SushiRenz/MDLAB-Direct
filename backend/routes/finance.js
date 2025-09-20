@@ -5,9 +5,15 @@ const {
   getFinanceStats,
   getBills,
   createBill,
+  deleteBill,
   getTransactions,
   createTransaction,
+  updateTransaction,
+  deleteTransaction,
   getPayments,
+  createPayment,
+  updatePayment,
+  deletePayment,
   verifyPayment,
   getBillingRates,
   createBillingRate,
@@ -70,34 +76,141 @@ router.route('/bills')
     createBill
   );
 
+// Individual bill operations
+router.delete('/bills/:id',
+  authorize('admin'), // Only admin can delete bills
+  deleteBill
+);
+
 // Transactions routes
 router.route('/transactions')
   .get(getTransactions)
   .post(
     authorize('admin'), // Only admin can create transactions
     [
-      body('billId')
+      body('type')
         .notEmpty()
-        .withMessage('Bill ID is required')
-        .isMongoId()
-        .withMessage('Valid bill ID is required'),
+        .withMessage('Transaction type is required')
+        .isIn(['payment', 'refund', 'adjustment'])
+        .withMessage('Invalid transaction type'),
+      body('amount')
+        .isNumeric()
+        .withMessage('Amount must be a number')
+        .isFloat({ min: 0 })
+        .withMessage('Amount must be positive'),
+      body('description')
+        .notEmpty()
+        .withMessage('Description is required'),
+      body('patientName')
+        .notEmpty()
+        .withMessage('Patient name is required'),
       body('paymentMethod')
         .notEmpty()
         .withMessage('Payment method is required')
-        .isIn(['cash', 'credit_card', 'debit_card', 'online_payment', 'gcash', 'bank_transfer', 'insurance'])
+        .isIn(['cash', 'card', 'bank_transfer', 'check', 'online', 'internal'])
         .withMessage('Invalid payment method'),
-      body('referenceNumber')
+      body('status')
         .optional()
-        .trim()
-        .isLength({ min: 1 })
-        .withMessage('Reference number cannot be empty if provided')
+        .isIn(['pending', 'completed', 'failed', 'cancelled'])
+        .withMessage('Invalid status')
     ],
     createTransaction
   );
 
+router.route('/transactions/:id')
+  .put(
+    authorize('admin'), // Only admin can update transactions
+    [
+      body('type')
+        .optional()
+        .isIn(['payment', 'refund', 'adjustment'])
+        .withMessage('Invalid transaction type'),
+      body('amount')
+        .optional()
+        .isNumeric()
+        .withMessage('Amount must be a number')
+        .isFloat({ min: 0 })
+        .withMessage('Amount must be positive'),
+      body('paymentMethod')
+        .optional()
+        .isIn(['cash', 'card', 'bank_transfer', 'check', 'online', 'internal'])
+        .withMessage('Invalid payment method'),
+      body('status')
+        .optional()
+        .isIn(['pending', 'completed', 'failed', 'cancelled'])
+        .withMessage('Invalid status')
+    ],
+    updateTransaction
+  )
+  .delete(
+    authorize('admin'), // Only admin can delete transactions
+    deleteTransaction
+  );
+
 // Payments routes
 router.route('/payments')
-  .get(getPayments);
+  .get(getPayments)
+  .post(
+    authorize('admin'), // Only admin can create payments
+    [
+      body('patientName')
+        .notEmpty()
+        .withMessage('Patient name is required'),
+      body('amountPaid')
+        .isNumeric()
+        .withMessage('Amount paid must be a number')
+        .isFloat({ min: 0 })
+        .withMessage('Amount paid must be positive'),
+      body('paymentMethod')
+        .notEmpty()
+        .withMessage('Payment method is required')
+        .isIn(['cash', 'credit_card', 'debit_card', 'bank_transfer', 'check', 'online'])
+        .withMessage('Invalid payment method'),
+      body('patientId')
+        .optional()
+        .isMongoId()
+        .withMessage('Valid patient ID is required'),
+      body('billId')
+        .optional()
+        .isMongoId()
+        .withMessage('Valid bill ID is required'),
+      body('status')
+        .optional()
+        .isIn(['pending', 'verified', 'rejected', 'refunded'])
+        .withMessage('Invalid status')
+    ],
+    createPayment
+  );
+
+router.route('/payments/:id')
+  .put(
+    authorize('admin'), // Only admin can update payments
+    [
+      body('patientName')
+        .optional()
+        .notEmpty()
+        .withMessage('Patient name cannot be empty'),
+      body('amountPaid')
+        .optional()
+        .isNumeric()
+        .withMessage('Amount paid must be a number')
+        .isFloat({ min: 0 })
+        .withMessage('Amount paid must be positive'),
+      body('paymentMethod')
+        .optional()
+        .isIn(['cash', 'credit_card', 'debit_card', 'bank_transfer', 'check', 'online'])
+        .withMessage('Invalid payment method'),
+      body('status')
+        .optional()
+        .isIn(['pending', 'verified', 'rejected', 'refunded'])
+        .withMessage('Invalid status')
+    ],
+    updatePayment
+  )
+  .delete(
+    authorize('admin'), // Only admin can delete payments
+    deletePayment
+  );
 
 router.put('/payments/:id/verify', 
   authorize('admin'), // Only admin can verify payments

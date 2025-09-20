@@ -210,6 +210,35 @@ const createBill = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Delete bill
+// @route   DELETE /api/finance/bills/:id
+// @access  Private/Admin
+const deleteBill = asyncHandler(async (req, res) => {
+  const bill = await Bill.findById(req.params.id);
+
+  if (!bill) {
+    return res.status(404).json({
+      success: false,
+      message: 'Bill not found'
+    });
+  }
+
+  // Security check: Only allow deletion of draft bills
+  if (bill.status !== 'draft') {
+    return res.status(400).json({
+      success: false,
+      message: 'Only draft bills can be deleted. Finalized bills must be kept for audit purposes.'
+    });
+  }
+
+  await bill.deleteOne();
+
+  res.status(200).json({
+    success: true,
+    message: `Bill ${bill.billId} deleted successfully`
+  });
+});
+
 // @desc    Get all transactions
 // @route   GET /api/finance/transactions
 // @access  Private/Admin
@@ -290,58 +319,91 @@ const createTransaction = asyncHandler(async (req, res) => {
     });
   }
 
-  const { billId, paymentMethod, referenceNumber, notes } = req.body;
+  const { 
+    type, 
+    amount, 
+    currency = 'PHP',
+    description, 
+    patientName, 
+    paymentMethod, 
+    status = 'pending', 
+    notes,
+    billId,
+    patientId
+  } = req.body;
 
-  // Verify bill exists
-  const bill = await Bill.findById(billId);
-  if (!bill) {
-    return res.status(404).json({
-      success: false,
-      message: 'Bill not found'
-    });
-  }
+  // Generate transaction ID
+  const transactionId = `TXN-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
 
   const transaction = await Transaction.create({
+    transactionId,
+    type,
+    amount,
+    currency,
+    description,
+    patientName,
     billId,
-    patientId: bill.patientId,
-    patientName: bill.patientName,
-    description: `Payment for ${bill.billId} - ${bill.services.map(s => s.name).join(', ')}`,
-    amount: bill.totalAmount,
+    patientId,
     paymentMethod,
-    referenceNumber,
-    processedBy: req.user.id,
+    status,
+    processedBy: req.user.username || req.user.name,
+    processedAt: new Date(),
+    referenceNumber: `REF-${transactionId.split('-')[2]}-${new Date().getFullYear()}`,
     notes
   });
 
-  // Update bill status to paid
-  bill.status = 'paid';
-  bill.paymentMethod = paymentMethod;
-  bill.updatedBy = req.user.id;
-  await bill.save();
-
-  // Create payment record
-  const payment = await Payment.create({
-    billId,
-    transactionId: transaction._id,
-    patientId: bill.patientId,
-    patientName: bill.patientName,
-    amountPaid: bill.totalAmount,
-    paymentMethod,
-    referenceNumber,
-    status: paymentMethod === 'cash' ? 'verified' : 'pending',
-    verifiedBy: paymentMethod === 'cash' ? req.user.id : null,
-    verificationDate: paymentMethod === 'cash' ? new Date() : null
-  });
-
-  await transaction.populate('patientId', 'name email');
-  await transaction.populate('processedBy', 'name');
-
   res.status(201).json({
     success: true,
-    data: {
-      transaction,
-      payment
-    }
+    data: transaction
+  });
+});
+
+// @desc    Update transaction
+// @route   PUT /api/finance/transactions/:id
+// @access  Private/Admin
+const updateTransaction = asyncHandler(async (req, res) => {
+  const transaction = await Transaction.findById(req.params.id);
+
+  if (!transaction) {
+    return res.status(404).json({
+      success: false,
+      message: 'Transaction not found'
+    });
+  }
+
+  const updatedTransaction = await Transaction.findByIdAndUpdate(
+    req.params.id,
+    req.body,
+    { new: true, runValidators: true }
+  );
+
+  await updatedTransaction.populate('patientId', 'name email');
+  await updatedTransaction.populate('processedBy', 'name');
+
+  res.status(200).json({
+    success: true,
+    data: updatedTransaction
+  });
+});
+
+// @desc    Delete transaction
+// @route   DELETE /api/finance/transactions/:id
+// @access  Private/Admin
+const deleteTransaction = asyncHandler(async (req, res) => {
+  const transaction = await Transaction.findById(req.params.id);
+
+  if (!transaction) {
+    return res.status(404).json({
+      success: false,
+      message: 'Transaction not found'
+    });
+  }
+
+  await transaction.deleteOne();
+
+  res.status(200).json({
+    success: true,
+    message: 'Transaction deleted successfully'
   });
 });
 
@@ -394,6 +456,139 @@ const getPayments = asyncHandler(async (req, res) => {
       pages: Math.ceil(total / limit)
     },
     data: payments
+  });
+});
+
+// @desc    Create new payment
+// @route   POST /api/finance/payments
+// @access  Private/Admin
+const createPayment = asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation error',
+      errors: errors.array()
+    });
+  }
+
+  const { 
+    patientId,
+    patientName,
+    billId,
+    amountPaid,
+    paymentMethod,
+    referenceNumber,
+    notes,
+    status = 'pending'
+  } = req.body;
+
+  // Verify patient exists if patientId provided
+  if (patientId) {
+    const patient = await User.findById(patientId);
+    if (!patient) {
+      return res.status(404).json({
+        success: false,
+        message: 'Patient not found'
+      });
+    }
+  }
+
+  // Verify bill exists if billId provided
+  if (billId) {
+    const bill = await Bill.findById(billId);
+    if (!bill) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bill not found'
+      });
+    }
+  }
+
+  const payment = await Payment.create({
+    patientId,
+    patientName,
+    billId,
+    amountPaid,
+    paymentMethod,
+    referenceNumber,
+    notes,
+    status,
+    paymentDate: new Date()
+  });
+
+  await payment.populate('patientId', 'name email');
+  await payment.populate('billId', 'billId');
+
+  res.status(201).json({
+    success: true,
+    data: payment
+  });
+});
+
+// @desc    Update payment
+// @route   PUT /api/finance/payments/:id
+// @access  Private/Admin
+const updatePayment = asyncHandler(async (req, res) => {
+  const payment = await Payment.findById(req.params.id);
+
+  if (!payment) {
+    return res.status(404).json({
+      success: false,
+      message: 'Payment not found'
+    });
+  }
+
+  // Prevent status change to verified through update - must use verify endpoint
+  if (req.body.status === 'verified' && payment.status !== 'verified') {
+    return res.status(400).json({
+      success: false,
+      message: 'Use the verify endpoint to verify payments'
+    });
+  }
+
+  const updatedPayment = await Payment.findByIdAndUpdate(
+    req.params.id,
+    req.body,
+    { new: true, runValidators: true }
+  );
+
+  await updatedPayment.populate('patientId', 'name email');
+  await updatedPayment.populate('billId', 'billId');
+  await updatedPayment.populate('verifiedBy', 'name');
+
+  res.status(200).json({
+    success: true,
+    data: updatedPayment
+  });
+});
+
+// @desc    Delete payment
+// @route   DELETE /api/finance/payments/:id
+// @access  Private/Admin
+const deletePayment = asyncHandler(async (req, res) => {
+  const payment = await Payment.findById(req.params.id);
+
+  if (!payment) {
+    return res.status(404).json({
+      success: false,
+      message: 'Payment not found'
+    });
+  }
+
+  // Security check: Only allow deletion of pending payments
+  if (payment.status === 'verified') {
+    return res.status(400).json({
+      success: false,
+      message: 'Verified payments cannot be deleted. Only pending payments can be removed.'
+    });
+  }
+
+  await payment.deleteOne();
+
+  res.status(200).json({
+    success: true,
+    message: `Payment ${payment.paymentId} deleted successfully`
   });
 });
 
@@ -533,9 +728,15 @@ module.exports = {
   getFinanceStats,
   getBills,
   createBill,
+  deleteBill,
   getTransactions,
   createTransaction,
+  updateTransaction,
+  deleteTransaction,
   getPayments,
+  createPayment,
+  updatePayment,
+  deletePayment,
   verifyPayment,
   getBillingRates,
   createBillingRate,

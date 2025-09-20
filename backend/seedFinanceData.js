@@ -245,33 +245,82 @@ const createSamplePayments = async () => {
     await Payment.deleteMany({});
     
     const admin = await User.findOne({ role: 'admin' });
-    const transactions = await Transaction.find({});
     const bills = await Bill.find({});
     
-    if (!admin || transactions.length === 0 || bills.length === 0) {
-      console.log('❌ Need admin, transactions and bills for payments.');
+    if (!admin || bills.length === 0) {
+      console.log('❌ Need admin and bills for payments.');
       return;
     }
 
-    const paidBill = bills.find(b => b.status === 'paid');
-    const transaction = transactions[0];
+    // Create simple transactions first for payments
+    const transactions = await Transaction.insertMany([
+      {
+        transactionId: 'TXN-2024-001',
+        type: 'payment',
+        amount: 1400,
+        currency: 'PHP',
+        description: 'Payment for lab services',
+        patientName: 'Carlos Rodriguez',
+        billId: bills[1]?._id || bills[0]._id,
+        patientId: bills[1]?.patientId || bills[0].patientId,
+        paymentMethod: 'cash',
+        status: 'completed',
+        processedBy: admin.username,
+        processedAt: new Date('2024-09-14T09:30:00'),
+        referenceNumber: 'REF-001-2024'
+      },
+      {
+        transactionId: 'TXN-2025-002',
+        type: 'payment',
+        amount: 2500,
+        currency: 'PHP',
+        description: 'Credit card payment',
+        patientName: 'Maria Santos',
+        billId: bills[0]._id,
+        patientId: bills[0].patientId,
+        paymentMethod: 'card',
+        status: 'pending',
+        processedBy: admin.username,
+        processedAt: new Date('2025-09-20T08:15:00'),
+        referenceNumber: 'REF-002-2025'
+      }
+    ]);
 
     const payments = [
       {
-        billId: paidBill._id,
-        transactionId: transaction._id,
-        patientId: paidBill.patientId,
-        patientName: paidBill.patientName,
-        amountPaid: paidBill.totalAmount,
+        billId: bills[1]?._id || bills[0]._id,
+        transactionId: transactions[0]._id,
+        patientId: bills[1]?.patientId || bills[0].patientId,
+        patientName: 'Carlos Rodriguez',
+        amountPaid: 1400,
         paymentMethod: 'cash',
         status: 'verified',
         verifiedBy: admin._id,
         verificationDate: new Date('2024-09-14T09:30:00'),
         paymentDate: new Date('2024-09-14T09:30:00')
+      },
+      {
+        billId: bills[0]._id,
+        transactionId: transactions[1]._id,
+        patientId: bills[0].patientId,
+        patientName: 'Maria Santos',
+        amountPaid: 2500.00,
+        paymentMethod: 'credit_card',
+        status: 'pending',
+        referenceNumber: 'REF-CC-2025092001',
+        notes: 'Online payment via credit card - awaiting verification',
+        paymentDate: new Date('2025-09-20T08:15:00')
       }
     ];
 
-    const createdPayments = await Payment.insertMany(payments);
+    // Create payments one by one to trigger the pre-save hook for paymentId generation
+    const createdPayments = [];
+    for (let i = 0; i < payments.length; i++) {
+      const payment = new Payment(payments[i]);
+      await payment.save();
+      createdPayments.push(payment);
+    }
+
     console.log(`✅ Created ${createdPayments.length} payments`);
     return createdPayments;
   } catch (error) {

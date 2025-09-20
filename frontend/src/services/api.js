@@ -246,6 +246,15 @@ export const financeAPI = {
     }
   },
 
+  deleteBill: async (billId) => {
+    try {
+      const response = await api.delete(`/finance/bills/${billId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to delete bill' };
+    }
+  },
+
   // Transactions management
   getTransactions: async (params = {}) => {
     try {
@@ -265,6 +274,24 @@ export const financeAPI = {
     }
   },
 
+  updateTransaction: async (transactionId, transactionData) => {
+    try {
+      const response = await api.put(`/finance/transactions/${transactionId}`, transactionData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to update transaction' };
+    }
+  },
+
+  deleteTransaction: async (transactionId) => {
+    try {
+      const response = await api.delete(`/finance/transactions/${transactionId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to delete transaction' };
+    }
+  },
+
   // Payments management
   getPayments: async (params = {}) => {
     try {
@@ -272,6 +299,43 @@ export const financeAPI = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { success: false, message: 'Failed to fetch payments' };
+    }
+  },
+
+  // Payments management
+  getPayments: async (params = {}) => {
+    try {
+      const response = await api.get('/finance/payments', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to fetch payments' };
+    }
+  },
+
+  createPayment: async (paymentData) => {
+    try {
+      const response = await api.post('/finance/payments', paymentData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to create payment' };
+    }
+  },
+
+  updatePayment: async (paymentId, paymentData) => {
+    try {
+      const response = await api.put(`/finance/payments/${paymentId}`, paymentData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to update payment' };
+    }
+  },
+
+  deletePayment: async (paymentId) => {
+    try {
+      const response = await api.delete(`/finance/payments/${paymentId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to delete payment' };
     }
   },
 
@@ -309,6 +373,58 @@ export const financeAPI = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { success: false, message: 'Failed to update billing rate' };
+    }
+  },
+
+  deleteBillingRate: async (rateId) => {
+    try {
+      const response = await api.delete(`/finance/billing-rates/${rateId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to delete billing rate' };
+    }
+  },
+
+  // Reports management
+  generateReport: async (reportType, params = {}) => {
+    try {
+      const response = await api.post('/finance/reports/generate', {
+        reportType,
+        ...params
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to generate report' };
+    }
+  },
+
+  getReportsHistory: async (params = {}) => {
+    try {
+      const response = await api.get('/finance/reports/history', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to fetch reports history' };
+    }
+  },
+
+  exportReport: async (reportId, format = 'pdf') => {
+    try {
+      const response = await api.get(`/finance/reports/${reportId}/export`, {
+        params: { format },
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to export report' };
+    }
+  },
+
+  scheduleReport: async (scheduleData) => {
+    try {
+      const response = await api.post('/finance/reports/schedule', scheduleData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to schedule report' };
     }
   }
 };

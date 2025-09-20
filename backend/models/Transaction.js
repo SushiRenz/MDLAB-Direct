@@ -3,74 +3,76 @@ const mongoose = require('mongoose');
 const TransactionSchema = new mongoose.Schema({
   transactionId: {
     type: String,
+    required: true,
     unique: true
   },
-  billId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Bill',
-    required: true
-  },
-  patientId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  patientName: {
+  type: {
     type: String,
-    required: true
-  },
-  description: {
-    type: String,
+    enum: ['payment', 'refund', 'adjustment'],
     required: true
   },
   amount: {
     type: Number,
     required: true
   },
+  currency: {
+    type: String,
+    default: 'PHP'
+  },
+  description: {
+    type: String,
+    required: true
+  },
+  patientId: {
+    type: String
+  },
+  patientName: {
+    type: String,
+    required: true
+  },
+  billId: {
+    type: String
+  },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'credit_card', 'debit_card', 'online_payment', 'gcash', 'bank_transfer', 'insurance'],
-    required: true
+    enum: ['cash', 'card', 'bank_transfer', 'check', 'online', 'internal'],
+    required: function() {
+      return this.type !== 'adjustment';
+    }
   },
   status: {
     type: String,
-    enum: ['completed', 'processing', 'failed', 'cancelled', 'refunded'],
-    default: 'completed'
+    enum: ['pending', 'completed', 'failed', 'cancelled'],
+    default: 'pending'
   },
-  referenceNumber: String,
   processedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    type: String,
     required: true
   },
-  transactionDate: {
+  processedAt: {
     type: Date,
     default: Date.now
   },
-  notes: String,
-  refundAmount: {
-    type: Number,
-    default: 0
+  referenceNumber: {
+    type: String
   },
-  refundReason: String,
-  refundDate: Date
+  notes: {
+    type: String
+  }
 }, {
   timestamps: true
-});
-
-// Generate Transaction ID automatically
-TransactionSchema.pre('save', async function(next) {
-  if (!this.transactionId) {
-    const year = new Date().getFullYear();
-    const count = await this.constructor.countDocuments({});
-    this.transactionId = `TXN-${year}-${String(count + 1).padStart(4, '0')}`;
-  }
-  next();
 });
 
 // Virtual for display amount (formatted)
 TransactionSchema.virtual('displayAmount').get(function() {
   return `₱${this.amount.toLocaleString()}`;
 });
+
+// Index for better query performance
+TransactionSchema.index({ transactionId: 1 });
+TransactionSchema.index({ patientName: 1 });
+TransactionSchema.index({ status: 1 });
+TransactionSchema.index({ type: 1 });
+TransactionSchema.index({ processedAt: 1 });
 
 module.exports = mongoose.model('Transaction', TransactionSchema);
