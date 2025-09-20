@@ -14,93 +14,96 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Check if user is already authenticated on app start
+  // Handle authentication persistence with session detection
   useEffect(() => {
-    const validateStoredSession = async () => {
-      // Check if this is a fresh browser session or just a page reload
-      const isNewSession = !sessionStorage.getItem('mdlab_session_active');
+    const handleSessionAndAuthentication = async () => {
+      // Check if this is a new browser session or just a page refresh
+      const sessionActive = sessionStorage.getItem('sessionActive');
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
       
-      if (isNewSession) {
-        // Fresh browser session - clear everything and go to login
+      if (!sessionActive) {
+        // This is a new browser session (browser was closed and reopened)
+        console.log('New browser session detected - clearing auth and going to login');
+        
+        // Clear stored credentials for new session
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        
+        // Reset authentication state
         setCurrentUser(null);
         setIsAuthenticated(false);
         setCurrentView('login');
         
-        // Mark session as active
-        sessionStorage.setItem('mdlab_session_active', 'true');
+        // Mark session as active for future page refreshes
+        sessionStorage.setItem('sessionActive', 'true');
         
-        console.log('Fresh browser session - redirected to login page');
-      } else {
-        // Page reload - try to restore previous state
-        const token = localStorage.getItem('token');
-        const user = localStorage.getItem('user');
+      } else if (token && user) {
+        // This is a page refresh within the same browser session
+        console.log('Page refresh detected - validating stored session');
         
-        if (token && user) {
-          try {
-            const userData = JSON.parse(user);
-            
-            // Validate token with backend
-            const response = await fetch(API_ENDPOINTS.ME, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            });
-            
-            if (response.ok) {
-              // Token is valid - restore user session
-              setCurrentUser(userData);
-              setIsAuthenticated(true);
-              
-              // Route to appropriate dashboard based on role
-              switch (userData.role) {
-                case 'admin':
-                  setCurrentView('dashboard');
-                  break;
-                case 'medtech':
-                  setCurrentView('medtech-dashboard');
-                  break;
-                case 'pathologist':
-                  setCurrentView('pathologist-dashboard');
-                  break;
-                case 'patient':
-                  setCurrentView('patient-portal');
-                  break;
-                default:
-                  setCurrentView('dashboard');
-              }
-              
-              console.log('Session restored after page reload for user:', userData.role);
-            } else {
-              // Token is invalid - clear and go to login
-              localStorage.removeItem('token');
-              localStorage.removeItem('user');
-              setCurrentUser(null);
-              setIsAuthenticated(false);
-              setCurrentView('login');
-              console.log('Invalid token - redirected to login');
+        try {
+          const userData = JSON.parse(user);
+          
+          // Validate token with backend
+          const response = await fetch(API_ENDPOINTS.ME, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
             }
-          } catch (error) {
-            // Error validating token or parsing user data - go to login
-            console.error('Error validating session:', error);
+          });
+          
+          if (response.ok) {
+            // Token is valid - restore user session
+            setCurrentUser(userData);
+            setIsAuthenticated(true);
+            
+            // Route to appropriate dashboard based on role
+            switch (userData.role) {
+              case 'admin':
+                setCurrentView('dashboard');
+                break;
+              case 'medtech':
+                setCurrentView('medtech-dashboard');
+                break;
+              case 'pathologist':
+                setCurrentView('pathologist-dashboard');
+                break;
+              case 'patient':
+                setCurrentView('patient-portal');
+                break;
+              default:
+                setCurrentView('dashboard');
+            }
+            
+            console.log('Session restored for user:', userData.role);
+          } else {
+            // Token is invalid - clear and go to login
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             setCurrentUser(null);
             setIsAuthenticated(false);
             setCurrentView('login');
+            console.log('Invalid token - redirected to login');
           }
-        } else {
-          // No stored credentials - go to login
+        } catch (error) {
+          // Error validating token or parsing user data - go to login
+          console.error('Error validating session:', error);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setCurrentUser(null);
+          setIsAuthenticated(false);
           setCurrentView('login');
-          console.log('No stored credentials - redirected to login');
         }
+      } else {
+        // No stored credentials but session is active (shouldn't happen, but handle it)
+        setCurrentView('login');
+        console.log('Session active but no credentials - redirected to login');
       }
     };
     
-    validateStoredSession();
+    handleSessionAndAuthentication();
   }, []);
 
   // Update document title based on current view
@@ -141,8 +144,8 @@ function App() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     
-    // Clear sessionStorage to ensure fresh session on next visit
-    sessionStorage.removeItem('mdlab_session_active');
+    // Clear sessionStorage
+    sessionStorage.removeItem('sessionActive');
     
     // Clear session state
     setIsAuthenticated(false);
@@ -187,6 +190,9 @@ function App() {
         const userData = JSON.parse(user);
         setCurrentUser(userData);
         setIsAuthenticated(true);
+        
+        // Mark session as active for refresh detection
+        sessionStorage.setItem('sessionActive', 'true');
         
         // Role-based routing
         switch (userData.role) {

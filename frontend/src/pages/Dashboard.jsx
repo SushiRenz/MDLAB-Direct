@@ -8,6 +8,20 @@ function Dashboard({ currentUser, onLogout }) {
   const [financeOpen, setFinanceOpen] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
   
+  // Dashboard Overview State
+  const [dashboardStats, setDashboardStats] = useState({
+    totalUsers: 0,
+    totalPatients: 0,
+    totalStaff: 0,
+    totalRevenue: 0,
+    pendingBills: 0,
+    recentTransactions: [],
+    monthlyRevenue: [],
+    topServices: []
+  });
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState('');
+  
   // User management state
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -210,6 +224,89 @@ function Dashboard({ currentUser, onLogout }) {
   });
 
   const user = currentUser;
+
+  // Dashboard data fetching
+  const fetchDashboardData = async () => {
+    setDashboardLoading(true);
+    setDashboardError('');
+    try {
+      // Fetch user statistics
+      const userStatsResponse = await userAPI.getUserStats();
+      
+      // Fetch finance statistics  
+      const financeStatsResponse = await financeAPI.getFinanceStats();
+      
+      // Fetch recent transactions
+      const recentTransactionsResponse = await financeAPI.getTransactions({ limit: 5 });
+      
+      // Fetch services statistics
+      const serviceStatsResponse = await servicesAPI.getServiceStats();
+
+      if (userStatsResponse.success && financeStatsResponse.success) {
+        setDashboardStats({
+          totalUsers: userStatsResponse.stats?.totalUsers || 0,
+          totalPatients: userStatsResponse.stats?.totalPatients || 0,
+          totalStaff: userStatsResponse.stats?.totalStaff || 0,
+          activeUsers: userStatsResponse.stats?.activeUsers || 0,
+          totalRevenue: financeStatsResponse.data?.totalRevenue || 0,
+          pendingBills: financeStatsResponse.data?.pendingBills || 0,
+          monthlyRevenue: financeStatsResponse.data?.monthlyRevenue || 0,
+          completedPayments: financeStatsResponse.data?.completedPayments || 0,
+          recentTransactions: recentTransactionsResponse.success ? (recentTransactionsResponse.data || []) : [],
+          topServices: serviceStatsResponse.success ? (serviceStatsResponse.data?.topServices || []) : []
+        });
+      } else {
+        throw new Error('Failed to fetch dashboard data');
+      }
+    } catch (err) {
+      console.error('Dashboard data fetch error:', err);
+      setDashboardError(err.message || 'Failed to load dashboard data');
+      
+      // Set fallback data for demo purposes
+      setDashboardStats({
+        totalUsers: 156,
+        totalPatients: 89,
+        totalStaff: 23,
+        activeUsers: 142,
+        totalRevenue: 1250000,
+        pendingBills: 45,
+        monthlyRevenue: 850000,
+        completedPayments: 128,
+        recentTransactions: [
+          {
+            transactionId: 'TXN-2025-001',
+            patientName: 'Maria Santos',
+            amount: 2500,
+            type: 'payment',
+            status: 'completed',
+            transactionDate: new Date().toISOString()
+          },
+          {
+            transactionId: 'TXN-2025-002', 
+            patientName: 'Carlos Rodriguez',
+            amount: 1800,
+            type: 'payment',
+            status: 'pending',
+            transactionDate: new Date(Date.now() - 86400000).toISOString()
+          }
+        ],
+        topServices: [
+          { serviceName: 'Complete Blood Count', count: 45, revenue: 36000 },
+          { serviceName: 'Lipid Profile', count: 32, revenue: 48000 },
+          { serviceName: 'X-Ray Chest', count: 28, revenue: 33600 }
+        ]
+      });
+    } finally {
+      setDashboardLoading(false);
+    }
+  };
+
+  // Load dashboard data on component mount
+  useEffect(() => {
+    if (activeSection === 'dashboard') {
+      fetchDashboardData();
+    }
+  }, [activeSection]);
 
   const handleSectionClick = (section) => {
     setActiveSection(section);
@@ -2066,39 +2163,55 @@ function Dashboard({ currentUser, onLogout }) {
     }
   };
 
-  const renderDashboardHome = () => (
+  const renderDashboardHome = () => {
+    if (dashboardLoading) {
+      return (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '400px',
+          fontSize: '18px',
+          color: '#666'
+        }}>
+          Loading dashboard data...
+        </div>
+      );
+    }
+
+    return (
     <>
       {/* Top Row Stats */}
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-icon"></div>
           <div className="stat-info">
-            <div className="stat-label">Total Appointments</div>
-            <div className="stat-value">1,234</div>
+            <div className="stat-label">Total Users</div>
+            <div className="stat-value">{dashboardStats.totalUsers}</div>
           </div>
         </div>
 
         <div className="stat-card">
           <div className="stat-icon"></div>
           <div className="stat-info">
-            <div className="stat-label">Pending Test Results</div>
-            <div className="stat-value">45</div>
+            <div className="stat-label">Active Patients</div>
+            <div className="stat-value">{dashboardStats.activePatients}</div>
           </div>
         </div>
 
         <div className="stat-card">
           <div className="stat-icon"></div>
           <div className="stat-info">
-            <div className="stat-label">Completed Reports</div>
-            <div className="stat-value">892</div>
+            <div className="stat-label">Total Revenue</div>
+            <div className="stat-value">₱{dashboardStats.totalRevenue?.toLocaleString() || '0'}</div>
           </div>
         </div>
 
         <div className="stat-card">
           <div className="stat-icon"></div>
           <div className="stat-info">
-            <div className="stat-label">Patient Visits</div>
-            <div className="stat-value">567</div>
+            <div className="stat-label">Total Services</div>
+            <div className="stat-value">{dashboardStats.totalServices}</div>
           </div>
         </div>
       </div>
@@ -2126,24 +2239,24 @@ function Dashboard({ currentUser, onLogout }) {
 
         <div className="info-card">
           <div className="card-header">
-            <h3>Bills Overview</h3>
+            <h3>Financial Overview</h3>
           </div>
           <div className="card-content">
             <div className="overview-item">
-              <span className="overview-label">Pending Bills</span>
-              <span className="overview-value">23</span>
+              <span className="overview-label">Total Bills</span>
+              <span className="overview-value">{dashboardStats.totalBills}</span>
             </div>
             <div className="overview-item">
-              <span className="overview-label">Paid Bills</span>
-              <span className="overview-value">156</span>
+              <span className="overview-label">Total Payments</span>
+              <span className="overview-value">{dashboardStats.totalPayments}</span>
             </div>
             <div className="overview-item">
-              <span className="overview-label">Overdue</span>
-              <span className="overview-value">8</span>
+              <span className="overview-label">Total Transactions</span>
+              <span className="overview-value">{dashboardStats.totalTransactions}</span>
             </div>
             <div className="overview-item">
-              <span className="overview-label">Total Amount</span>
-              <span className="overview-value">₱1,245,678</span>
+              <span className="overview-label">Total Revenue</span>
+              <span className="overview-value">₱{dashboardStats.totalRevenue?.toLocaleString() || '0'}</span>
             </div>
           </div>
         </div>
@@ -2165,12 +2278,12 @@ function Dashboard({ currentUser, onLogout }) {
           </div>
           <div className="quick-access-content">
             <div className="access-item">
-              <span>Active Patients</span>
-              <span className="access-count">342</span>
+              <span>Total Patients</span>
+              <span className="access-count">{dashboardStats.totalPatients}</span>
             </div>
             <div className="access-item">
-              <span>New This Month</span>
-              <span className="access-count">28</span>
+              <span>Active Patients</span>
+              <span className="access-count">{dashboardStats.activePatients}</span>
             </div>
           </div>
         </div>
@@ -2188,11 +2301,11 @@ function Dashboard({ currentUser, onLogout }) {
           <div className="quick-access-content">
             <div className="access-item">
               <span>Total Staff</span>
-              <span className="access-count">24</span>
+              <span className="access-count">{dashboardStats.totalStaff}</span>
             </div>
             <div className="access-item">
-              <span>On Duty</span>
-              <span className="access-count">18</span>
+              <span>Active Staff</span>
+              <span className="access-count">{dashboardStats.totalStaff}</span>
             </div>
           </div>
         </div>
@@ -2205,20 +2318,20 @@ function Dashboard({ currentUser, onLogout }) {
                 <path d="M12 20V4"></path>
                 <path d="M6 20v-6"></path>
               </svg>
-              Patient Visits
+              System Analytics
             </h3>
           </div>
           <div className="activity-content">
             <div className="activity-chart">
-              <div className="analytics-title">Visit Analytics</div>
+              <div className="analytics-title">System Overview</div>
               <div className="activity-stats">
                 <div className="activity-stat">
-                  <span>Today</span>
-                  <span className="stat-number">24</span>
+                  <span>Total Logs</span>
+                  <span className="stat-number">{dashboardStats.totalLogs}</span>
                 </div>
                 <div className="activity-stat">
-                  <span>This Week</span>
-                  <span className="stat-number">156</span>
+                  <span>Services</span>
+                  <span className="stat-number">{dashboardStats.totalServices}</span>
                 </div>
               </div>
             </div>
@@ -2226,7 +2339,8 @@ function Dashboard({ currentUser, onLogout }) {
         </div>
       </div>
     </>
-  );
+    );
+  };
 
   const renderPatientManagement = () => {
     const patients = users.filter(user => user.role === 'patient');

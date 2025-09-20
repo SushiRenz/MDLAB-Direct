@@ -1,113 +1,131 @@
-/* Patient Dashboard Styles */
+/* Patient Dashboard Styles - Modern Navbar Layout */
 .patient-dashboard-container {
   display: flex;
+  flex-direction: column;
   min-height: 100vh;
   background: linear-gradient(135deg, #f0fdfa 0%, #ecfdf5 50%, #f0f9ff 100%);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* Sidebar Styles */
-.patient-sidebar {
-  width: 280px;
-  background: linear-gradient(180deg, #21AEA8 0%, #179e93 100%);
-  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+/* Modern Navigation Bar */
+.patient-navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #21AEA8 0%, #179e93 100%);
+  box-shadow: 0 4px 20px rgba(33, 174, 168, 0.15);
+  padding: 0 32px;
+  height: 80px;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+}
+
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo-icon {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+}
+
+.logo-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.logo-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+}
+
+.brand-text {
   display: flex;
   flex-direction: column;
-  position: fixed;
-  height: 100vh;
-  overflow-y: auto;
 }
 
-.sidebar-header {
-  padding: 24px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.logo-container {
-  text-align: center;
-}
-
-.sidebar-title {
+.brand-title {
   color: white;
   font-size: 1.5rem;
   font-weight: 700;
-  margin: 0 0 8px 0;
+  margin: 0;
   letter-spacing: 1px;
+  line-height: 1;
 }
 
-.patient-label {
+.brand-subtitle {
   color: rgba(255, 255, 255, 0.8);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 500;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 4px 12px;
-  border-radius: 12px;
-  display: inline-block;
+  margin-top: 2px;
 }
 
-.sidebar-nav {
-  flex: 1;
-  padding: 20px 0;
+/* Navigation Items */
+.navbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  padding: 16px 24px;
+  justify-content: center;
+  padding: 12px 24px;
   color: rgba(255, 255, 255, 0.9);
   cursor: pointer;
   transition: all 0.3s ease;
-  border-left: 3px solid transparent;
+  border-radius: 8px;
   font-size: 1rem;
   font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.1);
   color: white;
-  border-left-color: rgba(255, 255, 255, 0.3);
 }
 
 .nav-item.active {
-  background: rgba(255, 255, 255, 0.15);
   color: white;
-  border-left-color: white;
   font-weight: 600;
 }
 
-.nav-icon {
-  margin-right: 12px;
-  width: 20px;
-  height: 20px;
+/* User Section */
+.navbar-user {
   display: flex;
   align-items: center;
-  justify-content: center;
-}
-
-.nav-icon svg {
-  width: 18px;
-  height: 18px;
-  fill: currentColor;
-}
-
-.nav-text {
-  font-size: 1rem;
-}
-
-.sidebar-footer {
-  padding: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 16px;
 }
 
 .user-info {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50px;
+  backdrop-filter: blur(10px);
 }
 
 .user-avatar {
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.2);
   display: flex;
@@ -115,11 +133,10 @@
   justify-content: center;
   color: white;
   font-weight: 600;
-  font-size: 1.2rem;
+  font-size: 1rem;
 }
 
 .user-details {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -128,96 +145,84 @@
 .user-name {
   color: white;
   font-weight: 600;
-  font-size: 0.95rem;
-}
-
-.user-email {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
+  line-height: 1;
 }
 
 .user-role {
   color: rgba(255, 255, 255, 0.8);
   font-size: 0.75rem;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 2px 8px;
-  border-radius: 8px;
-  align-self: flex-start;
+  line-height: 1;
 }
 
 .logout-btn {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
   color: white;
-  padding: 8px;
-  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   cursor: pointer;
-  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
 }
 
 .logout-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1);
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-2px);
 }
 
-/* Main Content Styles */
+.logout-btn svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+}
+
+/* Main Content Area */
 .patient-main {
   flex: 1;
-  margin-left: 280px;
   display: flex;
   flex-direction: column;
 }
 
-.patient-header {
+.content-header {
   background: white;
-  padding: 24px 32px;
+  padding: 32px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   border-bottom: 1px solid #f0f0f0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+}
+
+.page-info {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .page-title {
   color: #21AEA8;
-  font-size: 2rem;
+  font-size: 2.5rem;
   font-weight: 700;
-  margin: 0;
+  margin: 0 0 8px 0;
   letter-spacing: 0.5px;
 }
 
-/* Modern Logout Button */
-.modern-logout-btn {
-  background: linear-gradient(135deg, #ff4757 0%, #e94560 100%);
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 16px rgba(255, 71, 87, 0.3);
-  display: flex;
-  align-items: center;
-}
-
-.modern-logout-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 71, 87, 0.4);
-  background: linear-gradient(135deg, #e94560 0%, #d63447 100%);
-}
-
-.modern-logout-btn:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(255, 71, 87, 0.3);
+.page-description {
+  color: #666;
+  font-size: 1.1rem;
+  margin: 0;
+  font-weight: 400;
 }
 
 .patient-content {
   flex: 1;
   padding: 32px;
-  overflow-y: auto;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Welcome Section */
@@ -255,20 +260,26 @@
 
 .stat-item {
   text-align: center;
-  color: white;
+  color: white !important;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 20px;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  min-width: 140px;
 }
 
 .stat-number {
   font-size: 2.5rem;
   font-weight: 700;
   margin-bottom: 4px;
-  color: white;
+  color: white !important;
 }
 
 .stat-label {
   font-size: 0.9rem;
   opacity: 0.9;
-  color: white;
+  color: white !important;
 }
 
 /* Quick Actions */
@@ -1410,43 +1421,34 @@
 
 /* Responsive Design */
 @media (max-width: 1024px) {
-  .patient-dashboard-container {
-    flex-direction: column;
+  .patient-navbar {
+    padding: 0 24px;
+    height: 70px;
   }
   
-  .patient-sidebar {
-    width: 100%;
-    height: auto;
-    position: relative;
-    order: 2;
+  .brand-title {
+    font-size: 1.3rem;
   }
   
-  .patient-main {
-    margin-left: 0;
-    order: 1;
+  .brand-subtitle {
+    font-size: 0.8rem;
   }
   
-  .sidebar-nav {
-    display: flex;
-    overflow-x: auto;
-    padding: 10px 0;
+  .navbar-nav {
+    gap: 6px;
   }
   
   .nav-item {
-    white-space: nowrap;
-    min-width: auto;
-    padding: 12px 20px;
-    border-left: none;
-    border-bottom: 3px solid transparent;
+    padding: 10px 20px;
+    font-size: 0.95rem;
   }
   
-  .nav-item.active {
-    border-left: none;
-    border-bottom-color: white;
+  .page-title {
+    font-size: 2.2rem;
   }
   
-  .sidebar-footer {
-    display: none;
+  .patient-content {
+    padding: 24px;
   }
   
   .welcome-card {
@@ -1477,16 +1479,105 @@
 }
 
 @media (max-width: 768px) {
-  .patient-content {
-    padding: 20px;
+  .patient-navbar {
+    padding: 0 16px;
+    height: auto;
+    min-height: 60px;
+    flex-wrap: wrap;
+    gap: 16px;
   }
   
-  .patient-header {
-    padding: 20px;
+  .navbar-brand {
+    order: 1;
+    flex: 1;
+  }
+  
+  .navbar-user {
+    order: 2;
+    gap: 12px;
+  }
+  
+  .navbar-nav {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    padding: 12px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    gap: 4px;
+  }
+  
+  .nav-item {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .logo-icon {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .logo-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .brand-text {
+    gap: 2px;
+  }
+  
+  .brand-title {
+    font-size: 1.2rem;
+  }
+  
+  .brand-subtitle {
+    font-size: 0.75rem;
+  }
+  
+  .user-info {
+    padding: 6px 12px;
+    gap: 8px;
+  }
+  
+  .user-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+  }
+  
+  .user-name {
+    font-size: 0.85rem;
+  }
+  
+  .user-role {
+    font-size: 0.7rem;
+  }
+  
+  .logout-btn {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .logout-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .content-header {
+    padding: 24px 16px;
   }
   
   .page-title {
-    font-size: 1.5rem;
+    font-size: 1.8rem;
+  }
+  
+  .page-description {
+    font-size: 1rem;
+  }
+  
+  .patient-content {
+    padding: 16px;
   }
   
   .welcome-card {
@@ -1502,9 +1593,13 @@
   }
   
   .action-icon {
-    font-size: 2.5rem;
-    width: 60px;
-    height: 60px;
+    width: 56px;
+    height: 56px;
+  }
+  
+  .action-icon svg {
+    width: 28px;
+    height: 28px;
   }
   
   .appointments-header,
@@ -1521,12 +1616,13 @@
   }
   
   .appointment-card {
-    margin: 0 -10px;
+    margin: 0;
   }
   
   .info-card {
     flex-direction: column;
     text-align: center;
+    padding: 24px;
   }
   
   .schedule-grid {
@@ -1544,16 +1640,46 @@
   .profile-info {
     flex-direction: column;
     text-align: center;
+    padding: 24px;
   }
 }
 
 @media (max-width: 480px) {
-  .patient-content {
-    padding: 16px;
+  .patient-navbar {
+    padding: 0 12px;
   }
   
-  .patient-header {
-    padding: 16px;
+  .navbar-nav {
+    gap: 2px;
+  }
+  
+  .nav-item {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+  
+  .brand-title {
+    font-size: 1.1rem;
+  }
+  
+  .brand-subtitle {
+    display: none;
+  }
+  
+  .user-details {
+    display: none;
+  }
+  
+  .content-header {
+    padding: 20px 12px;
+  }
+  
+  .page-title {
+    font-size: 1.6rem;
+  }
+  
+  .patient-content {
+    padding: 12px;
   }
   
   .welcome-card {
@@ -1599,6 +1725,11 @@
   outline-offset: 2px;
 }
 
+.logout-btn:focus {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+
 .book-appointment-btn:focus,
 .request-service-btn:focus,
 .edit-profile-btn:focus,
@@ -1606,14 +1737,20 @@
 .btn-cancel:focus,
 .btn-view:focus,
 .btn-download:focus {
-  outline: 2px solid white;
+  outline: 2px solid #21AEA8;
   outline-offset: 2px;
 }
 
 /* Print Styles */
 @media print {
-  .patient-sidebar,
-  .patient-header,
+  .patient-navbar {
+    display: none;
+  }
+  
+  .content-header {
+    display: none;
+  }
+  
   .appointment-actions,
   .result-actions {
     display: none;
@@ -1624,7 +1761,7 @@
   }
   
   .patient-main {
-    margin-left: 0;
+    margin: 0;
   }
   
   .patient-content {

@@ -900,110 +900,94 @@ function PatientDashboard(props) {
 
   return (
     <div className="patient-dashboard-container">
-      {/* Sidebar */}
-      <div className="patient-sidebar">
-        <div className="sidebar-header">
-          <div className="logo-container">
-            <h2 className="sidebar-title">MDLAB DIRECT</h2>
-            <span className="patient-label">Patient Portal</span>
+      {/* Modern Navigation Header */}
+      <header className="patient-navbar">
+        <div className="navbar-brand">
+          <div className="brand-logo">
+            <div className="logo-icon">
+              <img src="/src/assets/mdlab-logo.png" alt="MDLAB Direct Logo" />
+            </div>
+            <div className="brand-text">
+              <h2 className="brand-title">MDLAB DIRECT</h2>
+              <span className="brand-subtitle">Patient Portal</span>
+            </div>
           </div>
         </div>
         
-        <nav className="sidebar-nav">
+        <nav className="navbar-nav">
           <div 
             className={`nav-item ${activeSection === 'overview' ? 'active' : ''}`}
             onClick={() => handleSectionClick('overview')}
           >
-            <span className="nav-icon">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </span>
-            <span className="nav-text">Overview</span>
+            Dashboard
           </div>
 
           <div 
             className={`nav-item ${activeSection === 'appointments' ? 'active' : ''}`}
             onClick={() => handleSectionClick('appointments')}
           >
-            <span className="nav-icon">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </span>
-            <span className="nav-text">Appointments</span>
+            Appointments
           </div>
 
           <div 
             className={`nav-item ${activeSection === 'results' ? 'active' : ''}`}
             onClick={() => handleSectionClick('results')}
           >
-            <span className="nav-icon">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </span>
-            <span className="nav-text">Test Results</span>
+            Results
           </div>
 
           <div 
             className={`nav-item ${activeSection === 'mobile' ? 'active' : ''}`}
             onClick={() => handleSectionClick('mobile')}
           >
-            <span className="nav-icon">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 17h2m0 0a2 2 0 104 0m-4 0a2 2 0 014 0m0 0h4m0 0a2 2 0 104 0m-4 0a2 2 0 014 0m0 0h2M3 12h1l2-4h12l2 4h1v3a1 1 0 01-1 1h-1m-14 0H4a1 1 0 01-1-1v-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <circle cx="8" cy="17" r="2" stroke="currentColor" strokeWidth="2"/>
-                <circle cx="16" cy="17" r="2" stroke="currentColor" strokeWidth="2"/>
-                <path d="M7 12h10" stroke="currentColor" strokeWidth="1.5"/>
-              </svg>
-            </span>
-            <span className="nav-text">Mobile Lab</span>
+            Mobile Lab
           </div>
 
           <div 
             className={`nav-item ${activeSection === 'profile' ? 'active' : ''}`}
             onClick={() => handleSectionClick('profile')}
           >
-            <span className="nav-icon">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </span>
-            <span className="nav-text">My Profile</span>
+            Profile
           </div>
         </nav>
 
-        <div className="sidebar-footer">
+        <div className="navbar-user">
           <div className="user-info">
             <div className="user-avatar">
               <span>{currentUser?.firstName?.charAt(0) || currentUser?.username?.charAt(0) || 'P'}</span>
             </div>
             <div className="user-details">
               <span className="user-name">{currentUser?.firstName} {currentUser?.lastName}</span>
-              <span className="user-email">{currentUser?.email}</span>
               <span className="user-role">Patient</span>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="patient-main">
-        <div className="patient-header">
-          <h1 className="page-title">{renderPageTitle()}</h1>
-          <button className="modern-logout-btn" onClick={handleLogout}>
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '18px', height: '18px', marginRight: '8px'}}>
+          <button className="logout-btn" onClick={handleLogout} title="Logout">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4m7 14l5-5-5-5m5 5H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Logout
           </button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="patient-main">
+        <div className="content-header">
+          <div className="page-info">
+            <h1 className="page-title">{renderPageTitle()}</h1>
+            <p className="page-description">
+              {activeSection === 'overview' && 'Welcome to your health dashboard'}
+              {activeSection === 'appointments' && 'Schedule and manage your appointments'}
+              {activeSection === 'results' && 'View your latest test results'}
+              {activeSection === 'mobile' && 'Mobile laboratory services in your community'}
+              {activeSection === 'profile' && 'Manage your personal information'}
+            </p>
+          </div>
         </div>
 
         <div className="patient-content">
           {renderContent()}
         </div>
-      </div>
+      </main>
 
       <BookAppointmentModal
         isOpen={isBookingModalOpen}
