@@ -215,6 +215,104 @@ export const userAPI = {
   },
 };
 
+// Finance API functions
+export const financeAPI = {
+  // Get finance dashboard stats
+  getFinanceStats: async () => {
+    try {
+      const response = await api.get('/finance/stats');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to fetch finance stats' };
+    }
+  },
+
+  // Bills management
+  getBills: async (params = {}) => {
+    try {
+      const response = await api.get('/finance/bills', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to fetch bills' };
+    }
+  },
+
+  createBill: async (billData) => {
+    try {
+      const response = await api.post('/finance/bills', billData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to create bill' };
+    }
+  },
+
+  // Transactions management
+  getTransactions: async (params = {}) => {
+    try {
+      const response = await api.get('/finance/transactions', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to fetch transactions' };
+    }
+  },
+
+  createTransaction: async (transactionData) => {
+    try {
+      const response = await api.post('/finance/transactions', transactionData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to create transaction' };
+    }
+  },
+
+  // Payments management
+  getPayments: async (params = {}) => {
+    try {
+      const response = await api.get('/finance/payments', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to fetch payments' };
+    }
+  },
+
+  verifyPayment: async (paymentId) => {
+    try {
+      const response = await api.put(`/finance/payments/${paymentId}/verify`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to verify payment' };
+    }
+  },
+
+  // Billing rates management
+  getBillingRates: async (params = {}) => {
+    try {
+      const response = await api.get('/finance/billing-rates', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to fetch billing rates' };
+    }
+  },
+
+  createBillingRate: async (rateData) => {
+    try {
+      const response = await api.post('/finance/billing-rates', rateData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to create billing rate' };
+    }
+  },
+
+  updateBillingRate: async (rateId, rateData) => {
+    try {
+      const response = await api.put(`/finance/billing-rates/${rateId}`, rateData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Failed to update billing rate' };
+    }
+  }
+};
+
 // Utility functions
 export const authUtils = {
   // Check if user is logged in

@@ -2591,6 +2591,11 @@ select:focus {
   box-sizing: border-box;
 }
 
+/* Higher z-index for edit modals opened from view modals */
+.modal-overlay.edit-on-top {
+  z-index: 1100;
+}
+
 .modal-content {
   background: white;
   border-radius: 12px;
@@ -2850,4 +2855,734 @@ select:focus {
 .role-admin {
   background-color: #fff3e0;
   color: #ef6c00;
+}
+
+/* Bill Modal Specific Styles */
+.services-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  background-color: #f9fafb;
+}
+
+.service-row {
+  margin-bottom: 12px;
+}
+
+.service-row:last-child {
+  margin-bottom: 0;
+}
+
+.service-input-group {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.service-input-group input[type="text"] {
+  flex: 2;
+}
+
+.service-input-group input[type="number"] {
+  flex: 1;
+}
+
+.readonly {
+  background-color: #f3f4f6 !important;
+  color: #6b7280 !important;
+  cursor: not-allowed !important;
+}
+
+/* View Modal Specific Styles */
+.modal-content.view-modal {
+  max-width: 800px;
+}
+
+.view-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+.info-section {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 20px;
+  border-left: 4px solid #21AEA8;
+}
+
+.info-section h4 {
+  margin: 0 0 16px 0;
+  color: #1f2937;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-row .label {
+  font-weight: 500;
+  color: #6b7280;
+  flex: 1;
+}
+
+.info-row .value {
+  font-weight: 500;
+  color: #1f2937;
+  flex: 2;
+  text-align: right;
+}
+
+.info-row .value.amount {
+  color: #059669;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.services-list {
+  background: white;
+  border-radius: 6px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+}
+
+.service-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.service-item:last-child {
+  border-bottom: none;
+}
+
+.service-name {
+  font-weight: 500;
+  color: #374151;
+}
+
+.service-price {
+  font-weight: 600;
+  color: #059669;
+}
+
+.payment-status {
+  background: white;
+  border-radius: 6px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.indicator.pending {
+  background-color: #f59e0b;
+}
+
+.indicator.paid {
+  background-color: #10b981;
+}
+
+.indicator.overdue {
+  background-color: #ef4444;
+}
+
+.indicator.cancelled {
+  background-color: #6b7280;
+}
+
+.payment-info p {
+  margin: 4px 0;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.notes {
+  color: #374151;
+  line-height: 1.6;
+  font-style: italic;
+}
+
+/* Patient View Modal Specific Styles */
+.patient-summary {
+  background: white;
+  border-radius: 6px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.summary-item:last-child {
+  border-bottom: none;
+}
+
+.summary-label {
+  font-weight: 500;
+  color: #6b7280;
+  flex: 1;
+  font-size: 0.875rem;
+}
+
+.summary-value {
+  font-weight: 500;
+  color: #374151;
+  flex: 2;
+  text-align: right;
+  font-size: 0.875rem;
+}
+
+.summary-value.active {
+  color: #059669;
+}
+
+.summary-value.inactive {
+  color: #dc2626;
+}
+
+/* Staff Schedule Table Styling */
+.schedule-table {
+  width: 100%;
+  margin-top: 15px;
+}
+
+.schedule-table table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.schedule-table th {
+  background-color: #f8f9fa;
+  color: #495057;
+  font-weight: 600;
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 2px solid #dee2e6;
+  font-size: 0.9rem;
+}
+
+.schedule-table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid #dee2e6;
+  font-size: 0.9rem;
+}
+
+.schedule-table tr:last-child td {
+  border-bottom: none;
+}
+
+.schedule-table tr:hover {
+  background-color: #f8f9fa;
+}
+
+.schedule-day {
+  font-weight: 600;
+  color: #495057;
+}
+
+.schedule-shift {
+  color: #212529;
+  font-family: 'Courier New', monospace;
+}
+
+.schedule-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.schedule-status.regular {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.schedule-status.off {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.schedule-status.overtime {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.btn-edit-small {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-edit-small:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.btn-edit-small:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Staff Summary Styling */
+.staff-summary {
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  margin-top: 15px;
+}
+
+/* Modal sizing for larger content */
+.view-modal {
+  max-width: 900px;
+  width: 95%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.view-modal .modal-body {
+  max-height: calc(90vh - 120px);
+  overflow-y: auto;
+}
+
+/* Full width sections for schedule and summary */
+.info-section.full-width {
+  grid-column: 1 / -1;
+}
+
+/* Responsive adjustments for schedule table */
+@media (max-width: 768px) {
+  .schedule-table {
+    overflow-x: auto;
+  }
+  
+  .schedule-table table {
+    min-width: 600px;
+  }
+  
+  .view-modal {
+    width: 98%;
+    margin: 1% auto;
+  }
+}
+
+/* Pathologist Specializations Styling */
+.specializations-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.specialization-tag {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border: 1px solid #bbdefb;
+}
+
+/* Pathologist Certifications Table Styling */
+.certifications-table {
+  width: 100%;
+  margin-top: 15px;
+}
+
+.certifications-table table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.certifications-table th {
+  background-color: #f8f9fa;
+  color: #495057;
+  font-weight: 600;
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 2px solid #dee2e6;
+  font-size: 0.9rem;
+}
+
+.certifications-table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid #dee2e6;
+  font-size: 0.9rem;
+}
+
+.certifications-table tr:last-child td {
+  border-bottom: none;
+}
+
+.certifications-table tr:hover {
+  background-color: #f8f9fa;
+}
+
+.cert-name {
+  font-weight: 600;
+  color: #495057;
+}
+
+.cert-date {
+  color: #212529;
+  font-family: 'Courier New', monospace;
+}
+
+.cert-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.cert-status.active {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.cert-status.expired {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.cert-status.pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+/* Pathologist Summary Styling */
+.pathologist-summary {
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  margin-top: 15px;
+}
+
+/* Role badge for pathologist */
+.role-badge.role-pathologist {
+  background-color: #e8f5e8;
+  color: #2e7d32;
+}
+
+/* Schedule Edit Modal Styling */
+.schedule-edit-modal {
+  max-width: 500px;
+  width: 95%;
+}
+
+.schedule-edit-form {
+  padding: 0;
+}
+
+.staff-info {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.staff-info h4 {
+  margin: 0 0 5px 0;
+  color: #495057;
+  font-size: 1.1rem;
+}
+
+.staff-info p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.time-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.schedule-preview {
+  background-color: #e9ecef;
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.schedule-preview h5 {
+  margin: 0 0 8px 0;
+  color: #495057;
+  font-size: 0.95rem;
+}
+
+.preview-text {
+  margin: 0;
+  font-weight: 600;
+  color: #212529;
+  font-family: 'Courier New', monospace;
+}
+
+.day-off-info {
+  background-color: #f8d7da;
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.off-message {
+  margin: 0;
+  color: #721c24;
+  font-weight: 500;
+  text-align: center;
+}
+
+.form-control[type="time"] {
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-family: 'Courier New', monospace;
+}
+
+/* Responsive adjustments for schedule edit modal */
+@media (max-width: 480px) {
+  .time-inputs {
+    grid-template-columns: 1fr;
+  }
+  
+  .schedule-edit-modal {
+    width: 98%;
+    margin: 1% auto;
+  }
+}
+
+/* Role-Specific Form Styling */
+.section-title {
+  color: #495057;
+  font-size: 1.1rem;
+  margin: 20px 0 10px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #dee2e6;
+  font-weight: 600;
+}
+
+.form-group.full-width .section-title {
+  margin-top: 0;
+}
+
+/* Enhanced form styling for role-specific fields */
+.form-group input[placeholder*="e.g."] {
+  font-style: italic;
+  color: #6c757d;
+}
+
+.form-group input[placeholder*="e.g."]:focus {
+  font-style: normal;
+  color: #495057;
+}
+
+/* Department and shift preference styling */
+.form-group select[name="department"],
+.form-group select[name="shiftPreference"] {
+  background-color: #f8f9fa;
+  border: 1px solid #ced4da;
+}
+
+.form-group select[name="department"]:focus,
+.form-group select[name="shiftPreference"]:focus {
+  background-color: white;
+  border-color: #007bff;
+}
+
+/* Years experience number input */
+.form-group input[name="yearsExperience"] {
+  max-width: 120px;
+}
+
+/* Specializations input styling */
+.form-group input[name="specializations"] {
+  font-size: 0.9rem;
+}
+
+/* Enhanced modal for role-specific forms */
+.modal-content:has(.section-title) {
+  max-width: 700px;
+}
+
+.modal-content:has(.section-title) .modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* Section header with action buttons */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.section-header h4 {
+  margin: 0;
+  color: #495057;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.section-header .btn-edit-small {
+  font-size: 0.8rem;
+  padding: 6px 12px;
+}
+
+/* Certification Management Modal Styling */
+.certification-modal {
+  max-width: 800px;
+  width: 95%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.certification-form {
+  background-color: #f8f9fa;
+  padding: 20px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.form-header {
+  margin-bottom: 15px;
+}
+
+.form-header h4 {
+  margin: 0;
+  color: #495057;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 15px;
+}
+
+.certifications-list {
+  margin-top: 20px;
+}
+
+.certifications-list h4 {
+  margin: 0 0 15px 0;
+  color: #495057;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.no-certifications {
+  text-align: center;
+  color: #6c757d;
+  font-style: italic;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+}
+
+.cert-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.btn-delete-small {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-delete-small:hover {
+  background-color: #c82333;
+}
+
+/* Enhanced table styling for certification modal */
+.certification-modal .certifications-table {
+  background-color: white;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.certification-modal .certifications-table table {
+  margin: 0;
+}
+
+.certification-modal .certifications-table th {
+  background-color: #495057;
+  color: white;
+}
+
+/* Responsive adjustments for certification modal */
+@media (max-width: 768px) {
+  .certification-modal {
+    width: 98%;
+    margin: 1% auto;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .cert-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .cert-actions button {
+    width: 100%;
+    margin-bottom: 2px;
+  }
 }

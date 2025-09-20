@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../design/Dashboard.css';
-import { userAPI } from '../services/api';
+import { userAPI, financeAPI } from '../services/api';
 
 function Dashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -17,6 +17,51 @@ function Dashboard({ currentUser, onLogout }) {
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [userStats, setUserStats] = useState(null);
+
+  // Finance management state
+  const [financeStats, setFinanceStats] = useState(null);
+  const [bills, setBills] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [billingRates, setBillingRates] = useState([]);
+  const [financeLoading, setFinanceLoading] = useState(false);
+  const [financeError, setFinanceError] = useState('');
+
+  // Bill management modals
+  const [showCreateBillModal, setShowCreateBillModal] = useState(false);
+  const [showEditBillModal, setShowEditBillModal] = useState(false);
+  const [showViewBillModal, setShowViewBillModal] = useState(false);
+  const [selectedBill, setSelectedBill] = useState(null);
+
+  // Patient view modal
+  const [showViewPatientModal, setShowViewPatientModal] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+
+  // Staff view modal
+  const [showViewStaffModal, setShowViewStaffModal] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState(null);
+
+  // Pathologist view modal
+  const [showViewPathologistModal, setShowViewPathologistModal] = useState(false);
+  const [selectedPathologist, setSelectedPathologist] = useState(null);
+
+  // Schedule edit modal for staff
+  const [showScheduleEditModal, setShowScheduleEditModal] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState(null);
+  const [scheduleStartTime, setScheduleStartTime] = useState('');
+  const [scheduleEndTime, setScheduleEndTime] = useState('');
+  const [scheduleStatus, setScheduleStatus] = useState('Regular');
+
+  // Certification management modal for pathologist
+  const [showCertificationModal, setShowCertificationModal] = useState(false);
+  const [pathologistCertifications, setPathologistCertifications] = useState([]);
+  const [editingCertification, setEditingCertification] = useState(null);
+  const [certificationName, setCertificationName] = useState('');
+  const [certificationDate, setCertificationDate] = useState('');
+  const [certificationStatus, setCertificationStatus] = useState('Active');
+
+  // Track if edit modal is opened from a view modal (for z-index layering)
+  const [editModalFromView, setEditModalFromView] = useState(false);
 
   const user = currentUser;
 
@@ -155,14 +200,169 @@ function Dashboard({ currentUser, onLogout }) {
     }
   };
 
-  const openUserModal = (user = null) => {
+  const openUserModal = (user = null, fromView = false) => {
     setEditingUser(user);
     setShowUserModal(true);
+    setEditModalFromView(fromView);
   };
 
   const closeUserModal = () => {
     setEditingUser(null);
     setShowUserModal(false);
+    setEditModalFromView(false);
+  };
+
+  // Bill modal functions
+  const openCreateBillModal = () => {
+    setSelectedBill(null);
+    setShowCreateBillModal(true);
+  };
+
+  const openEditBillModal = (bill) => {
+    setSelectedBill(bill);
+    setShowEditBillModal(true);
+  };
+
+  const openViewBillModal = (bill) => {
+    setSelectedBill(bill);
+    setShowViewBillModal(true);
+  };
+
+  const closeBillModals = () => {
+    setSelectedBill(null);
+    setShowCreateBillModal(false);
+    setShowEditBillModal(false);
+    setShowViewBillModal(false);
+  };
+
+  // Patient modal functions
+  const openViewPatientModal = (patient) => {
+    setSelectedPatient(patient);
+    setShowViewPatientModal(true);
+  };
+
+  const closePatientModal = () => {
+    setSelectedPatient(null);
+    setShowViewPatientModal(false);
+  };
+
+  // Staff modal functions
+  const openViewStaffModal = (staff) => {
+    setSelectedStaff(staff);
+    setShowViewStaffModal(true);
+  };
+
+  const closeStaffModal = () => {
+    setSelectedStaff(null);
+    setShowViewStaffModal(false);
+  };
+
+  // Pathologist modal functions
+  const openViewPathologistModal = (pathologist) => {
+    setSelectedPathologist(pathologist);
+    setShowViewPathologistModal(true);
+  };
+
+  const closePathologistModal = () => {
+    setSelectedPathologist(null);
+    setShowViewPathologistModal(false);
+  };
+
+  // Schedule edit modal functions
+  const openScheduleEditModal = (scheduleData) => {
+    setEditingSchedule(scheduleData);
+    // Initialize form values based on schedule data
+    if (scheduleData.shift.includes('8:00 AM')) {
+      setScheduleStartTime('08:00');
+    } else {
+      setScheduleStartTime('');
+    }
+    if (scheduleData.shift.includes('5:00 PM')) {
+      setScheduleEndTime('17:00');
+    } else {
+      setScheduleEndTime('');
+    }
+    setScheduleStatus(scheduleData.status || 'Regular');
+    setShowScheduleEditModal(true);
+  };
+
+  const closeScheduleEditModal = () => {
+    setEditingSchedule(null);
+    setScheduleStartTime('');
+    setScheduleEndTime('');
+    setScheduleStatus('Regular');
+    setShowScheduleEditModal(false);
+  };
+
+  // Certification modal functions
+  const openCertificationModal = (pathologist) => {
+    // Initialize with sample certifications (in real app, this would come from the pathologist's data)
+    const sampleCertifications = [
+      { id: 1, name: 'Board Certified Pathologist', date: '2020', status: 'Active' },
+      { id: 2, name: 'Clinical Laboratory Certification', date: '2019', status: 'Active' },
+      { id: 3, name: 'Hematology Subspecialty', date: '2021', status: 'Active' }
+    ];
+    setPathologistCertifications(sampleCertifications);
+    setShowCertificationModal(true);
+  };
+
+  const closeCertificationModal = () => {
+    setShowCertificationModal(false);
+    setPathologistCertifications([]);
+    setEditingCertification(null);
+    setCertificationName('');
+    setCertificationDate('');
+    setCertificationStatus('Active');
+  };
+
+  const openAddCertification = () => {
+    setEditingCertification(null);
+    setCertificationName('');
+    setCertificationDate('');
+    setCertificationStatus('Active');
+  };
+
+  const openEditCertification = (cert) => {
+    setEditingCertification(cert);
+    setCertificationName(cert.name);
+    setCertificationDate(cert.date);
+    setCertificationStatus(cert.status);
+  };
+
+  const handleSaveCertification = () => {
+    if (!certificationName || !certificationDate) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    const certificationData = {
+      id: editingCertification?.id || Date.now(),
+      name: certificationName,
+      date: certificationDate,
+      status: certificationStatus
+    };
+
+    if (editingCertification) {
+      // Update existing certification
+      setPathologistCertifications(prev => 
+        prev.map(cert => cert.id === editingCertification.id ? certificationData : cert)
+      );
+    } else {
+      // Add new certification
+      setPathologistCertifications(prev => [...prev, certificationData]);
+    }
+
+    // Reset form
+    setEditingCertification(null);
+    setCertificationName('');
+    setCertificationDate('');
+    setCertificationStatus('Active');
+  };
+
+  const handleDeleteCertification = (certId) => {
+    if (confirm('Are you sure you want to delete this certification?')) {
+      setPathologistCertifications(prev => prev.filter(cert => cert.id !== certId));
+    }
   };
 
   // Effect to fetch users when section changes
@@ -171,7 +371,323 @@ function Dashboard({ currentUser, onLogout }) {
       fetchUsers(getCurrentRole());
       fetchUserStats();
     }
+    if (['bills', 'transaction', 'payments', 'billing-rates'].includes(activeSection)) {
+      fetchFinanceData();
+    }
   }, [activeSection, searchTerm, filterStatus]);
+
+  // Finance data fetching functions
+  const fetchFinanceData = async () => {
+    setFinanceLoading(true);
+    setFinanceError('');
+    try {
+      // Fetch finance stats for all finance sections
+      const statsData = await financeAPI.getFinanceStats();
+      if (statsData.success) {
+        setFinanceStats(statsData.data);
+      }
+
+      // Fetch specific data based on active section
+      switch (activeSection) {
+        case 'bills':
+          await fetchBills();
+          break;
+        case 'transaction':
+          await fetchTransactions();
+          break;
+        case 'payments':
+          await fetchPayments();
+          break;
+        case 'billing-rates':
+          await fetchBillingRates();
+          break;
+      }
+    } catch (err) {
+      setFinanceError(err.message || 'Failed to fetch finance data');
+      console.error('Finance data fetch error:', err);
+    } finally {
+      setFinanceLoading(false);
+    }
+  };
+
+  const fetchBills = async (params = {}) => {
+    try {
+      const data = await financeAPI.getBills(params);
+      if (data.success) {
+        setBills(data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch bills:', err);
+    }
+  };
+
+  const fetchTransactions = async (params = {}) => {
+    try {
+      const data = await financeAPI.getTransactions(params);
+      if (data.success) {
+        setTransactions(data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch transactions:', err);
+    }
+  };
+
+  const fetchPayments = async (params = {}) => {
+    try {
+      const data = await financeAPI.getPayments(params);
+      if (data.success) {
+        setPayments(data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch payments:', err);
+    }
+  };
+
+  const fetchBillingRates = async (params = {}) => {
+    try {
+      const data = await financeAPI.getBillingRates(params);
+      if (data.success) {
+        setBillingRates(data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch billing rates:', err);
+    }
+  };
+
+  // Finance Action Handlers
+  const handleEditBill = (bill) => {
+    console.log('Edit bill:', bill);
+    openEditBillModal(bill);
+  };
+
+  const handleViewBill = (bill) => {
+    console.log('View bill clicked:', bill);
+    console.log('Bill data:', JSON.stringify(bill, null, 2));
+    openViewBillModal(bill);
+  };
+
+  const handleSendBill = async (bill) => {
+    try {
+      console.log('Sending bill:', bill);
+      // TODO: Implement actual email/SMS sending
+      alert(`Bill ${bill.billId} sent to ${bill.patientName}\nAmount: ₱${bill.totalAmount?.toLocaleString()}`);
+    } catch (error) {
+      console.error('Failed to send bill:', error);
+      alert('Failed to send bill. Please try again.');
+    }
+  };
+
+  const handlePrintBill = (bill) => {
+    console.log('Printing bill:', bill);
+    // TODO: Implement actual printing
+    const printContent = `
+      MDLAB DIRECT - LABORATORY BILL
+      ================================
+      Bill ID: ${bill.billId}
+      Patient: ${bill.patientName}
+      Date Issued: ${new Date(bill.dateIssued).toLocaleDateString()}
+      Due Date: ${new Date(bill.dueDate).toLocaleDateString()}
+      
+      Services:
+      ${bill.services?.map(s => `- ${s.name}: ₱${s.price}`).join('\n') || 'No services listed'}
+      
+      Total Amount: ₱${bill.totalAmount?.toLocaleString()}
+      Status: ${bill.status?.toUpperCase()}
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head><title>Bill ${bill.billId}</title></head>
+        <body style="font-family: monospace; white-space: pre-line;">
+          ${printContent}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const handlePrintReceipt = (transaction) => {
+    console.log('Printing receipt:', transaction);
+    const receiptContent = `
+      MDLAB DIRECT - PAYMENT RECEIPT
+      ===============================
+      Transaction ID: ${transaction.transactionId}
+      Patient: ${transaction.patientName}
+      Date: ${new Date(transaction.transactionDate).toLocaleDateString()}
+      
+      Description: ${transaction.description}
+      Payment Method: ${transaction.paymentMethod?.replace('_', ' ')?.replace(/\b\w/g, l => l.toUpperCase())}
+      Amount: ₱${transaction.amount?.toLocaleString()}
+      Status: ${transaction.status?.toUpperCase()}
+      
+      Thank you for your payment!
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head><title>Receipt ${transaction.transactionId}</title></head>
+        <body style="font-family: monospace; white-space: pre-line;">
+          ${receiptContent}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const handleRefundTransaction = async (transaction) => {
+    if (transaction.status !== 'completed') {
+      alert('Only completed transactions can be refunded.');
+      return;
+    }
+
+    const confirmation = window.confirm(
+      `Are you sure you want to refund this transaction?\n\n` +
+      `Transaction ID: ${transaction.transactionId}\n` +
+      `Patient: ${transaction.patientName}\n` +
+      `Amount: ₱${transaction.amount?.toLocaleString()}\n\n` +
+      `This action cannot be undone.`
+    );
+
+    if (confirmation) {
+      try {
+        console.log('Processing refund for:', transaction);
+        // TODO: Implement actual refund API call
+        alert(`Refund processed for Transaction ${transaction.transactionId}\nAmount: ₱${transaction.amount?.toLocaleString()}`);
+        // Refresh transactions after refund
+        fetchTransactions();
+      } catch (error) {
+        console.error('Failed to process refund:', error);
+        alert('Failed to process refund. Please try again.');
+      }
+    }
+  };
+
+  const handlePrintPaymentReceipt = (payment) => {
+    console.log('Printing payment receipt:', payment);
+    const receiptContent = `
+      MDLAB DIRECT - PAYMENT RECEIPT
+      ===============================
+      Payment ID: ${payment.paymentId}
+      Bill ID: ${payment.billId}
+      Patient: ${payment.patientName}
+      Date: ${new Date(payment.paymentDate).toLocaleDateString()}
+      
+      Amount: ₱${payment.amount?.toLocaleString()}
+      Payment Method: ${payment.paymentMethod?.replace('_', ' ')?.replace(/\b\w/g, l => l.toUpperCase())}
+      Reference: ${payment.referenceNumber || 'N/A'}
+      Status: ${payment.status?.toUpperCase()}
+      
+      Thank you for your payment!
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head><title>Payment Receipt ${payment.paymentId}</title></head>
+        <body style="font-family: monospace; white-space: pre-line;">
+          ${receiptContent}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const handleVerifyPayment = async (payment) => {
+    const confirmation = window.confirm(
+      `Verify this payment?\n\n` +
+      `Payment ID: ${payment.paymentId}\n` +
+      `Patient: ${payment.patientName}\n` +
+      `Amount: ₱${payment.amount?.toLocaleString()}\n` +
+      `Method: ${payment.paymentMethod?.replace('_', ' ')?.replace(/\b\w/g, l => l.toUpperCase())}`
+    );
+
+    if (confirmation) {
+      try {
+        console.log('Verifying payment:', payment);
+        // TODO: Call verify payment API
+        const result = await financeAPI.verifyPayment(payment._id);
+        if (result.success) {
+          alert(`Payment ${payment.paymentId} verified successfully!`);
+          // Refresh payments after verification
+          fetchPayments();
+        }
+      } catch (error) {
+        console.error('Failed to verify payment:', error);
+        alert('Failed to verify payment. Please try again.');
+      }
+    }
+  };
+
+  const handleDisputePayment = (payment) => {
+    const reason = prompt(
+      `Dispute Payment ${payment.paymentId}\n\n` +
+      `Patient: ${payment.patientName}\n` +
+      `Amount: ₱${payment.amount?.toLocaleString()}\n\n` +
+      `Please enter the reason for dispute:`
+    );
+
+    if (reason && reason.trim()) {
+      try {
+        console.log('Disputing payment:', payment, 'Reason:', reason);
+        // TODO: Implement dispute API call
+        alert(`Payment ${payment.paymentId} marked as disputed.\nReason: ${reason}`);
+        // Refresh payments after dispute
+        fetchPayments();
+      } catch (error) {
+        console.error('Failed to dispute payment:', error);
+        alert('Failed to mark payment as disputed. Please try again.');
+      }
+    }
+  };
+
+  const handleCreateBill = () => {
+    console.log('Create new bill');
+    openCreateBillModal();
+  };
+
+  const handleRecordPayment = () => {
+    console.log('Record new payment');
+    // TODO: Open record payment modal
+    alert('Record Payment - Modal to be implemented');
+  };
+
+  const handleAddBillingRate = () => {
+    console.log('Add new billing rate');
+    // TODO: Open add billing rate modal
+    alert('Add New Billing Rate - Modal to be implemented');
+  };
+
+  const handleExportReport = () => {
+    console.log('Export financial report');
+    // TODO: Implement export functionality
+    const reportData = {
+      date: new Date().toISOString(),
+      stats: financeStats,
+      bills: bills.length,
+      transactions: transactions.length,
+      payments: payments.length
+    };
+    
+    const dataStr = JSON.stringify(reportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `mdlab-finance-report-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleAdvancedFilter = () => {
+    console.log('Open advanced filter');
+    // TODO: Open advanced filter modal
+    alert('Advanced Filter - Modal to be implemented');
+  };
 
   const renderPageTitle = () => {
     switch (activeSection) {
@@ -503,7 +1019,7 @@ function Dashboard({ currentUser, onLogout }) {
                           <div className="action-buttons">
                             <button 
                               className="btn-view"
-                              onClick={() => alert(`View patient details for ${patient.firstName} ${patient.lastName}`)}
+                              onClick={() => openViewPatientModal(patient)}
                             >
                               View
                             </button>
@@ -667,7 +1183,7 @@ function Dashboard({ currentUser, onLogout }) {
                           <div className="action-buttons">
                             <button 
                               className="btn-view"
-                              onClick={() => alert(`View staff details for ${member.firstName} ${member.lastName}`)}
+                              onClick={() => openViewStaffModal(member)}
                             >
                               View
                             </button>
@@ -831,7 +1347,7 @@ function Dashboard({ currentUser, onLogout }) {
                           <div className="action-buttons">
                             <button 
                               className="btn-view"
-                              onClick={() => alert(`View pathologist details for ${pathologist.firstName} ${pathologist.lastName}`)}
+                              onClick={() => openViewPathologistModal(pathologist)}
                             >
                               View
                             </button>
@@ -945,7 +1461,6 @@ function Dashboard({ currentUser, onLogout }) {
                 <td><span className="status active">Active</span></td>
                 <td>
                   <div className="action-buttons">
-                    <button className="btn-view">View</button>
                     <button className="btn-edit">Edit</button>
                     <button className="btn-delete">Delete</button>
                   </div>
@@ -960,7 +1475,6 @@ function Dashboard({ currentUser, onLogout }) {
                 <td><span className="status active">Active</span></td>
                 <td>
                   <div className="action-buttons">
-                    <button className="btn-view">View</button>
                     <button className="btn-edit">Edit</button>
                     <button className="btn-delete">Delete</button>
                   </div>
@@ -975,7 +1489,6 @@ function Dashboard({ currentUser, onLogout }) {
                 <td><span className="status active">Active</span></td>
                 <td>
                   <div className="action-buttons">
-                    <button className="btn-view">View</button>
                     <button className="btn-edit">Edit</button>
                     <button className="btn-delete">Delete</button>
                   </div>
@@ -996,7 +1509,7 @@ function Dashboard({ currentUser, onLogout }) {
           <h2>Bills Management</h2>
           <p>Monitor and manage patient billing, invoices, and payment tracking</p>
         </div>
-        <button className="add-btn">+ Create New Bill</button>
+        <button className="add-btn" onClick={handleCreateBill}>+ Create New Bill</button>
       </div>
 
       <div className="management-stats">
@@ -1004,116 +1517,96 @@ function Dashboard({ currentUser, onLogout }) {
           <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Total Outstanding</div>
-            <div className="stat-value">₱245,670</div>
+            <div className="stat-value">₱{financeStats?.bills?.totalOutstanding?.toLocaleString() || '0'}</div>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Pending Bills</div>
-            <div className="stat-value">23</div>
+            <div className="stat-value">{financeStats?.bills?.pendingBills || 0}</div>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Paid This Month</div>
-            <div className="stat-value">156</div>
+            <div className="stat-value">{financeStats?.bills?.paidThisMonth || 0}</div>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Overdue</div>
-            <div className="stat-value">8</div>
+            <div className="stat-value">{financeStats?.bills?.overdueBills || 0}</div>
           </div>
         </div>
       </div>
 
-      <div className="management-content">
-        <div className="content-header">
-          <div className="search-filter">
-            <input type="text" placeholder="Search bills..." className="search-input" />
-            <select className="filter-select">
-              <option>All Bills</option>
-              <option>Pending</option>
-              <option>Paid</option>
-              <option>Overdue</option>
-              <option>Cancelled</option>
-            </select>
+      {financeLoading ? (
+        <div className="loading">Loading bills...</div>
+      ) : financeError ? (
+        <div className="error">Error: {financeError}</div>
+      ) : (
+        <div className="management-content">
+          <div className="content-header">
+            <div className="search-filter">
+              <input type="text" placeholder="Search bills..." className="search-input" />
+              <select className="filter-select">
+                <option>All Bills</option>
+                <option>Pending</option>
+                <option>Paid</option>
+                <option>Overdue</option>
+                <option>Cancelled</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="data-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Bill ID</th>
+                  <th>Patient Name</th>
+                  <th>Services</th>
+                  <th>Amount</th>
+                  <th>Date Issued</th>
+                  <th>Due Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bills.length > 0 ? bills.map((bill) => (
+                  <tr key={bill._id}>
+                    <td>{bill.billId}</td>
+                    <td>{bill.patientName}</td>
+                    <td>{bill.services?.map(s => s.name).join(', ')}</td>
+                    <td>₱{bill.totalAmount?.toLocaleString()}</td>
+                    <td>{new Date(bill.dateIssued).toLocaleDateString()}</td>
+                    <td>{new Date(bill.dueDate).toLocaleDateString()}</td>
+                    <td><span className={`status ${bill.status}`}>{bill.status.charAt(0).toUpperCase() + bill.status.slice(1)}</span></td>
+                    <td>
+                      <div className="action-buttons">
+                        <button className="btn-view" title="View" onClick={() => handleViewBill(bill)}>View</button>
+                        <button className="btn-edit" title="Edit" onClick={() => handleEditBill(bill)}>Edit</button>
+                        <button className="btn-send" title="Send" onClick={() => handleSendBill(bill)}>Send</button>
+                        <button className="btn-print" title="Print" onClick={() => handlePrintBill(bill)}>Print</button>
+                      </div>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '20px' }}>
+                      No bills found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-
-        <div className="data-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Bill ID</th>
-                <th>Patient Name</th>
-                <th>Services</th>
-                <th>Amount</th>
-                <th>Date Issued</th>
-                <th>Due Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>BL-2024-001</td>
-                <td>Juan dela Cruz</td>
-                <td>Complete Blood Count, Urinalysis</td>
-                <td>₱2,500</td>
-                <td>2024-09-10</td>
-                <td>2024-09-25</td>
-                <td><span className="status pending">Pending</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view" title="View">View</button>
-                    <button className="btn-edit" title="Edit">Edit</button>
-                    <button className="btn-send" title="Send">Send</button>
-                    <button className="btn-print" title="Print">Print</button>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td>BL-2024-002</td>
-                <td>Maria Santos</td>
-                <td>X-Ray Chest, ECG</td>
-                <td>₱3,200</td>
-                <td>2024-09-08</td>
-                <td>2024-09-23</td>
-                <td><span className="status paid">Paid</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view" title="View">View</button>
-                    <button className="btn-edit" title="Edit">Edit</button>
-                    <button className="btn-print" title="Print">Print</button>
-                    <button className="btn-receipt" title="Receipt">🧾</button>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td>BL-2024-003</td>
-                <td>Pedro Rodriguez</td>
-                <td>Lipid Profile, Blood Sugar</td>
-                <td>₱1,800</td>
-                <td>2024-08-28</td>
-                <td>2024-09-12</td>
-                <td><span className="status overdue">Overdue</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view" title="View">View</button>
-                    <button className="btn-edit" title="Edit">Edit</button>
-                    <button className="btn-remind" title="Remind">Remind</button>
-                    <button className="btn-call" title="Call">📞</button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      )}
     </div>
   );
 
@@ -1125,7 +1618,7 @@ function Dashboard({ currentUser, onLogout }) {
           <p>Complete record of all financial transactions and payments</p>
         </div>
         <div className="header-actions">
-          <button className="export-btn">
+          <button className="export-btn" onClick={handleExportReport}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 20V10"></path>
               <path d="M12 20V4"></path>
@@ -1133,7 +1626,7 @@ function Dashboard({ currentUser, onLogout }) {
             </svg>
             Export Report
           </button>
-          <button className="filter-btn">Advanced Filter</button>
+          <button className="filter-btn" onClick={handleAdvancedFilter}>Advanced Filter</button>
         </div>
       </div>
 
@@ -1142,28 +1635,28 @@ function Dashboard({ currentUser, onLogout }) {
           <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Today's Revenue</div>
-            <div className="stat-value">₱48,500</div>
+            <div className="stat-value">₱{financeStats?.transactions?.todayRevenue?.toLocaleString() || '0'}</div>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">This Week</div>
-            <div className="stat-value">₱325,670</div>
+            <div className="stat-value">₱{financeStats?.transactions?.weekRevenue?.toLocaleString() || '0'}</div>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Cash Payments</div>
-            <div className="stat-value">₱125,000</div>
+            <div className="stat-value">₱{financeStats?.transactions?.cashPayments?.toLocaleString() || '0'}</div>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Card Payments</div>
-            <div className="stat-value">₱200,670</div>
+            <div className="stat-value">₱{financeStats?.transactions?.cardPayments?.toLocaleString() || '0'}</div>
           </div>
         </div>
       </div>
@@ -1199,54 +1692,29 @@ function Dashboard({ currentUser, onLogout }) {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>TXN-2024-0891</td>
-                <td>2024-09-14 09:30</td>
-                <td>Juan dela Cruz</td>
-                <td>Laboratory Tests - CBC, Urinalysis</td>
-                <td>Cash</td>
-                <td>₱2,500</td>
-                <td><span className="status completed">Completed</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view" title="View">View</button>
-                    <button className="btn-print" title="Print Receipt">Print</button>
-                    <button className="btn-refund" title="Refund">Refund</button>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td>TXN-2024-0890</td>
-                <td>2024-09-14 08:15</td>
-                <td>Maria Santos</td>
-                <td>X-Ray Services</td>
-                <td>Credit Card</td>
-                <td>₱3,200</td>
-                <td><span className="status completed">Completed</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view" title="View">View</button>
-                    <button className="btn-print" title="Print Receipt">Print</button>
-                    <button className="btn-details" title="Payment Details">Details</button>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td>TXN-2024-0889</td>
-                <td>2024-09-13 16:45</td>
-                <td>Carlos Mendoza</td>
-                <td>Emergency Lab Package</td>
-                <td>Online Payment</td>
-                <td>₱5,500</td>
-                <td><span className="status processing">Processing</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view" title="View">View</button>
-                    <button className="btn-track" title="Track Payment">📍</button>
-                    <button className="btn-verify" title="Verify">✅</button>
-                  </div>
-                </td>
-              </tr>
+              {transactions.length > 0 ? transactions.map((transaction) => (
+                <tr key={transaction._id}>
+                  <td>{transaction.transactionId}</td>
+                  <td>{new Date(transaction.transactionDate).toLocaleString()}</td>
+                  <td>{transaction.patientName}</td>
+                  <td>{transaction.description}</td>
+                  <td>{transaction.paymentMethod?.replace('_', ' ')?.replace(/\b\w/g, l => l.toUpperCase())}</td>
+                  <td>₱{transaction.amount?.toLocaleString()}</td>
+                  <td><span className={`status ${transaction.status}`}>{transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}</span></td>
+                  <td>
+                    <div className="action-buttons">
+                      <button className="btn-print" title="Print Receipt" onClick={() => handlePrintReceipt(transaction)}>Print</button>
+                      {transaction.status === 'completed' && <button className="btn-refund" title="Refund" onClick={() => handleRefundTransaction(transaction)}>Refund</button>}
+                    </div>
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '20px' }}>
+                    No transactions found
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -1262,8 +1730,8 @@ function Dashboard({ currentUser, onLogout }) {
           <p>Detailed payment history and reconciliation records</p>
         </div>
         <div className="header-actions">
-          <button className="add-btn">+ Record Payment</button>
-          <button className="reconcile-btn">Reconcile</button>
+          <button className="add-btn" onClick={handleRecordPayment}>+ Record Payment</button>
+          <button className="reconcile-btn" onClick={handleExportReport}>Reconcile</button>
         </div>
       </div>
 
@@ -1272,28 +1740,28 @@ function Dashboard({ currentUser, onLogout }) {
           <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Total Collected</div>
-            <div className="stat-value">₱1,245,670</div>
+            <div className="stat-value">₱{financeStats?.payments?.totalCollected?.toLocaleString() || '0'}</div>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Pending Verification</div>
-            <div className="stat-value">12</div>
+            <div className="stat-value">{financeStats?.payments?.pendingVerification || 0}</div>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Refunds Processed</div>
-            <div className="stat-value">3</div>
+            <div className="stat-value">{financeStats?.payments?.refundsProcessed || 0}</div>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Collection Rate</div>
-            <div className="stat-value">94.5%</div>
+            <div className="stat-value">{financeStats?.payments?.collectionRate || 0}%</div>
           </div>
         </div>
       </div>
@@ -1328,39 +1796,35 @@ function Dashboard({ currentUser, onLogout }) {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>PAY-2024-0234</td>
-                <td>BL-2024-001</td>
-                <td>Juan dela Cruz</td>
-                <td>₱2,500</td>
-                <td>2024-09-14 10:30</td>
-                <td>Cash</td>
-                <td>Maria Santos</td>
-                <td><span className="status verified">Verified</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view" title="View">View</button>
-                    <button className="btn-receipt" title="Receipt">🧾</button>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td>PAY-2024-0235</td>
-                <td>BL-2024-005</td>
-                <td>Anna Rodriguez</td>
-                <td>₱3,800</td>
-                <td>2024-09-14 11:15</td>
-                <td>GCash</td>
-                <td>-</td>
-                <td><span className="status pending">Pending</span></td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn-view" title="View">View</button>
-                    <button className="btn-verify" title="Verify">✅</button>
-                    <button className="btn-dispute" title="Dispute">Dispute</button>
-                  </div>
-                </td>
-              </tr>
+              {payments.length > 0 ? payments.map((payment) => (
+                <tr key={payment._id}>
+                  <td>{payment.paymentId}</td>
+                  <td>{payment.billId}</td>
+                  <td>{payment.patientName}</td>
+                  <td>₱{payment.amount?.toLocaleString()}</td>
+                  <td>{new Date(payment.paymentDate).toLocaleString()}</td>
+                  <td>{payment.paymentMethod?.replace('_', ' ')?.replace(/\b\w/g, l => l.toUpperCase())}</td>
+                  <td>{payment.verifiedBy || '-'}</td>
+                  <td><span className={`status ${payment.status}`}>{payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}</span></td>
+                  <td>
+                    <div className="action-buttons">
+                      <button className="btn-receipt" title="Receipt" onClick={() => handlePrintPaymentReceipt(payment)}>Receipt</button>
+                      {payment.status === 'pending' && (
+                        <>
+                          <button className="btn-verify" title="Verify" onClick={() => handleVerifyPayment(payment)}>Verify</button>
+                          <button className="btn-dispute" title="Dispute" onClick={() => handleDisputePayment(payment)}>Dispute</button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '20px' }}>
+                    No payments found
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -1375,7 +1839,7 @@ function Dashboard({ currentUser, onLogout }) {
           <h2>Billing Rates & Pricing</h2>
           <p>Manage test pricing, packages, and billing configurations</p>
         </div>
-        <button className="add-btn">+ Add New Rate</button>
+        <button className="add-btn" onClick={handleAddBillingRate}>+ Add New Rate</button>
       </div>
 
       <div className="billing-categories">
@@ -2281,7 +2745,7 @@ function Dashboard({ currentUser, onLogout }) {
     const currentRole = getCurrentRole() || 'patient';
     
     return (
-      <div className="modal-overlay" onClick={closeUserModal}>
+      <div className={`modal-overlay ${editModalFromView ? 'edit-on-top' : ''}`} onClick={closeUserModal}>
         <div className="modal-content" onClick={(e) => e.stopPropagation()}>
           <div className="modal-header">
             <h3>{isEditing ? 'Edit User' : 'Add New User'}</h3>
@@ -2307,6 +2771,24 @@ function Dashboard({ currentUser, onLogout }) {
                 zipCode: formData.get('zipCode')
               }
             };
+
+            // Add role-specific fields
+            const userRole = formData.get('role') || currentRole;
+            
+            if (userRole === 'pathologist') {
+              userData.licenseNumber = formData.get('licenseNumber');
+              userData.boardCertification = formData.get('boardCertification');
+              userData.yearsExperience = formData.get('yearsExperience');
+              const specializations = formData.get('specializations');
+              userData.specializations = specializations ? specializations.split(',').map(s => s.trim()) : [];
+            }
+            
+            if (userRole === 'medtech') {
+              userData.employeeId = formData.get('employeeId');
+              userData.department = formData.get('department');
+              userData.shiftPreference = formData.get('shiftPreference');
+              userData.certifications = formData.get('certifications');
+            }
             
             if (!isEditing) {
               userData.password = formData.get('password');
@@ -2445,6 +2927,106 @@ function Dashboard({ currentUser, onLogout }) {
                     defaultValue={editingUser?.address?.zipCode || ''}
                   />
                 </div>
+                
+                {/* Role-Specific Fields */}
+                {(editingUser?.role === 'pathologist' || (!isEditing && currentRole === 'pathologist')) && (
+                  <>
+                    <div className="form-group full-width">
+                      <h4 className="section-title">Pathologist Information</h4>
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>Medical License Number</label>
+                      <input 
+                        type="text" 
+                        name="licenseNumber" 
+                        placeholder="e.g., MD-12345-PH"
+                        defaultValue={editingUser?.licenseNumber || ''}
+                      />
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>Board Certification</label>
+                      <input 
+                        type="text" 
+                        name="boardCertification" 
+                        placeholder="e.g., American Board of Pathology"
+                        defaultValue={editingUser?.boardCertification || ''}
+                      />
+                    </div>
+                    
+                    <div className="form-group full-width">
+                      <label>Specializations (comma-separated)</label>
+                      <input 
+                        type="text" 
+                        name="specializations" 
+                        placeholder="e.g., Anatomical Pathology, Clinical Pathology, Hematology"
+                        defaultValue={editingUser?.specializations?.join(', ') || ''}
+                      />
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>Years of Experience</label>
+                      <input 
+                        type="number" 
+                        name="yearsExperience" 
+                        min="0" 
+                        max="50"
+                        defaultValue={editingUser?.yearsExperience || ''}
+                      />
+                    </div>
+                  </>
+                )}
+                
+                {(editingUser?.role === 'medtech' || (!isEditing && currentRole === 'staff')) && (
+                  <>
+                    <div className="form-group full-width">
+                      <h4 className="section-title">Staff Information</h4>
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>Employee ID</label>
+                      <input 
+                        type="text" 
+                        name="employeeId" 
+                        placeholder="e.g., EMP-001"
+                        defaultValue={editingUser?.employeeId || ''}
+                      />
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>Department</label>
+                      <select name="department" defaultValue={editingUser?.department || ''}>
+                        <option value="">Select Department</option>
+                        <option value="laboratory">Laboratory</option>
+                        <option value="phlebotomy">Phlebotomy</option>
+                        <option value="administration">Administration</option>
+                        <option value="quality-control">Quality Control</option>
+                      </select>
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>Shift Preference</label>
+                      <select name="shiftPreference" defaultValue={editingUser?.shiftPreference || ''}>
+                        <option value="">Select Shift</option>
+                        <option value="morning">Morning (8:00 AM - 5:00 PM)</option>
+                        <option value="afternoon">Afternoon (1:00 PM - 10:00 PM)</option>
+                        <option value="night">Night (10:00 PM - 7:00 AM)</option>
+                        <option value="flexible">Flexible</option>
+                      </select>
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>Certifications</label>
+                      <input 
+                        type="text" 
+                        name="certifications" 
+                        placeholder="e.g., Phlebotomy Certification, ASCP MLT"
+                        defaultValue={editingUser?.certifications || ''}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
             
@@ -2457,6 +3039,1335 @@ function Dashboard({ currentUser, onLogout }) {
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    );
+  };
+
+  // Bill Modal Components
+  const renderCreateBillModal = () => {
+    if (!showCreateBillModal) return null;
+    
+    return (
+      <div className="modal-overlay" onClick={closeBillModals}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h3>Create New Bill</h3>
+            <button className="modal-close" onClick={closeBillModals}>×</button>
+          </div>
+          
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            // Get all service inputs
+            const serviceNames = formData.getAll('serviceName');
+            const servicePrices = formData.getAll('servicePrice');
+            const services = serviceNames.map((name, index) => ({
+              name: name,
+              price: parseFloat(servicePrices[index]) || 0
+            })).filter(service => service.name.trim() !== '');
+            
+            const billData = {
+              patientId: formData.get('patientId'),
+              patientName: formData.get('patientName'),
+              services: services,
+              totalAmount: parseFloat(formData.get('totalAmount')),
+              dueDate: formData.get('dueDate'),
+              notes: formData.get('notes')
+            };
+            
+            try {
+              const result = await financeAPI.createBill(billData);
+              if (result.success) {
+                closeBillModals();
+                fetchBills(); // Refresh the bills list
+                alert('Bill created successfully!');
+              }
+            } catch (error) {
+              console.error('Error creating bill:', error);
+              alert('Failed to create bill. Please try again.');
+            }
+          }}>
+            <div className="modal-body">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Patient ID</label>
+                  <input 
+                    type="text" 
+                    name="patientId" 
+                    required 
+                    placeholder="Enter patient ID"
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Patient Name</label>
+                  <input 
+                    type="text" 
+                    name="patientName" 
+                    required 
+                    placeholder="Enter patient name"
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Due Date</label>
+                  <input 
+                    type="date" 
+                    name="dueDate" 
+                    required 
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Total Amount (₱)</label>
+                  <input 
+                    type="number" 
+                    name="totalAmount" 
+                    required 
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                  />
+                </div>
+                
+                <div className="form-group full-width">
+                  <label>Services</label>
+                  <div className="services-section">
+                    <div className="service-row">
+                      <div className="service-input-group">
+                        <input 
+                          type="text" 
+                          name="serviceName" 
+                          placeholder="Service name (e.g., Complete Blood Count)"
+                          required
+                        />
+                        <input 
+                          type="number" 
+                          name="servicePrice" 
+                          placeholder="Price"
+                          min="0"
+                          step="0.01"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="service-row">
+                      <div className="service-input-group">
+                        <input 
+                          type="text" 
+                          name="serviceName" 
+                          placeholder="Service name (optional)"
+                        />
+                        <input 
+                          type="number" 
+                          name="servicePrice" 
+                          placeholder="Price"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+                    </div>
+                    <div className="service-row">
+                      <div className="service-input-group">
+                        <input 
+                          type="text" 
+                          name="serviceName" 
+                          placeholder="Service name (optional)"
+                        />
+                        <input 
+                          type="number" 
+                          name="servicePrice" 
+                          placeholder="Price"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="form-group full-width">
+                  <label>Notes (Optional)</label>
+                  <textarea 
+                    name="notes" 
+                    rows="2"
+                    placeholder="Additional notes or instructions"
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={closeBillModals}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary">
+                Create Bill
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const renderEditBillModal = () => {
+    if (!showEditBillModal || !selectedBill) return null;
+    
+    // Prepare existing services for the form (ensure we have at least 3 slots)
+    const existingServices = selectedBill.services || [];
+    const serviceSlots = [...existingServices];
+    while (serviceSlots.length < 3) {
+      serviceSlots.push({ name: '', price: '' });
+    }
+    
+    return (
+      <div className="modal-overlay" onClick={closeBillModals}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h3>Edit Bill - {selectedBill.billId}</h3>
+            <button className="modal-close" onClick={closeBillModals}>×</button>
+          </div>
+          
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            // Get all service inputs
+            const serviceNames = formData.getAll('serviceName');
+            const servicePrices = formData.getAll('servicePrice');
+            const services = serviceNames.map((name, index) => ({
+              name: name,
+              price: parseFloat(servicePrices[index]) || 0
+            })).filter(service => service.name.trim() !== '');
+            
+            const billData = {
+              patientName: formData.get('patientName'),
+              services: services,
+              totalAmount: parseFloat(formData.get('totalAmount')),
+              dueDate: formData.get('dueDate'),
+              status: formData.get('status'),
+              notes: formData.get('notes')
+            };
+            
+            try {
+              const result = await financeAPI.updateBill(selectedBill._id, billData);
+              if (result.success) {
+                closeBillModals();
+                fetchBills(); // Refresh the bills list
+                alert('Bill updated successfully!');
+              }
+            } catch (error) {
+              console.error('Error updating bill:', error);
+              alert('Failed to update bill. Please try again.');
+            }
+          }}>
+            <div className="modal-body">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Bill ID (Read-only)</label>
+                  <input 
+                    type="text" 
+                    value={selectedBill.billId}
+                    readOnly
+                    className="readonly"
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Patient Name</label>
+                  <input 
+                    type="text" 
+                    name="patientName" 
+                    required 
+                    defaultValue={selectedBill.patientName}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Due Date</label>
+                  <input 
+                    type="date" 
+                    name="dueDate" 
+                    required 
+                    defaultValue={selectedBill.dueDate ? new Date(selectedBill.dueDate).toISOString().split('T')[0] : ''}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Status</label>
+                  <select name="status" defaultValue={selectedBill.status}>
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+                
+                <div className="form-group">
+                  <label>Total Amount (₱)</label>
+                  <input 
+                    type="number" 
+                    name="totalAmount" 
+                    required 
+                    min="0"
+                    step="0.01"
+                    defaultValue={selectedBill.totalAmount}
+                  />
+                </div>
+                
+                <div className="form-group"></div>
+                
+                <div className="form-group full-width">
+                  <label>Services</label>
+                  <div className="services-section">
+                    {serviceSlots.map((service, index) => (
+                      <div key={index} className="service-row">
+                        <div className="service-input-group">
+                          <input 
+                            type="text" 
+                            name="serviceName" 
+                            placeholder="Service name"
+                            defaultValue={service.name}
+                            required={index === 0}
+                          />
+                          <input 
+                            type="number" 
+                            name="servicePrice" 
+                            placeholder="Price"
+                            min="0"
+                            step="0.01"
+                            defaultValue={service.price}
+                            required={index === 0}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="form-group full-width">
+                  <label>Notes</label>
+                  <textarea 
+                    name="notes" 
+                    rows="2"
+                    defaultValue={selectedBill.notes || ''}
+                    placeholder="Additional notes or instructions"
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={closeBillModals}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary">
+                Update Bill
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const renderViewBillModal = () => {
+    console.log('Rendering view modal, showViewBillModal:', showViewBillModal, 'selectedBill:', selectedBill);
+    
+    if (!showViewBillModal || !selectedBill) return null;
+    
+    // Add safety checks for the bill data
+    const bill = selectedBill;
+    const billId = bill.billId || 'N/A';
+    const patientName = bill.patientName || 'Unknown Patient';
+    // Handle patientId - it might be an object or string
+    const patientId = bill.patientId ? 
+      (typeof bill.patientId === 'object' ? bill.patientId.id || bill.patientId.email || 'N/A' : bill.patientId) 
+      : 'N/A';
+    const totalAmount = bill.totalAmount || 0;
+    const status = bill.status || 'unknown';
+    const services = bill.services || [];
+    const notes = bill.notes || '';
+    
+    // Safe date handling
+    const dateIssued = bill.dateIssued ? new Date(bill.dateIssued).toLocaleDateString() : 'N/A';
+    const dueDate = bill.dueDate ? new Date(bill.dueDate).toLocaleDateString() : 'N/A';
+    
+    try {
+      return (
+        <div className="modal-overlay" onClick={closeBillModals}>
+          <div className="modal-content view-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Bill Details - {billId}</h3>
+              <button className="modal-close" onClick={closeBillModals}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="view-grid">
+                <div className="info-section">
+                  <h4>Patient Information</h4>
+                  <div className="info-row">
+                    <span className="label">Patient Name:</span>
+                    <span className="value">{patientName}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Patient ID:</span>
+                    <span className="value">{patientId}</span>
+                  </div>
+                </div>
+                
+                <div className="info-section">
+                  <h4>Bill Information</h4>
+                  <div className="info-row">
+                    <span className="label">Bill ID:</span>
+                    <span className="value">{billId}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Date Issued:</span>
+                    <span className="value">{dateIssued}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Due Date:</span>
+                    <span className="value">{dueDate}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Status:</span>
+                    <span className={`value status ${status}`}>
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Total Amount:</span>
+                    <span className="value amount">₱{totalAmount.toLocaleString()}</span>
+                  </div>
+                </div>
+                
+                <div className="info-section full-width">
+                  <h4>Services</h4>
+                  <div className="services-list">
+                    {services && services.length > 0 ? (
+                      services.map((service, index) => (
+                        <div key={index} className="service-item">
+                          <span className="service-name">{service.name || 'Unknown Service'}</span>
+                          <span className="service-price">₱{(service.price || 0).toLocaleString()}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p>No services listed</p>
+                    )}
+                  </div>
+                </div>
+                
+                {notes && (
+                  <div className="info-section full-width">
+                    <h4>Notes</h4>
+                    <p className="notes">{notes}</p>
+                  </div>
+                )}
+                
+                <div className="info-section full-width">
+                  <h4>Payment Tracking</h4>
+                  <div className="payment-status">
+                    <div className="status-indicator">
+                      <span className={`indicator ${status}`}></span>
+                      <span>Payment Status: {status.charAt(0).toUpperCase() + status.slice(1)}</span>
+                    </div>
+                    {status === 'paid' && (
+                      <div className="payment-info">
+                        <p>✅ Payment received</p>
+                      </div>
+                    )}
+                    {status === 'pending' && (
+                      <div className="payment-info">
+                        <p>⏳ Awaiting payment</p>
+                      </div>
+                    )}
+                    {status === 'overdue' && (
+                      <div className="payment-info">
+                        <p>⚠️ Payment overdue - Follow up required</p>
+                      </div>
+                    )}
+                    {status === 'unknown' && (
+                      <div className="payment-info">
+                        <p>❓ Payment status unknown</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={closeBillModals}>
+                Close
+              </button>
+              <button type="button" className="btn-primary" onClick={() => handlePrintBill(selectedBill)}>
+                Print Bill
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    } catch (error) {
+      console.error('Error rendering view modal:', error);
+      return (
+        <div className="modal-overlay" onClick={closeBillModals}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Error Loading Bill</h3>
+              <button className="modal-close" onClick={closeBillModals}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>There was an error loading the bill details. Please try again.</p>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={closeBillModals}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+  };
+
+  // Patient View Modal Component
+  const renderViewPatientModal = () => {
+    if (!showViewPatientModal || !selectedPatient) return null;
+    
+    const patient = selectedPatient;
+    const patientName = `${patient.firstName || ''} ${patient.lastName || ''}`.trim() || 'Unknown Patient';
+    const email = patient.email || 'N/A';
+    const phone = patient.phone || 'N/A';
+    const username = patient.username || 'N/A';
+    const role = patient.role || 'patient';
+    const gender = patient.gender || 'N/A';
+    const dateOfBirth = patient.dateOfBirth ? new Date(patient.dateOfBirth).toLocaleDateString() : 'N/A';
+    const isActive = patient.isActive !== undefined ? patient.isActive : true;
+    const createdAt = patient.createdAt ? new Date(patient.createdAt).toLocaleDateString() : 'N/A';
+    const lastLogin = patient.lastLogin ? new Date(patient.lastLogin).toLocaleDateString() : 'Never';
+    
+    // Handle address safely
+    const address = patient.address || {};
+    const fullAddress = [
+      address.street,
+      address.city,
+      address.province,
+      address.zipCode
+    ].filter(Boolean).join(', ') || 'No address provided';
+
+    try {
+      return (
+        <div className="modal-overlay" onClick={closePatientModal}>
+          <div className="modal-content view-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Patient Details - {patientName}</h3>
+              <button className="modal-close" onClick={closePatientModal}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="view-grid">
+                <div className="info-section">
+                  <h4>Personal Information</h4>
+                  <div className="info-row">
+                    <span className="label">Full Name:</span>
+                    <span className="value">{patientName}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Email:</span>
+                    <span className="value">{email}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Phone:</span>
+                    <span className="value">{phone}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Gender:</span>
+                    <span className="value">{gender}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Date of Birth:</span>
+                    <span className="value">{dateOfBirth}</span>
+                  </div>
+                </div>
+                
+                <div className="info-section">
+                  <h4>Account Information</h4>
+                  <div className="info-row">
+                    <span className="label">Username:</span>
+                    <span className="value">{username}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Role:</span>
+                    <span className="value role-badge role-patient">{role.charAt(0).toUpperCase() + role.slice(1)}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Status:</span>
+                    <span className={`value status ${isActive ? 'active' : 'inactive'}`}>
+                      {isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Created:</span>
+                    <span className="value">{createdAt}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Last Login:</span>
+                    <span className="value">{lastLogin}</span>
+                  </div>
+                </div>
+                
+                <div className="info-section full-width">
+                  <h4>Address</h4>
+                  <div className="info-row">
+                    <span className="label">Address:</span>
+                    <span className="value">{fullAddress}</span>
+                  </div>
+                </div>
+                
+                <div className="info-section full-width">
+                  <h4>Medical Record Summary</h4>
+                  <div className="patient-summary">
+                    <div className="summary-item">
+                      <span className="summary-label">Account Status:</span>
+                      <span className={`summary-value ${isActive ? 'active' : 'inactive'}`}>
+                        {isActive ? 'Active Patient' : 'Inactive Patient'}
+                      </span>
+                    </div>
+                    <div className="summary-item">
+                      <span className="summary-label">Registration:</span>
+                      <span className="summary-value">Registered on {createdAt}</span>
+                    </div>
+                    <div className="summary-item">
+                      <span className="summary-label">Contact:</span>
+                      <span className="summary-value">{email} | {phone}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={closePatientModal}>
+                Close
+              </button>
+              <button type="button" className="btn-primary" onClick={() => openUserModal(patient, true)}>
+                Edit Patient
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    } catch (error) {
+      console.error('Error rendering patient view modal:', error);
+      return (
+        <div className="modal-overlay" onClick={closePatientModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Error Loading Patient</h3>
+              <button className="modal-close" onClick={closePatientModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>There was an error loading the patient details. Please try again.</p>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={closePatientModal}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+  };
+
+  // Staff View Modal Component
+  const renderViewStaffModal = () => {
+    if (!showViewStaffModal || !selectedStaff) return null;
+    
+    const staff = selectedStaff;
+    const staffName = `${staff.firstName || ''} ${staff.lastName || ''}`.trim() || 'Unknown Staff';
+    const email = staff.email || 'N/A';
+    const phone = staff.phone || 'N/A';
+    const username = staff.username || 'N/A';
+    const role = staff.role || 'staff';
+    const gender = staff.gender || 'N/A';
+    const dateOfBirth = staff.dateOfBirth ? new Date(staff.dateOfBirth).toLocaleDateString() : 'N/A';
+    const isActive = staff.isActive !== undefined ? staff.isActive : true;
+    const createdAt = staff.createdAt ? new Date(staff.createdAt).toLocaleDateString() : 'N/A';
+    const lastLogin = staff.lastLogin ? new Date(staff.lastLogin).toLocaleDateString() : 'Never';
+    
+    // Handle address safely
+    const address = staff.address || {};
+    const fullAddress = [
+      address.street,
+      address.city,
+      address.province,
+      address.zipCode
+    ].filter(Boolean).join(', ') || 'No address provided';
+
+    // Sample schedule data (this would come from backend in real implementation)
+    const sampleSchedule = [
+      { day: 'Monday', shift: '8:00 AM - 5:00 PM', status: 'Regular' },
+      { day: 'Tuesday', shift: '8:00 AM - 5:00 PM', status: 'Regular' },
+      { day: 'Wednesday', shift: '8:00 AM - 5:00 PM', status: 'Regular' },
+      { day: 'Thursday', shift: '8:00 AM - 5:00 PM', status: 'Regular' },
+      { day: 'Friday', shift: '8:00 AM - 5:00 PM', status: 'Regular' },
+      { day: 'Saturday', shift: 'OFF', status: 'Off' },
+      { day: 'Sunday', shift: 'OFF', status: 'Off' }
+    ];
+
+    try {
+      return (
+        <div className="modal-overlay" onClick={closeStaffModal}>
+          <div className="modal-content view-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Staff Details - {staffName}</h3>
+              <button className="modal-close" onClick={closeStaffModal}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="view-grid">
+                <div className="info-section">
+                  <h4>Personal Information</h4>
+                  <div className="info-row">
+                    <span className="label">Full Name:</span>
+                    <span className="value">{staffName}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Email:</span>
+                    <span className="value">{email}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Phone:</span>
+                    <span className="value">{phone}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Gender:</span>
+                    <span className="value">{gender}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Date of Birth:</span>
+                    <span className="value">{dateOfBirth}</span>
+                  </div>
+                </div>
+                
+                <div className="info-section">
+                  <h4>Employment Information</h4>
+                  <div className="info-row">
+                    <span className="label">Username:</span>
+                    <span className="value">{username}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Role:</span>
+                    <span className="value role-badge role-medtech">{role.charAt(0).toUpperCase() + role.slice(1)}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Status:</span>
+                    <span className={`value status ${isActive ? 'active' : 'inactive'}`}>
+                      {isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Hired Date:</span>
+                    <span className="value">{createdAt}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Last Login:</span>
+                    <span className="value">{lastLogin}</span>
+                  </div>
+                </div>
+                
+                <div className="info-section full-width">
+                  <h4>Address</h4>
+                  <div className="info-row">
+                    <span className="label">Address:</span>
+                    <span className="value">{fullAddress}</span>
+                  </div>
+                </div>
+                
+                <div className="info-section full-width">
+                  <h4>Weekly Schedule</h4>
+                  <div className="schedule-table">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Day</th>
+                          <th>Shift Hours</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sampleSchedule.map((schedule, index) => (
+                          <tr key={index}>
+                            <td className="schedule-day">{schedule.day}</td>
+                            <td className="schedule-shift">{schedule.shift}</td>
+                            <td>
+                              <span className={`schedule-status ${schedule.status.toLowerCase()}`}>
+                                {schedule.status}
+                              </span>
+                            </td>
+                            <td>
+                              <button 
+                                className="btn-edit-small"
+                                onClick={() => openScheduleEditModal({...schedule, staffId: selectedStaff?.id, staffName: `${selectedStaff?.firstName || ''} ${selectedStaff?.lastName || ''}`.trim()})}
+                                disabled={schedule.status === 'Off'}
+                              >
+                                Edit
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                
+                <div className="info-section full-width">
+                  <h4>Staff Summary</h4>
+                  <div className="staff-summary">
+                    <div className="summary-item">
+                      <span className="summary-label">Employment Status:</span>
+                      <span className={`summary-value ${isActive ? 'active' : 'inactive'}`}>
+                        {isActive ? 'Active Employee' : 'Inactive Employee'}
+                      </span>
+                    </div>
+                    <div className="summary-item">
+                      <span className="summary-label">Employment Date:</span>
+                      <span className="summary-value">Hired on {createdAt}</span>
+                    </div>
+                    <div className="summary-item">
+                      <span className="summary-label">Contact:</span>
+                      <span className="summary-value">{email} | {phone}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={closeStaffModal}>
+                Close
+              </button>
+              <button type="button" className="btn-primary" onClick={() => openUserModal(staff, true)}>
+                Edit Staff
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    } catch (error) {
+      console.error('Error rendering staff view modal:', error);
+      return (
+        <div className="modal-overlay" onClick={closeStaffModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Error Loading Staff</h3>
+              <button className="modal-close" onClick={closeStaffModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>There was an error loading the staff details. Please try again.</p>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={closeStaffModal}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+  };
+
+  // Pathologist View Modal Component
+  const renderViewPathologistModal = () => {
+    if (!showViewPathologistModal || !selectedPathologist) return null;
+    
+    const pathologist = selectedPathologist;
+    const pathologistName = `${pathologist.firstName || ''} ${pathologist.lastName || ''}`.trim() || 'Unknown Pathologist';
+    const email = pathologist.email || 'N/A';
+    const phone = pathologist.phone || 'N/A';
+    const username = pathologist.username || 'N/A';
+    const role = pathologist.role || 'pathologist';
+    const gender = pathologist.gender || 'N/A';
+    const dateOfBirth = pathologist.dateOfBirth ? new Date(pathologist.dateOfBirth).toLocaleDateString() : 'N/A';
+    const isActive = pathologist.isActive !== undefined ? pathologist.isActive : true;
+    const createdAt = pathologist.createdAt ? new Date(pathologist.createdAt).toLocaleDateString() : 'N/A';
+    const lastLogin = pathologist.lastLogin ? new Date(pathologist.lastLogin).toLocaleDateString() : 'Never';
+    
+    // Handle address safely
+    const address = pathologist.address || {};
+    const fullAddress = [
+      address.street,
+      address.city,
+      address.province,
+      address.zipCode
+    ].filter(Boolean).join(', ') || 'No address provided';
+
+    // Sample pathologist specializations and certifications
+    const specializations = [
+      'Anatomical Pathology',
+      'Clinical Pathology', 
+      'Hematology',
+      'Immunology',
+      'Microbiology'
+    ];
+
+    const certifications = [
+      { name: 'Board Certified Pathologist', date: '2020', status: 'Active' },
+      { name: 'Clinical Laboratory Certification', date: '2019', status: 'Active' },
+      { name: 'Hematology Subspecialty', date: '2021', status: 'Active' }
+    ];
+
+    try {
+      return (
+        <div className="modal-overlay" onClick={closePathologistModal}>
+          <div className="modal-content view-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Pathologist Details - {pathologistName}</h3>
+              <button className="modal-close" onClick={closePathologistModal}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="view-grid">
+                <div className="info-section">
+                  <h4>Personal Information</h4>
+                  <div className="info-row">
+                    <span className="label">Full Name:</span>
+                    <span className="value">{pathologistName}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Email:</span>
+                    <span className="value">{email}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Phone:</span>
+                    <span className="value">{phone}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Gender:</span>
+                    <span className="value">{gender}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Date of Birth:</span>
+                    <span className="value">{dateOfBirth}</span>
+                  </div>
+                </div>
+                
+                <div className="info-section">
+                  <h4>Professional Information</h4>
+                  <div className="info-row">
+                    <span className="label">Username:</span>
+                    <span className="value">{username}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Role:</span>
+                    <span className="value role-badge role-pathologist">{role.charAt(0).toUpperCase() + role.slice(1)}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Status:</span>
+                    <span className={`value status ${isActive ? 'active' : 'inactive'}`}>
+                      {isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Joined Date:</span>
+                    <span className="value">{createdAt}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Last Login:</span>
+                    <span className="value">{lastLogin}</span>
+                  </div>
+                </div>
+                
+                <div className="info-section full-width">
+                  <h4>Address</h4>
+                  <div className="info-row">
+                    <span className="label">Address:</span>
+                    <span className="value">{fullAddress}</span>
+                  </div>
+                </div>
+                
+                <div className="info-section full-width">
+                  <h4>Specializations</h4>
+                  <div className="specializations-list">
+                    {specializations.map((spec, index) => (
+                      <span key={index} className="specialization-tag">
+                        {spec}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="info-section full-width">
+                  <div className="section-header">
+                    <h4>Certifications & Licenses</h4>
+                    <button 
+                      className="btn-edit-small"
+                      onClick={() => openCertificationModal(pathologist)}
+                    >
+                      Manage Certifications
+                    </button>
+                  </div>
+                  <div className="certifications-table">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Certification</th>
+                          <th>Date Obtained</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {certifications.map((cert, index) => (
+                          <tr key={index}>
+                            <td className="cert-name">{cert.name}</td>
+                            <td className="cert-date">{cert.date}</td>
+                            <td>
+                              <span className={`cert-status ${cert.status.toLowerCase()}`}>
+                                {cert.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                
+                <div className="info-section full-width">
+                  <h4>Pathologist Summary</h4>
+                  <div className="pathologist-summary">
+                    <div className="summary-item">
+                      <span className="summary-label">Professional Status:</span>
+                      <span className={`summary-value ${isActive ? 'active' : 'inactive'}`}>
+                        {isActive ? 'Active Pathologist' : 'Inactive Pathologist'}
+                      </span>
+                    </div>
+                    <div className="summary-item">
+                      <span className="summary-label">Service Date:</span>
+                      <span className="summary-value">Joined on {createdAt}</span>
+                    </div>
+                    <div className="summary-item">
+                      <span className="summary-label">Contact:</span>
+                      <span className="summary-value">{email} | {phone}</span>
+                    </div>
+                    <div className="summary-item">
+                      <span className="summary-label">Specialties:</span>
+                      <span className="summary-value">General Pathology, Clinical Lab</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={closePathologistModal}>
+                Close
+              </button>
+              <button type="button" className="btn-primary" onClick={() => openUserModal(pathologist, true)}>
+                Edit Pathologist
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    } catch (error) {
+      console.error('Error rendering pathologist view modal:', error);
+      return (
+        <div className="modal-overlay" onClick={closePathologistModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Error Loading Pathologist</h3>
+              <button className="modal-close" onClick={closePathologistModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>There was an error loading the pathologist details. Please try again.</p>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={closePathologistModal}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+  };
+
+  // Schedule Edit Modal Component
+  const renderScheduleEditModal = () => {
+    if (!showScheduleEditModal || !editingSchedule) return null;
+
+    const schedule = editingSchedule;
+
+    const handleSaveSchedule = () => {
+      // Here you would typically save to backend
+      const formattedShift = scheduleStatus === 'Off' ? 'OFF' : 
+        `${formatTime(scheduleStartTime)} - ${formatTime(scheduleEndTime)}`;
+      
+      console.log('Saving schedule:', {
+        staffId: schedule.staffId,
+        day: schedule.day,
+        shift: formattedShift,
+        status: scheduleStatus
+      });
+      
+      alert(`Schedule updated for ${schedule.day}: ${formattedShift} (${scheduleStatus})`);
+      closeScheduleEditModal();
+    };
+
+    const formatTime = (time) => {
+      if (!time) return '';
+      const [hours, minutes] = time.split(':');
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+      return `${displayHour}:${minutes} ${ampm}`;
+    };
+
+    return (
+      <div className={`modal-overlay ${editModalFromView ? 'edit-on-top' : ''}`} onClick={closeScheduleEditModal}>
+        <div className="modal-content schedule-edit-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h3>Edit Schedule - {schedule.day}</h3>
+            <button className="modal-close" onClick={closeScheduleEditModal}>×</button>
+          </div>
+          
+          <div className="modal-body">
+            <div className="schedule-edit-form">
+              <div className="staff-info">
+                <h4>Staff: {schedule.staffName}</h4>
+                <p>Day: {schedule.day}</p>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="scheduleStatus">Schedule Status:</label>
+                <select 
+                  id="scheduleStatus"
+                  value={scheduleStatus} 
+                  onChange={(e) => setScheduleStatus(e.target.value)}
+                  className="form-control"
+                >
+                  <option value="Regular">Regular</option>
+                  <option value="Overtime">Overtime</option>
+                  <option value="Off">Day Off</option>
+                </select>
+              </div>
+
+              {scheduleStatus !== 'Off' && (
+                <>
+                  <div className="time-inputs">
+                    <div className="form-group">
+                      <label htmlFor="startTime">Start Time:</label>
+                      <input
+                        type="time"
+                        id="startTime"
+                        value={scheduleStartTime}
+                        onChange={(e) => setScheduleStartTime(e.target.value)}
+                        className="form-control"
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="endTime">End Time:</label>
+                      <input
+                        type="time"
+                        id="endTime"
+                        value={scheduleEndTime}
+                        onChange={(e) => setScheduleEndTime(e.target.value)}
+                        className="form-control"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="schedule-preview">
+                    <h5>Preview:</h5>
+                    <p className="preview-text">
+                      {scheduleStartTime && scheduleEndTime ? 
+                        `${formatTime(scheduleStartTime)} - ${formatTime(scheduleEndTime)} (${scheduleStatus})` : 
+                        'Please set start and end times'
+                      }
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {scheduleStatus === 'Off' && (
+                <div className="day-off-info">
+                  <p className="off-message">This day is set as a day off.</p>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="modal-footer">
+            <button 
+              type="button" 
+              className="btn-secondary" 
+              onClick={closeScheduleEditModal}
+            >
+              Cancel
+            </button>
+            <button 
+              type="button" 
+              className="btn-primary" 
+              onClick={handleSaveSchedule}
+              disabled={scheduleStatus !== 'Off' && (!scheduleStartTime || !scheduleEndTime)}
+            >
+              Save Schedule
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Certification Management Modal Component
+  const renderCertificationModal = () => {
+    if (!showCertificationModal) return null;
+
+    return (
+      <div className={`modal-overlay ${editModalFromView ? 'edit-on-top' : ''}`} onClick={closeCertificationModal}>
+        <div className="modal-content certification-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h3>Manage Certifications</h3>
+            <button className="modal-close" onClick={closeCertificationModal}>×</button>
+          </div>
+          
+          <div className="modal-body">
+            {/* Certification Form */}
+            <div className="certification-form">
+              <div className="form-header">
+                <h4>{editingCertification ? 'Edit Certification' : 'Add New Certification'}</h4>
+              </div>
+
+              <div className="form-grid">
+                <div className="form-group">
+                  <label htmlFor="certName">Certification Name</label>
+                  <input
+                    type="text"
+                    id="certName"
+                    value={certificationName}
+                    onChange={(e) => setCertificationName(e.target.value)}
+                    placeholder="e.g., Board Certified Pathologist"
+                    className="form-control"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="certDate">Date Obtained</label>
+                  <input
+                    type="text"
+                    id="certDate"
+                    value={certificationDate}
+                    onChange={(e) => setCertificationDate(e.target.value)}
+                    placeholder="e.g., 2020"
+                    className="form-control"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="certStatus">Status</label>
+                  <select
+                    id="certStatus"
+                    value={certificationStatus}
+                    onChange={(e) => setCertificationStatus(e.target.value)}
+                    className="form-control"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Expired">Expired</option>
+                    <option value="Pending">Pending</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-actions">
+                <button 
+                  type="button" 
+                  className="btn-secondary" 
+                  onClick={openAddCertification}
+                >
+                  Clear Form
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-primary" 
+                  onClick={handleSaveCertification}
+                  disabled={!certificationName || !certificationDate}
+                >
+                  {editingCertification ? 'Update' : 'Add'} Certification
+                </button>
+              </div>
+            </div>
+
+            {/* Certifications List */}
+            <div className="certifications-list">
+              <h4>Current Certifications</h4>
+              {pathologistCertifications.length === 0 ? (
+                <p className="no-certifications">No certifications added yet.</p>
+              ) : (
+                <div className="certifications-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Certification</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pathologistCertifications.map((cert) => (
+                        <tr key={cert.id}>
+                          <td className="cert-name">{cert.name}</td>
+                          <td className="cert-date">{cert.date}</td>
+                          <td>
+                            <span className={`cert-status ${cert.status.toLowerCase()}`}>
+                              {cert.status}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="cert-actions">
+                              <button 
+                                className="btn-edit-small"
+                                onClick={() => openEditCertification(cert)}
+                              >
+                                Edit
+                              </button>
+                              <button 
+                                className="btn-delete-small"
+                                onClick={() => handleDeleteCertification(cert.id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={closeCertificationModal}>
+              Close
+            </button>
+            <button type="button" className="btn-primary" onClick={closeCertificationModal}>
+              Save Changes
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -2658,6 +4569,26 @@ function Dashboard({ currentUser, onLogout }) {
       
       {/* User Modal */}
       {renderUserModal()}
+      
+      {/* Bill Modals */}
+      {renderCreateBillModal()}
+      {renderEditBillModal()}
+      {renderViewBillModal()}
+      
+      {/* Patient View Modal */}
+      {renderViewPatientModal()}
+      
+      {/* Staff View Modal */}
+      {renderViewStaffModal()}
+      
+      {/* Pathologist View Modal */}
+      {renderViewPathologistModal()}
+      
+      {/* Schedule Edit Modal */}
+      {renderScheduleEditModal()}
+      
+      {/* Certification Management Modal */}
+      {renderCertificationModal()}
     </div>
   );
 }

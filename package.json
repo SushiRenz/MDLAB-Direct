@@ -1,0 +1,23 @@
+{
+  "name": "mdlab-direct",
+  "version": "1.0.0",
+  "main": "clean_all_emojis.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SushiRenz/MDLAB-Direct.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/SushiRenz/MDLAB-Direct/issues"
+  },
+  "homepage": "https://github.com/SushiRenz/MDLAB-Direct#readme",
+  "description": "",
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  }
+}
