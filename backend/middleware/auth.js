@@ -72,16 +72,20 @@ const authorize = (...roles) => {
 // Admin only access
 const adminOnly = authorize('admin');
 
-// Staff access (medtech, pathologist, admin)
-const staffOnly = authorize('medtech', 'pathologist', 'admin');
+// Staff access (medtech, pathologist, receptionist, admin)
+const staffOnly = authorize('medtech', 'pathologist', 'receptionist', 'admin');
 
 // Medical professional access (pathologist, admin)
 const medicalOnly = authorize('pathologist', 'admin');
+
+// Receptionist access (receptionist, admin)
+const receptionistOnly = authorize('receptionist', 'admin');
 
 module.exports = {
   protect,
   authorize,
   adminOnly,
   staffOnly,
-  medicalOnly
+  medicalOnly,
+  receptionistOnly
 };

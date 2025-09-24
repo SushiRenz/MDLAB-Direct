@@ -12,7 +12,7 @@ function Dashboard({ currentUser, onLogout }) {
   const [dashboardStats, setDashboardStats] = useState({
     totalUsers: 0,
     totalPatients: 0,
-    totalStaff: 0,
+    totalMedTech: 0,
     totalRevenue: 0,
     pendingBills: 0,
     recentTransactions: [],
@@ -52,15 +52,19 @@ function Dashboard({ currentUser, onLogout }) {
   const [showViewPatientModal, setShowViewPatientModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
 
-  // Staff view modal
-  const [showViewStaffModal, setShowViewStaffModal] = useState(false);
-  const [selectedStaff, setSelectedStaff] = useState(null);
+  // MedTech view modal
+  const [showViewMedTechModal, setShowViewMedTechModal] = useState(false);
+  const [selectedMedTech, setSelectedMedTech] = useState(null);
+
+  // Receptionist view modal
+  const [showViewReceptionistModal, setShowViewReceptionistModal] = useState(false);
+  const [selectedReceptionist, setSelectedReceptionist] = useState(null);
 
   // Pathologist view modal
   const [showViewPathologistModal, setShowViewPathologistModal] = useState(false);
   const [selectedPathologist, setSelectedPathologist] = useState(null);
 
-  // Schedule edit modal for staff
+  // Schedule edit modal for medtech
   const [showScheduleEditModal, setShowScheduleEditModal] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [scheduleStartTime, setScheduleStartTime] = useState('');
@@ -246,7 +250,7 @@ function Dashboard({ currentUser, onLogout }) {
         setDashboardStats({
           totalUsers: userStatsResponse.stats?.totalUsers || 0,
           totalPatients: userStatsResponse.stats?.totalPatients || 0,
-          totalStaff: userStatsResponse.stats?.totalStaff || 0,
+          totalMedTech: userStatsResponse.stats?.totalMedTech || 0,
           activeUsers: userStatsResponse.stats?.activeUsers || 0,
           totalRevenue: financeStatsResponse.data?.totalRevenue || 0,
           pendingBills: financeStatsResponse.data?.pendingBills || 0,
@@ -266,7 +270,7 @@ function Dashboard({ currentUser, onLogout }) {
       setDashboardStats({
         totalUsers: 156,
         totalPatients: 89,
-        totalStaff: 23,
+        totalMedTech: 23,
         activeUsers: 142,
         totalRevenue: 1250000,
         pendingBills: 45,
@@ -440,9 +444,11 @@ function Dashboard({ currentUser, onLogout }) {
 
   const getCurrentRole = () => {
     switch (activeSection) {
-      case 'patient': return 'patient';
-      case 'staff': return 'medtech';
+      case 'patients': return 'patient';
+      case 'medtech': return 'medtech';
       case 'pathologist': return 'pathologist';
+      case 'receptionist': return 'receptionist';
+      case 'admin': return 'admin';
       default: return '';
     }
   };
@@ -493,15 +499,26 @@ function Dashboard({ currentUser, onLogout }) {
     setShowViewPatientModal(false);
   };
 
-  // Staff modal functions
-  const openViewStaffModal = (staff) => {
-    setSelectedStaff(staff);
-    setShowViewStaffModal(true);
+  // MedTech modal functions
+  const openViewMedTechModal = (medtech) => {
+    setSelectedMedTech(medtech);
+    setShowViewMedTechModal(true);
   };
 
-  const closeStaffModal = () => {
-    setSelectedStaff(null);
-    setShowViewStaffModal(false);
+  const closeMedTechModal = () => {
+    setSelectedMedTech(null);
+    setShowViewMedTechModal(false);
+  };
+
+  // Receptionist modal functions
+  const openViewReceptionistModal = (receptionist) => {
+    setSelectedReceptionist(receptionist);
+    setShowViewReceptionistModal(true);
+  };
+
+  const closeReceptionistModal = () => {
+    setSelectedReceptionist(null);
+    setShowViewReceptionistModal(false);
   };
 
   // Pathologist modal functions
@@ -698,7 +715,7 @@ function Dashboard({ currentUser, onLogout }) {
 
   // Effect to fetch users when section changes
   useEffect(() => {
-    if (['patient', 'staff', 'pathologist'].includes(activeSection)) {
+    if (['patients', 'medtech', 'pathologist', 'receptionist'].includes(activeSection)) {
       fetchUsers(getCurrentRole());
       fetchUserStats();
     }
@@ -2131,10 +2148,11 @@ function Dashboard({ currentUser, onLogout }) {
 
   const renderPageTitle = () => {
     switch (activeSection) {
-      case 'patient': return 'Patient Management';
-      case 'staff': return 'Staff Management';
+      case 'patients': return 'Patient Management';
+      case 'medtech': return 'MedTech Management';
       case 'pathologist': return 'Pathologist Management';
-      case 'admin': return 'Staff Management';
+      case 'receptionist': return 'Receptionist Management';
+      case 'admin': return 'Administrator Management';
       case 'bills': return 'Bills Management';
       case 'transaction': return 'Transaction History';
       case 'payments': return 'Payment Records';
@@ -2148,9 +2166,10 @@ function Dashboard({ currentUser, onLogout }) {
 
   const renderContent = () => {
     switch (activeSection) {
-      case 'patient': return renderPatientManagement();
-      case 'staff': return renderStaffManagement();
+      case 'patients': return renderPatientManagement();
+      case 'medtech': return renderMedTechManagement();
       case 'pathologist': return renderPathologistManagement();
+      case 'receptionist': return renderReceptionistManagement();
       case 'admin': return renderAdminManagement();
       case 'bills': return renderBillsManagement();
       case 'transaction': return renderTransactionHistory();
@@ -2295,17 +2314,17 @@ function Dashboard({ currentUser, onLogout }) {
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
-              Staff
+              MedTech
             </h3>
           </div>
           <div className="quick-access-content">
             <div className="access-item">
-              <span>Total Staff</span>
-              <span className="access-count">{dashboardStats.totalStaff}</span>
+              <span>Total MedTech</span>
+              <span className="access-count">{dashboardStats.totalMedTech}</span>
             </div>
             <div className="access-item">
-              <span>Active Staff</span>
-              <span className="access-count">{dashboardStats.totalStaff}</span>
+              <span>Active MedTech</span>
+              <span className="access-count">{dashboardStats.totalMedTech}</span>
             </div>
           </div>
         </div>
@@ -2510,9 +2529,9 @@ function Dashboard({ currentUser, onLogout }) {
     );
   };
 
-  const renderStaffManagement = () => {
-    const staff = users.filter(user => user.role === 'medtech');
-    const staffStats = userStats?.byRole?.find(stat => stat._id === 'medtech') || { count: 0, active: 0 };
+  const renderMedTechManagement = () => {
+    const medtech = users.filter(user => user.role === 'medtech');
+    const medtechStats = userStats?.byRole?.find(stat => stat._id === 'medtech') || { count: 0, active: 0 };
     
     return (
       <div className="management-container">
@@ -2530,11 +2549,11 @@ function Dashboard({ currentUser, onLogout }) {
         
         <div className="management-header">
           <div className="management-title">
-            <h2>Staff Management</h2>
-            <p>Manage laboratory staff, schedules, and performance</p>
+            <h2>MedTech Management</h2>
+            <p>Manage medical technologists, schedules, and performance</p>
           </div>
           <button className="add-btn" onClick={() => openUserModal()}>
-            + Add New Staff
+            + Add New MedTech
           </button>
         </div>
 
@@ -2542,15 +2561,15 @@ function Dashboard({ currentUser, onLogout }) {
           <div className="stat-card">
             <div className="stat-icon"></div>
             <div className="stat-info">
-              <div className="stat-label">Total Staff</div>
-              <div className="stat-value">{staffStats.count}</div>
+              <div className="stat-label">Total MedTech</div>
+              <div className="stat-value">{medtechStats.count}</div>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon"></div>
             <div className="stat-info">
-              <div className="stat-label">Active Staff</div>
-              <div className="stat-value">{staffStats.active}</div>
+              <div className="stat-label">Active MedTech</div>
+              <div className="stat-value">{medtechStats.active}</div>
             </div>
           </div>
           <div className="stat-card">
@@ -2569,7 +2588,7 @@ function Dashboard({ currentUser, onLogout }) {
             <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">Filtered Results</div>
-              <div className="stat-value">{staff.length}</div>
+              <div className="stat-value">{medtech.length}</div>
             </div>
           </div>
         </div>
@@ -2579,7 +2598,7 @@ function Dashboard({ currentUser, onLogout }) {
             <div className="search-filter">
               <input 
                 type="text" 
-                placeholder="Search staff..." 
+                placeholder="Search medtech..." 
                 className="search-input"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -2589,7 +2608,7 @@ function Dashboard({ currentUser, onLogout }) {
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
               >
-                <option value="">All Staff</option>
+                <option value="">All MedTech</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
@@ -2598,12 +2617,12 @@ function Dashboard({ currentUser, onLogout }) {
 
           <div className="data-table">
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '20px' }}>Loading staff...</div>
+              <div style={{ textAlign: 'center', padding: '20px' }}>Loading medtech...</div>
             ) : (
               <table>
                 <thead>
                   <tr>
-                    <th>Staff ID</th>
+                    <th>MedTech ID</th>
                     <th>Name</th>
                     <th>Position</th>
                     <th>Email</th>
@@ -2614,18 +2633,18 @@ function Dashboard({ currentUser, onLogout }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {staff.length === 0 ? (
+                  {medtech.length === 0 ? (
                     <tr>
                       <td colSpan="8" style={{ textAlign: 'center', padding: '20px' }}>
-                        No staff found
+                        No medtech found
                       </td>
                     </tr>
                   ) : (
-                    staff.map((member) => (
+                    medtech.map((member) => (
                       <tr key={member.id}>
-                        <td>S{member.id.slice(-6)}</td>
+                        <td>MT{member.id.slice(-6)}</td>
                         <td>{member.firstName} {member.lastName}</td>
-                        <td>Lab Technician</td>
+                        <td>Medical Technologist</td>
                         <td>{member.email}</td>
                         <td>{member.phone || 'N/A'}</td>
                         <td>{new Date(member.createdAt).toLocaleDateString()}</td>
@@ -2638,7 +2657,7 @@ function Dashboard({ currentUser, onLogout }) {
                           <div className="action-buttons">
                             <button 
                               className="btn-view"
-                              onClick={() => openViewStaffModal(member)}
+                              onClick={() => openViewMedTechModal(member)}
                             >
                               View
                             </button>
@@ -2653,6 +2672,152 @@ function Dashboard({ currentUser, onLogout }) {
                               onClick={() => handleDeleteUser(member.id)}
                             >
                               Delete
+                            </button>
+                            <button 
+                              className={`btn-toggle ${member.isActive ? 'btn-deactivate' : 'btn-activate'}`}
+                              onClick={() => handleToggleUserStatus(member.id, member.isActive)}
+                            >
+                              {member.isActive ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderReceptionistManagement = () => {
+    const receptionists = users.filter(user => user.role === 'receptionist');
+    const receptionistStats = userStats?.byRole?.find(stat => stat._id === 'receptionist') || { count: 0, active: 0 };
+    
+    return (
+      <div className="management-container">
+        {error && (
+          <div className="error-message" style={{
+            background: '#fee', 
+            color: '#c33', 
+            padding: '10px', 
+            borderRadius: '4px', 
+            marginBottom: '20px'
+          }}>
+            {error}
+          </div>
+        )}
+        
+        <div className="management-header">
+          <div className="management-title">
+            <h2>Receptionist Management</h2>
+            <p>Manage reception staff, appointments, and patient interactions</p>
+          </div>
+          <button className="add-btn" onClick={() => openUserModal()}>
+            + Add New Receptionist
+          </button>
+        </div>
+
+        <div className="management-stats">
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Total Receptionists</div>
+              <div className="stat-value">{receptionistStats.count}</div>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Active Receptionists</div>
+              <div className="stat-value">{receptionistStats.active}</div>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon"></div>
+            <div className="stat-info">
+              <div className="stat-label">Filtered Results</div>
+              <div className="stat-value">{receptionists.length}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="management-content">
+          <div className="content-header">
+            <div className="search-filter">
+              <input 
+                type="text" 
+                placeholder="Search receptionists..." 
+                className="search-input"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <select 
+                className="filter-select"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="">All Receptionists</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="data-table">
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>Loading receptionists...</div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Receptionist ID</th>
+                    <th>Name</th>
+                    <th>Position</th>
+                    <th>Email</th>
+                    <th>Contact</th>
+                    <th>Created</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {receptionists.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '20px' }}>
+                        No receptionists found
+                      </td>
+                    </tr>
+                  ) : (
+                    receptionists.map((member) => (
+                      <tr key={member.id}>
+                        <td>RC{member.id.slice(-6)}</td>
+                        <td>{member.firstName} {member.lastName}</td>
+                        <td>Receptionist</td>
+                        <td>{member.email}</td>
+                        <td>{member.phone || 'N/A'}</td>
+                        <td>{new Date(member.createdAt).toLocaleDateString()}</td>
+                        <td>
+                          <span className={`status ${member.isActive ? 'active' : 'inactive'}`}>
+                            {member.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="action-buttons">
+                            <button 
+                              className="btn-view"
+                              onClick={() => openViewReceptionistModal(member)}
+                            >
+                              View
+                            </button>
+                            <button 
+                              className="btn-edit"
+                              onClick={() => openUserModal(member)}
+                            >
+                              Edit
                             </button>
                             <button 
                               className={`btn-toggle ${member.isActive ? 'btn-deactivate' : 'btn-activate'}`}
@@ -4203,8 +4368,9 @@ function Dashboard({ currentUser, onLogout }) {
                   <label>Role</label>
                   <select name="role" defaultValue={editingUser?.role || currentRole}>
                     <option value="patient">Patient</option>
-                    <option value="medtech">Medical Technician</option>
+                    <option value="medtech">Medical Technologist</option>
                     <option value="pathologist">Pathologist</option>
+                    <option value="receptionist">Receptionist</option>
                     <option value="admin">Admin</option>
                   </select>
                 </div>
@@ -6665,24 +6831,24 @@ function Dashboard({ currentUser, onLogout }) {
     }
   };
 
-  // Staff View Modal Component
-  const renderViewStaffModal = () => {
-    if (!showViewStaffModal || !selectedStaff) return null;
+  // MedTech View Modal Component
+  const renderViewMedTechModal = () => {
+    if (!showViewMedTechModal || !selectedMedTech) return null;
     
-    const staff = selectedStaff;
-    const staffName = `${staff.firstName || ''} ${staff.lastName || ''}`.trim() || 'Unknown Staff';
-    const email = staff.email || 'N/A';
-    const phone = staff.phone || 'N/A';
-    const username = staff.username || 'N/A';
-    const role = staff.role || 'staff';
-    const gender = staff.gender || 'N/A';
-    const dateOfBirth = staff.dateOfBirth ? new Date(staff.dateOfBirth).toLocaleDateString() : 'N/A';
-    const isActive = staff.isActive !== undefined ? staff.isActive : true;
-    const createdAt = staff.createdAt ? new Date(staff.createdAt).toLocaleDateString() : 'N/A';
-    const lastLogin = staff.lastLogin ? new Date(staff.lastLogin).toLocaleDateString() : 'Never';
+    const medtech = selectedMedTech;
+    const medtechName = `${medtech.firstName || ''} ${medtech.lastName || ''}`.trim() || 'Unknown MedTech';
+    const email = medtech.email || 'N/A';
+    const phone = medtech.phone || 'N/A';
+    const username = medtech.username || 'N/A';
+    const role = medtech.role || 'medtech';
+    const gender = medtech.gender || 'N/A';
+    const dateOfBirth = medtech.dateOfBirth ? new Date(medtech.dateOfBirth).toLocaleDateString() : 'N/A';
+    const isActive = medtech.isActive !== undefined ? medtech.isActive : true;
+    const createdAt = medtech.createdAt ? new Date(medtech.createdAt).toLocaleDateString() : 'N/A';
+    const lastLogin = medtech.lastLogin ? new Date(medtech.lastLogin).toLocaleDateString() : 'Never';
     
     // Handle address safely
-    const address = staff.address || {};
+    const address = medtech.address || {};
     const fullAddress = [
       address.street,
       address.city,
@@ -6703,11 +6869,11 @@ function Dashboard({ currentUser, onLogout }) {
 
     try {
       return (
-        <div className="modal-overlay" onClick={closeStaffModal}>
+        <div className="modal-overlay" onClick={closeMedTechModal}>
           <div className="modal-content view-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Staff Details - {staffName}</h3>
-              <button className="modal-close" onClick={closeStaffModal}>×</button>
+              <h3>MedTech Details - {medtechName}</h3>
+              <button className="modal-close" onClick={closeMedTechModal}>×</button>
             </div>
             
             <div className="modal-body">
@@ -6716,7 +6882,7 @@ function Dashboard({ currentUser, onLogout }) {
                   <h4>Personal Information</h4>
                   <div className="info-row">
                     <span className="label">Full Name:</span>
-                    <span className="value">{staffName}</span>
+                    <span className="value">{medtechName}</span>
                   </div>
                   <div className="info-row">
                     <span className="label">Email:</span>
@@ -6842,19 +7008,19 @@ function Dashboard({ currentUser, onLogout }) {
         </div>
       );
     } catch (error) {
-      console.error('Error rendering staff view modal:', error);
+      console.error('Error rendering medtech view modal:', error);
       return (
-        <div className="modal-overlay" onClick={closeStaffModal}>
+        <div className="modal-overlay" onClick={closeMedTechModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Error Loading Staff</h3>
-              <button className="modal-close" onClick={closeStaffModal}>×</button>
+              <h3>Error Loading MedTech</h3>
+              <button className="modal-close" onClick={closeMedTechModal}>×</button>
             </div>
             <div className="modal-body">
-              <p>There was an error loading the staff details. Please try again.</p>
+              <p>There was an error loading the medtech details. Please try again.</p>
             </div>
             <div className="modal-footer">
-              <button type="button" className="btn-secondary" onClick={closeStaffModal}>
+              <button type="button" className="btn-secondary" onClick={closeMedTechModal}>
                 Close
               </button>
             </div>
@@ -7071,6 +7237,132 @@ function Dashboard({ currentUser, onLogout }) {
             </div>
             <div className="modal-footer">
               <button type="button" className="btn-secondary" onClick={closePathologistModal}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+  };
+
+  // Receptionist View Modal Component
+  const renderViewReceptionistModal = () => {
+    if (!showViewReceptionistModal || !selectedReceptionist) return null;
+    
+    const receptionist = selectedReceptionist;
+    const receptionistName = `${receptionist.firstName || ''} ${receptionist.lastName || ''}`.trim() || 'Unknown Receptionist';
+    const email = receptionist.email || 'N/A';
+    const phone = receptionist.phone || 'N/A';
+    const username = receptionist.username || 'N/A';
+    const role = receptionist.role || 'receptionist';
+    const gender = receptionist.gender || 'N/A';
+    const dateOfBirth = receptionist.dateOfBirth ? new Date(receptionist.dateOfBirth).toLocaleDateString() : 'N/A';
+    const isActive = receptionist.isActive !== undefined ? receptionist.isActive : true;
+    const createdAt = receptionist.createdAt ? new Date(receptionist.createdAt).toLocaleDateString() : 'N/A';
+    const lastLogin = receptionist.lastLogin ? new Date(receptionist.lastLogin).toLocaleDateString() : 'Never';
+    
+    // Handle address safely
+    const address = receptionist.address || {};
+    const fullAddress = [
+      address.street,
+      address.city,
+      address.province,
+      address.zipCode
+    ].filter(Boolean).join(', ') || 'No address provided';
+
+    try {
+      return (
+        <div className="modal-overlay" onClick={closeReceptionistModal}>
+          <div className="modal-content view-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Receptionist Details - {receptionistName}</h3>
+              <button className="modal-close" onClick={closeReceptionistModal}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="view-grid">
+                <div className="info-section">
+                  <h4>Personal Information</h4>
+                  <div className="info-row">
+                    <span className="label">Full Name:</span>
+                    <span className="value">{receptionistName}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Email:</span>
+                    <span className="value">{email}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Phone:</span>
+                    <span className="value">{phone}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Username:</span>
+                    <span className="value">{username}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Gender:</span>
+                    <span className="value">{gender}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Date of Birth:</span>
+                    <span className="value">{dateOfBirth}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Address:</span>
+                    <span className="value">{fullAddress}</span>
+                  </div>
+                </div>
+
+                <div className="info-section">
+                  <h4>Account Information</h4>
+                  <div className="info-row">
+                    <span className="label">Role:</span>
+                    <span className="value role-receptionist">Receptionist</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Status:</span>
+                    <span className={`value status ${isActive ? 'active' : 'inactive'}`}>
+                      {isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Account Created:</span>
+                    <span className="value">{createdAt}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="label">Last Login:</span>
+                    <span className="value">{lastLogin}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={closeReceptionistModal}>
+                Close
+              </button>
+              <button type="button" className="btn-primary" onClick={() => openUserModal(receptionist, true)}>
+                Edit Receptionist
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    } catch (error) {
+      console.error('Error rendering receptionist view modal:', error);
+      return (
+        <div className="modal-overlay" onClick={closeReceptionistModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Error Loading Receptionist</h3>
+              <button className="modal-close" onClick={closeReceptionistModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>There was an error loading the receptionist details. Please try again.</p>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={closeReceptionistModal}>
                 Close
               </button>
             </div>
@@ -7581,22 +7873,28 @@ function Dashboard({ currentUser, onLogout }) {
             {userManagementOpen && (
               <div className="nav-submenu">
                 <div 
-                  className={`nav-subitem ${activeSection === 'patient' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('patient')}
+                  className={`nav-subitem ${activeSection === 'patients' ? 'active' : ''}`}
+                  onClick={() => handleSectionClick('patients')}
                 >
                   Patient
                 </div>
                 <div 
-                  className={`nav-subitem ${activeSection === 'staff' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('staff')}
+                  className={`nav-subitem ${activeSection === 'medtech' ? 'active' : ''}`}
+                  onClick={() => handleSectionClick('medtech')}
                 >
-                  Staff
+                  MedTech
                 </div>
                 <div 
                   className={`nav-subitem ${activeSection === 'pathologist' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('pathologist')}
                 >
                   Pathologist
+                </div>
+                <div 
+                  className={`nav-subitem ${activeSection === 'receptionist' ? 'active' : ''}`}
+                  onClick={() => handleSectionClick('receptionist')}
+                >
+                  Receptionist
                 </div>
               </div>
             )}
@@ -7744,11 +8042,14 @@ function Dashboard({ currentUser, onLogout }) {
       {/* Patient View Modal */}
       {renderViewPatientModal()}
       
-      {/* Staff View Modal */}
-      {renderViewStaffModal()}
+      {/* MedTech View Modal */}
+      {renderViewMedTechModal()}
       
       {/* Pathologist View Modal */}
       {renderViewPathologistModal()}
+      
+      {/* Receptionist View Modal */}
+      {renderViewReceptionistModal()}
       
       {/* Schedule Edit Modal */}
       {renderScheduleEditModal()}

@@ -35,12 +35,53 @@ app.use(cors({
   origin: [
     'http://localhost:5173',
     'http://localhost:5174',
-    /^http:\/\/192\.168\.\d+\.\d+:5174$/, // Allow any 192.168.x.x IP
-    /^http:\/\/10\.\d+\.\d+\.\d+:5174$/,   // Allow any 10.x.x.x IP  
-    /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+:5174$/ // Allow 172.16-31.x.x IPs
+    /^http:\/\/192\.168\.\d+\.\d+:5173$/, // Allow any 192.168.x.x IP on port 5173
+    /^http:\/\/192\.168\.\d+\.\d+:5174$/, // Allow any 192.168.x.x IP on port 5174
+    /^http:\/\/10\.\d+\.\d+\.\d+:5173$/,   // Allow any 10.x.x.x IP on port 5173
+    /^http:\/\/10\.\d+\.\d+\.\d+:5174$/,   // Allow any 10.x.x.x IP on port 5174
+    /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+:5173$/, // Allow 172.16-31.x.x IPs on port 5173
+    /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+:5174$/ // Allow 172.16-31.x.x IPs on port 5174
   ],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With',
+    'Content-Type',
+    'Accept',
+    'Authorization',
+    'Cache-Control',
+    'X-HTTP-Method-Override'
+  ],
+  exposedHeaders: ['Authorization'],
+  preflightContinue: false,
+  optionsSuccessStatus: 200
 }));
+
+// Additional CORS headers middleware (fallback)
+app.use((req, res, next) => {
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:5174'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control');
+  res.header('Access-Control-Expose-Headers', 'Authorization');
+  
+  // Handle preflight OPTIONS requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+});
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -120,7 +161,16 @@ mongoose.connect(mongoURI, mongoOptions)
   })
   .catch(err => {
     console.error('❌ MongoDB connection failed:', err);
-    process.exit(1);
+    console.log('🔄 Retrying MongoDB connection in 5 seconds...');
+    
+    // Don't exit in development, try to reconnect
+    if (process.env.NODE_ENV === 'development') {
+      setTimeout(() => {
+        mongoose.connect(mongoURI, mongoOptions);
+      }, 5000);
+    } else {
+      process.exit(1);
+    }
   });
 
 // MongoDB connection event handlers
@@ -134,25 +184,29 @@ mongoose.connection.on('error', (err) => {
 
 mongoose.connection.on('disconnected', () => {
   console.log('⚠️ Mongoose disconnected from MongoDB');
+  
+  // Attempt to reconnect in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔄 Attempting to reconnect to MongoDB...');
+    setTimeout(() => {
+      mongoose.connect(mongoURI, mongoOptions);
+    }, 5000);
+  }
 });
 
 mongoose.connection.on('reconnected', () => {
   console.log('🔄 Mongoose reconnected to MongoDB');
 });
 
-// Handle MongoDB connection termination
-process.on('SIGINT', async () => {
-  try {
-    await mongoose.connection.close();
-    console.log('📴 MongoDB connection closed through app termination');
-    process.exit(0);
-  } catch (err) {
-    console.error('Error closing MongoDB connection:', err);
-    process.exit(1);
+// Periodic health monitoring to keep server active
+setInterval(() => {
+  const memUsage = process.memoryUsage();
+  if (memUsage.rss > 1000000000) { // 1GB threshold
+    console.log('⚠️ High memory usage detected:', Math.round(memUsage.rss / 1024 / 1024), 'MB');
   }
-});
+}, 300000); // Check every 5 minutes
 
-// Enhanced error handling for unhandled promise rejections
+// Graceful shutdown handling
 process.on('unhandledRejection', (err, promise) => {
   console.error('🚨 Unhandled Promise Rejection:', err.message);
   console.error('Stack:', err.stack);
@@ -197,9 +251,9 @@ const server = app.listen(PORT, () => {
 });
 
 // Set server timeout to prevent hanging connections
-server.timeout = 120000; // 2 minutes
-server.keepAliveTimeout = 65000; // 65 seconds
-server.headersTimeout = 66000; // 66 seconds
+server.timeout = 300000; // 5 minutes instead of 2
+server.keepAliveTimeout = 120000; // 2 minutes
+server.headersTimeout = 121000; // 2 minutes + 1 second
 
 // Graceful shutdown handling
 const gracefulShutdown = (signal) => {

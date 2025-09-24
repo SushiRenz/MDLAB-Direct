@@ -30,8 +30,8 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Role is required'],
     enum: {
-      values: ['patient', 'medtech', 'pathologist', 'admin'],
-      message: 'Role must be either patient, medtech, pathologist, or admin'
+      values: ['patient', 'medtech', 'pathologist', 'receptionist', 'admin'],
+      message: 'Role must be either patient, medtech, pathologist, receptionist, or admin'
     },
     default: 'patient'
   },
