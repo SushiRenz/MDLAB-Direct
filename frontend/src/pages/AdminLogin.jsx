@@ -78,12 +78,12 @@ function AdminLogin({ onNavigateToLogin, onNavigateToDashboard }) {
       if (data.success && data.token) {
         const userRole = data.user.role;
         
-        if (userRole === 'admin' || userRole === 'pathologist' || userRole === 'medtech') {
+        if (userRole === 'admin' || userRole === 'pathologist' || userRole === 'medtech' || userRole === 'receptionist') {
           // Valid admin/staff user
           localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
           
-          console.log('Admin login successful:', data.user);
+          console.log('Staff login successful:', data.user);
           
           setTimeout(() => {
             setLoading(false);

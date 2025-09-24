@@ -7,6 +7,7 @@ import AdminLogin from './pages/AdminLogin';
 import MedTechDashboard from './pages/MedTechDashboard';
 import PathologistDashboard from './pages/PathologistDashboard';
 import PatientDashboard from './pages/PatientDashboard';
+import ReceptionistDashboard from './pages/ReceptionistDashboard';
 import { API_ENDPOINTS } from './config/api';
 
 function App() {
@@ -63,6 +64,9 @@ function App() {
             switch (userData.role) {
               case 'admin':
                 setCurrentView('dashboard');
+                break;
+              case 'receptionist':
+                setCurrentView('receptionist-dashboard');
                 break;
               case 'medtech':
                 setCurrentView('medtech-dashboard');
@@ -121,6 +125,9 @@ function App() {
           break;
         case 'dashboard':
           document.title = 'MDLAB Direct - Admin Dashboard';
+          break;
+        case 'receptionist-dashboard':
+          document.title = 'MDLAB Direct - Receptionist Portal';
           break;
         case 'medtech-dashboard':
           document.title = 'MDLAB Direct - MedTech Dashboard';
@@ -200,6 +207,10 @@ function App() {
             console.log('Routing to admin dashboard');
             setCurrentView('dashboard'); // Admin Dashboard
             break;
+          case 'receptionist':
+            console.log('Routing to receptionist dashboard');
+            setCurrentView('receptionist-dashboard'); // Receptionist Dashboard
+            break;
           case 'medtech':
             console.log('Routing to medtech dashboard');
             setCurrentView('medtech-dashboard'); // MedTech Dashboard
@@ -256,6 +267,13 @@ function App() {
       case 'dashboard':
         return (
           <Dashboard
+            currentUser={currentUser}
+            onLogout={handleLogout}
+          />
+        );
+      case 'receptionist-dashboard':
+        return (
+          <ReceptionistDashboard
             currentUser={currentUser}
             onLogout={handleLogout}
           />

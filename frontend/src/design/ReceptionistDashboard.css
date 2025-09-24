@@ -1,0 +1,1330 @@
+/* Receptionist Dashboard Component Styles */
+.receptionist-dashboard-container {
+  display: flex;
+  min-height: 100vh;
+  background: #f5f7fa;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+/* Receptionist Sidebar Styles */
+.receptionist-dashboard-sidebar {
+  width: 260px;
+  background: #2c3e50;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  height: 100vh;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.receptionist-sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid #34495e;
+  background: #21AEA8;
+}
+
+.receptionist-sidebar-title {
+  color: white;
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  margin: 0;
+  text-align: center;
+}
+
+.receptionist-sidebar-nav {
+  flex: 1;
+  padding: 15px 0;
+}
+
+.receptionist-nav-item {
+  margin: 2px 10px;
+  padding: 12px 15px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #bdc3c7;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.receptionist-nav-item:hover {
+  background: #34495e;
+  color: white;
+}
+
+.receptionist-nav-item.active {
+  background: #21AEA8;
+  color: white;
+}
+
+.receptionist-nav-icon {
+  font-size: 1.1rem;
+  width: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.receptionist-nav-text {
+  font-size: 0.9rem;
+}
+
+.receptionist-dropdown {
+  margin: 2px 10px;
+}
+
+.receptionist-dropdown .receptionist-nav-item-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px 15px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #bdc3c7;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.receptionist-dropdown .receptionist-nav-item-header:hover {
+  background: #34495e;
+  color: white;
+}
+
+.receptionist-nav-item-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.receptionist-dropdown-arrow {
+  font-size: 0.7rem;
+  transition: transform 0.2s ease;
+  color: #7f8c8d;
+  margin-left: auto;
+}
+
+.receptionist-dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.receptionist-nav-submenu {
+  background: rgba(52, 73, 94, 0.3);
+  border-radius: 6px;
+  margin: 4px 0;
+  padding: 4px 0;
+  overflow: hidden;
+}
+
+.receptionist-nav-subitem {
+  padding: 8px 15px 8px 45px;
+  margin: 1px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #95a5a6;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.receptionist-nav-subitem::before {
+  content: "—";
+  position: absolute;
+  left: 25px;
+  color: #7f8c8d;
+}
+
+.receptionist-nav-subitem:hover {
+  background: #34495e;
+  color: #ecf0f1;
+}
+
+.receptionist-nav-subitem.active {
+  background: #21AEA8;
+  color: white;
+}
+
+.receptionist-sidebar-footer {
+  padding: 15px;
+  border-top: 1px solid #34495e;
+}
+
+.receptionist-user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #34495e;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.receptionist-user-avatar {
+  width: 35px;
+  height: 35px;
+  background: #21AEA8;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.receptionist-user-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.receptionist-user-role {
+  color: white;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.receptionist-user-email {
+  color: #bdc3c7;
+  font-size: 0.7rem;
+}
+
+.receptionist-logout-btn {
+  background: none;
+  border: none;
+  color: #bdc3c7;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 5px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.receptionist-logout-btn:hover {
+  background: #21AEA8;
+  color: white;
+}
+
+/* Receptionist Main Content Styles */
+.receptionist-dashboard-main {
+  flex: 1;
+  margin-left: 260px;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.receptionist-dashboard-header {
+  background: white;
+  padding: 20px 25px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid #e9ecef;
+}
+
+.receptionist-page-title {
+  color: #2c3e50;
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.receptionist-dashboard-content {
+  padding: 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Receptionist Stats Grid */
+.receptionist-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.receptionist-stat-card {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #21AEA8;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.receptionist-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.receptionist-stat-icon {
+  width: 45px;
+  height: 45px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  color: #21AEA8;
+}
+
+.receptionist-stat-icon:empty {
+  display: none;
+}
+
+.receptionist-stat-info {
+  flex: 1;
+}
+
+.receptionist-stat-label {
+  color: #6c757d;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.receptionist-stat-value {
+  color: #2c3e50;
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Receptionist Middle Grid */
+.receptionist-middle-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
+.receptionist-chart-card, .receptionist-info-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.receptionist-card-header {
+  padding: 20px 25px 15px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.receptionist-card-header h3 {
+  color: #2c3e50;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.receptionist-card-content {
+  padding: 20px 25px;
+}
+
+.receptionist-appointment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.receptionist-appointment-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 3px solid #21AEA8;
+}
+
+.receptionist-appointment-time {
+  font-weight: 600;
+  color: #21AEA8;
+  min-width: 80px;
+  font-size: 0.9rem;
+}
+
+.receptionist-appointment-details {
+  flex: 1;
+}
+
+.receptionist-appointment-patient {
+  font-weight: 500;
+  color: #2c3e50;
+  font-size: 0.9rem;
+}
+
+.receptionist-appointment-service {
+  color: #6c757d;
+  font-size: 0.8rem;
+}
+
+.receptionist-appointment-status {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.receptionist-appointment-status.confirmed {
+  background: #d4edda;
+  color: #155724;
+}
+
+.receptionist-appointment-status.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.receptionist-appointment-status.completed {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.receptionist-overview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f1f3f4;
+}
+
+.receptionist-overview-item:last-child {
+  border-bottom: none;
+}
+
+.receptionist-overview-label {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.receptionist-overview-value {
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+/* Receptionist Bottom Grid */
+.receptionist-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.receptionist-quick-access-card, .receptionist-activity-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  transition: transform 0.2s ease;
+}
+
+.receptionist-quick-access-card:hover, .receptionist-activity-card:hover {
+  transform: translateY(-2px);
+}
+
+.receptionist-quick-access-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.receptionist-quick-btn {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  padding: 12px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.receptionist-quick-btn:hover {
+  background: #21AEA8;
+  color: white;
+  border-color: #21AEA8;
+  transform: translateY(-1px);
+}
+
+.receptionist-activity-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  height: 100%;
+  padding: 10px 0;
+}
+
+.receptionist-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #21AEA8;
+  min-height: 80px;
+  text-align: center;
+}
+
+.receptionist-stat-item .receptionist-stat-label {
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-bottom: 6px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.receptionist-stat-item .receptionist-stat-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #21AEA8;
+  line-height: 1;
+}
+
+.receptionist-empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6c757d;
+}
+
+.receptionist-loading {
+  text-align: center;
+  padding: 40px;
+  color: #6c757d;
+  font-size: 1.1rem;
+}
+
+/* Receptionist Management Styles */
+.receptionist-management-container {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.receptionist-management-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.receptionist-management-title h2 {
+  color: #2c3e50;
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin: 0 0 5px 0;
+}
+
+.receptionist-management-title p {
+  color: #6c757d;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.receptionist-add-btn {
+  background: #21AEA8;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+}
+
+.receptionist-add-btn:hover {
+  background: #1e9a94;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(230, 126, 34, 0.3);
+}
+
+.receptionist-search-filter {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.receptionist-search-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: #ffffff;
+  color: #2d3748;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.receptionist-search-input:focus {
+  outline: none;
+  border-color: #21AEA8;
+  box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05);
+  background: #ffffff;
+}
+
+.receptionist-search-input::placeholder {
+  color: #a0aec0;
+  font-style: italic;
+}
+
+.receptionist-filter-select, .receptionist-date-filter {
+  padding: 12px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: #ffffff;
+  color: #2d3748;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.receptionist-filter-select:focus, .receptionist-date-filter:focus {
+  outline: none;
+  border-color: #21AEA8;
+  box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.receptionist-management-content {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.receptionist-data-table {
+  overflow-x: auto;
+}
+
+.receptionist-data-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.receptionist-data-table th {
+  background: #f8f9fa;
+  padding: 15px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #495057;
+  border-bottom: 1px solid #dee2e6;
+  white-space: nowrap;
+}
+
+.receptionist-data-table td {
+  padding: 15px 12px;
+  border-bottom: 1px solid #f1f3f4;
+  color: #495057;
+  vertical-align: middle;
+}
+
+.receptionist-data-table tr:hover {
+  background: #f8f9fa;
+}
+
+.receptionist-status {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.receptionist-status.confirmed {
+  background: #d4edda;
+  color: #155724;
+}
+
+.receptionist-status.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.receptionist-status.completed {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.receptionist-status.cancelled {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.receptionist-status.checked-in {
+  background: #d4edda;
+  color: #155724;
+}
+
+.receptionist-status.walk-in {
+  background: #e2e3e5;
+  color: #383d41;
+}
+
+.receptionist-action-buttons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.receptionist-btn-view, .receptionist-btn-edit, .receptionist-btn-delete,
+.receptionist-btn-checkin, .receptionist-btn-checkout, .receptionist-btn-bill {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 50px;
+  height: 32px;
+  color: #4a5568;
+  white-space: nowrap;
+}
+
+.receptionist-btn-view:hover {
+  background: #21AEA8;
+  border-color: #21AEA8;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(230, 126, 34, 0.2);
+}
+
+.receptionist-btn-edit:hover {
+  background: #3182ce;
+  border-color: #3182ce;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(49, 130, 206, 0.2);
+}
+
+.receptionist-btn-delete:hover {
+  background: #e53e3e;
+  border-color: #e53e3e;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(229, 62, 62, 0.2);
+}
+
+.receptionist-btn-checkin:hover {
+  background: #38a169;
+  border-color: #38a169;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(56, 161, 105, 0.2);
+}
+
+.receptionist-btn-checkout:hover {
+  background: #d69e2e;
+  border-color: #d69e2e;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(214, 158, 46, 0.2);
+}
+
+.receptionist-btn-bill:hover {
+  background: #805ad5;
+  border-color: #805ad5;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(128, 90, 213, 0.2);
+}
+
+.receptionist-form-container {
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive Styles for Receptionist Dashboard */
+@media (max-width: 1200px) {
+  .receptionist-dashboard-sidebar {
+    width: 240px;
+  }
+  
+  .receptionist-dashboard-main {
+    margin-left: 240px;
+  }
+  
+  .receptionist-middle-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .receptionist-bottom-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .receptionist-dashboard-sidebar {
+    width: 100%;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .receptionist-dashboard-sidebar.open {
+    transform: translateX(0);
+  }
+  
+  .receptionist-dashboard-main {
+    margin-left: 0;
+    width: 100%;
+  }
+  
+  .receptionist-stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .receptionist-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .receptionist-dashboard-content {
+    padding: 15px;
+  }
+  
+  .receptionist-dashboard-header {
+    padding: 15px 20px;
+  }
+  
+  .receptionist-page-title {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .receptionist-stat-card {
+    padding: 15px;
+  }
+  
+  .receptionist-stat-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem;
+  }
+  
+  .receptionist-stat-value {
+    font-size: 1.5rem;
+  }
+  
+  .receptionist-card-header, .receptionist-card-content {
+    padding: 15px 20px;
+  }
+  
+  .receptionist-quick-access-card, .receptionist-activity-card {
+    padding: 15px;
+  }
+  
+  .receptionist-management-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: stretch;
+  }
+  
+  .receptionist-add-btn {
+    align-self: flex-start;
+  }
+  
+  .receptionist-search-filter {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .receptionist-filter-select, .receptionist-date-filter {
+    min-width: auto;
+  }
+  
+  .receptionist-data-table {
+    font-size: 0.8rem;
+  }
+  
+  .receptionist-data-table th,
+  .receptionist-data-table td {
+    padding: 10px 8px;
+  }
+  
+  .receptionist-action-buttons {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .receptionist-btn-view, .receptionist-btn-edit, .receptionist-btn-delete,
+  .receptionist-btn-checkin, .receptionist-btn-checkout, .receptionist-btn-bill {
+    min-width: 45px;
+    height: 30px;
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+}
+
+/* Additional Receptionist-specific styles */
+.receptionist-priority-badge {
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.receptionist-priority-badge.urgent {
+  background: #fed7d7;
+  color: #c53030;
+}
+
+.receptionist-priority-badge.regular {
+  background: #e6fffa;
+  color: #38b2ac;
+}
+
+.receptionist-appointment-notes {
+  font-style: italic;
+  color: #718096;
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+.receptionist-service-info {
+  background: #f7fafc;
+  padding: 10px;
+  border-radius: 6px;
+  border-left: 3px solid #21AEA8;
+  margin-bottom: 10px;
+}
+
+.receptionist-service-name {
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 4px;
+}
+
+.receptionist-service-price {
+  color: #21AEA8;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.receptionist-time-slot {
+  background: #edf2f7;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  color: #2d3748;
+  text-align: center;
+  border: 2px solid transparent;
+}
+
+.receptionist-time-slot.selected {
+  background: #21AEA8;
+  color: white;
+  border-color: #1e9a94;
+}
+
+.receptionist-patient-info {
+  background: #f7fafc;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.receptionist-patient-detail {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.receptionist-patient-detail:last-child {
+  border-bottom: none;
+}
+
+.receptionist-patient-label {
+  font-weight: 500;
+  color: #4a5568;
+}
+
+.receptionist-patient-value {
+  color: #2d3748;
+}
+
+.receptionist-notification-badge {
+  background: #e53e3e;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: -8px;
+  right: -8px;
+}
+
+.receptionist-nav-item {
+  position: relative;
+}
+
+/* Success and Error Messages */
+.receptionist-success-message {
+  background: #f0fff4;
+  color: #2f855a;
+  padding: 12px 16px;
+  border-radius: 6px;
+  border-left: 4px solid #38a169;
+  margin-bottom: 20px;
+}
+
+.receptionist-error-message {
+  background: #fed7d7;
+  color: #c53030;
+  padding: 12px 16px;
+  border-radius: 6px;
+  border-left: 4px solid #e53e3e;
+  margin-bottom: 20px;
+}
+
+/* Modal Base Styles for Receptionist */
+.receptionist-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.receptionist-modal-content {
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.receptionist-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.receptionist-modal-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0;
+}
+
+.receptionist-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #a0aec0;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.receptionist-modal-close:hover {
+  background: #edf2f7;
+  color: #4a5568;
+}
+
+.receptionist-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.receptionist-btn-primary {
+  background: #21AEA8;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.receptionist-btn-primary:hover {
+  background: #1e9a94;
+  transform: translateY(-1px);
+}
+
+.receptionist-btn-secondary {
+  background: #edf2f7;
+  color: #4a5568;
+  border: 1px solid #e2e8f0;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.receptionist-btn-secondary:hover {
+  background: #e2e8f0;
+}
+
+/* Receptionist-specific Additional Styles */
+.receptionist-quick-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.receptionist-info-box {
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.receptionist-info-box h4 {
+  color: #2d3748;
+  margin: 0 0 15px 0;
+}
+
+.receptionist-info-box ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #4a5568;
+}
+
+.receptionist-info-box li {
+  margin-bottom: 8px;
+}
+
+.receptionist-checkin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 25px;
+}
+
+.receptionist-patient-queue {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.receptionist-patient-queue h4 {
+  color: #2d3748;
+  margin: 0 0 20px 0;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #21AEA8;
+}
+
+.receptionist-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.receptionist-queue-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: #f7fafc;
+  border-radius: 8px;
+  border-left: 4px solid #21AEA8;
+}
+
+.receptionist-patient-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.receptionist-patient-info strong {
+  color: #2d3748;
+  font-size: 1rem;
+}
+
+.receptionist-patient-info span {
+  color: #4a5568;
+  font-size: 0.9rem;
+}
+
+.receptionist-queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.receptionist-search-patient {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.receptionist-patient-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.receptionist-services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.receptionist-service-category {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.receptionist-service-category h4 {
+  color: #2d3748;
+  margin: 0 0 15px 0;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #21AEA8;
+}
+
+.receptionist-service-category ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.receptionist-service-category li {
+  padding: 10px 0;
+  border-bottom: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #4a5568;
+}
+
+.receptionist-service-category li:hover {
+  background: #f7fafc;
+  padding-left: 10px;
+  color: #21AEA8;
+}
+
+.receptionist-service-category li:last-child {
+  border-bottom: none;
+}
+
+.receptionist-billing-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.receptionist-billing-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  transition: transform 0.2s ease;
+}
+
+.receptionist-billing-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.receptionist-billing-card h4 {
+  color: #2d3748;
+  margin: 0 0 10px 0;
+}
+
+.receptionist-billing-card p {
+  color: #4a5568;
+  margin: 0 0 15px 0;
+  font-size: 0.9rem;
+}
+
+/* Mobile responsiveness for new sections */
+@media (max-width: 768px) {
+  .receptionist-quick-actions {
+    flex-direction: column;
+  }
+  
+  .receptionist-checkin-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .receptionist-queue-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .receptionist-queue-actions {
+    align-self: stretch;
+    justify-content: space-between;
+  }
+  
+  .receptionist-search-patient {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .receptionist-patient-actions {
+    flex-direction: column;
+  }
+  
+  .receptionist-services-grid,
+  .receptionist-billing-tools {
+    grid-template-columns: 1fr;
+  }
+}
