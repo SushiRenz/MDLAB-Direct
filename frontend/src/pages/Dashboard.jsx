@@ -7831,67 +7831,48 @@ function Dashboard({ currentUser, onLogout }) {
     <div className="dashboard-container">
       {/* Sidebar */}
       <div className="dashboard-sidebar">
-        <div className="sidebar-header">
-          <h2 className="sidebar-title">MDLAB DIRECT</h2>
+        <div className="dashboard-sidebar-header">
+          <h2 className="dashboard-sidebar-title">MDLAB DIRECT</h2>
+          <div className="dashboard-sidebar-subtitle">Owner Portal</div>
         </div>
         
-        <nav className="sidebar-nav">
+        <nav className="dashboard-sidebar-nav">
           <div 
-            className={`nav-item ${activeSection === 'dashboard' ? 'active' : ''}`}
+            className={`dashboard-nav-item ${activeSection === 'dashboard' ? 'active' : ''}`}
             onClick={() => handleSectionClick('dashboard')}
           >
-            <span className="nav-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="7" height="7"></rect>
-                <rect x="14" y="3" width="7" height="7"></rect>
-                <rect x="14" y="14" width="7" height="7"></rect>
-                <rect x="3" y="14" width="7" height="7"></rect>
-              </svg>
-            </span>
-            <span className="nav-text">Dashboard</span>
+            <span className="dashboard-nav-text">Dashboard</span>
           </div>
 
-          <div className="dropdown">
-            <div className="nav-item-header" onClick={toggleUserManagement}>
-              <div className="nav-item-main">
-                <span className="nav-icon">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                  </svg>
-                </span>
-                <span className="nav-text">User Management</span>
+          <div className="dashboard-dropdown">
+            <div className="dashboard-nav-item-header" onClick={toggleUserManagement}>
+              <div className="dashboard-nav-item-main">
+                <span className="dashboard-nav-text">User Management</span>
               </div>
-              <span className={`dropdown-arrow ${userManagementOpen ? 'open' : ''}`}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="6,9 12,15 18,9"></polyline>
-                </svg>
-              </span>
+              <span className={`dashboard-dropdown-arrow ${userManagementOpen ? 'open' : ''}`}>▼</span>
             </div>
             {userManagementOpen && (
-              <div className="nav-submenu">
+              <div className="dashboard-nav-submenu">
                 <div 
-                  className={`nav-subitem ${activeSection === 'patients' ? 'active' : ''}`}
+                  className={`dashboard-nav-subitem ${activeSection === 'patients' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('patients')}
                 >
                   Patient
                 </div>
                 <div 
-                  className={`nav-subitem ${activeSection === 'medtech' ? 'active' : ''}`}
+                  className={`dashboard-nav-subitem ${activeSection === 'medtech' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('medtech')}
                 >
                   MedTech
                 </div>
                 <div 
-                  className={`nav-subitem ${activeSection === 'pathologist' ? 'active' : ''}`}
+                  className={`dashboard-nav-subitem ${activeSection === 'pathologist' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('pathologist')}
                 >
                   Pathologist
                 </div>
                 <div 
-                  className={`nav-subitem ${activeSection === 'receptionist' ? 'active' : ''}`}
+                  className={`dashboard-nav-subitem ${activeSection === 'receptionist' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('receptionist')}
                 >
                   Receptionist
@@ -7900,51 +7881,41 @@ function Dashboard({ currentUser, onLogout }) {
             )}
           </div>
 
-          <div className="dropdown">
-            <div className="nav-item-header" onClick={toggleFinance}>
-              <div className="nav-item-main">
-                <span className="nav-icon">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="12" y1="1" x2="12" y2="23"></line>
-                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                  </svg>
-                </span>
-                <span className="nav-text">Finance</span>
+          <div className="dashboard-dropdown">
+            <div className="dashboard-nav-item-header" onClick={toggleFinance}>
+              <div className="dashboard-nav-item-main">
+                <span className="dashboard-nav-text">Finance</span>
               </div>
-              <span className={`dropdown-arrow ${financeOpen ? 'open' : ''}`}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="6,9 12,15 18,9"></polyline>
-                </svg>
-              </span>
+              <span className={`dashboard-dropdown-arrow ${financeOpen ? 'open' : ''}`}>▼</span>
             </div>
             {financeOpen && (
-              <div className="nav-submenu">
+              <div className="dashboard-nav-submenu">
                 <div 
-                  className={`nav-subitem ${activeSection === 'bills' ? 'active' : ''}`}
+                  className={`dashboard-nav-subitem ${activeSection === 'bills' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('bills')}
                 >
                   Bills
                 </div>
                 <div 
-                  className={`nav-subitem ${activeSection === 'transaction' ? 'active' : ''}`}
+                  className={`dashboard-nav-subitem ${activeSection === 'transaction' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('transaction')}
                 >
                   Transaction
                 </div>
                 <div 
-                  className={`nav-subitem ${activeSection === 'payments' ? 'active' : ''}`}
+                  className={`dashboard-nav-subitem ${activeSection === 'payments' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('payments')}
                 >
                   Payments
                 </div>
                 <div 
-                  className={`nav-subitem ${activeSection === 'billing-rates' ? 'active' : ''}`}
+                  className={`dashboard-nav-subitem ${activeSection === 'billing-rates' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('billing-rates')}
                 >
                   Billing Rates
                 </div>
                 <div 
-                  className={`nav-subitem ${activeSection === 'reports' ? 'active' : ''}`}
+                  className={`dashboard-nav-subitem ${activeSection === 'reports' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('reports')}
                 >
                   Reports
@@ -7953,36 +7924,23 @@ function Dashboard({ currentUser, onLogout }) {
             )}
           </div>
 
-          <div className="dropdown">
-            <div className="nav-item-header" onClick={toggleLogs}>
-              <div className="nav-item-main">
-                <span className="nav-icon">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14,2 14,8 20,8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10,9 9,9 8,9"></polyline>
-                  </svg>
-                </span>
-                <span className="nav-text">System</span>
+          <div className="dashboard-dropdown">
+            <div className="dashboard-nav-item-header" onClick={toggleLogs}>
+              <div className="dashboard-nav-item-main">
+                <span className="dashboard-nav-text">System</span>
               </div>
-              <span className={`dropdown-arrow ${logsOpen ? 'open' : ''}`}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="6,9 12,15 18,9"></polyline>
-                </svg>
-              </span>
+              <span className={`dashboard-dropdown-arrow ${logsOpen ? 'open' : ''}`}>▼</span>
             </div>
             {logsOpen && (
-              <div className="nav-submenu">
+              <div className="dashboard-nav-submenu">
                 <div 
-                  className={`nav-subitem ${activeSection === 'logs' ? 'active' : ''}`}
+                  className={`dashboard-nav-subitem ${activeSection === 'logs' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('logs')}
                 >
                   System Logs
                 </div>
                 <div 
-                  className={`nav-subitem ${activeSection === 'services' ? 'active' : ''}`}
+                  className={`dashboard-nav-subitem ${activeSection === 'services' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('services')}
                 >
                   Services
@@ -7992,11 +7950,17 @@ function Dashboard({ currentUser, onLogout }) {
           </div>
         </nav>
 
-        <div className="sidebar-footer">
-          <div className="owner-section">
-            <span className="owner-label">OWNER</span>
-            <button className="logout-btn-red" onClick={handleLogout} title="Logout">
-              Logout
+        <div className="dashboard-sidebar-footer">
+          <div className="dashboard-user-info">
+            <div className="dashboard-user-avatar">
+              {user?.firstName?.charAt(0) || user?.username?.charAt(0) || 'O'}
+            </div>
+            <div className="dashboard-user-details">
+              <div className="dashboard-user-role">Owner</div>
+              <div className="dashboard-user-email">{user?.email || 'owner@mdlab.com'}</div>
+            </div>
+            <button className="dashboard-logout-btn" onClick={handleLogout}>
+              ⏻
             </button>
           </div>
         </div>
@@ -8005,7 +7969,7 @@ function Dashboard({ currentUser, onLogout }) {
       {/* Main Content */}
       <div className="dashboard-main">
         <div className="dashboard-header">
-          <h1 className="page-title">{renderPageTitle()}</h1>
+          <h1 className="dashboard-page-title">{renderPageTitle()}</h1>
         </div>
 
         <div className="dashboard-content">

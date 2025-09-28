@@ -1137,45 +1137,43 @@ function MedTechDashboard({ currentUser, onLogout }) {
   return (
     <div className="medtech-dashboard-container">
       {/* Sidebar */}
-      <div className="medtech-sidebar">
-        <div className="sidebar-header">
-          <h2 className="sidebar-title">MDLAB DIRECT</h2>
-          <div className="sidebar-subtitle">MedTech Portal</div>
+      <div className="medtech-dashboard-sidebar">
+        <div className="medtech-sidebar-header">
+          <h2 className="medtech-sidebar-title">MDLAB DIRECT</h2>
+          <div className="medtech-sidebar-subtitle">MedTech Portal</div>
         </div>
         
-        <nav className="sidebar-nav">
+        <nav className="medtech-sidebar-nav">
           <div 
-            className={`nav-item ${activeSection === 'dashboard' ? 'active' : ''}`}
+            className={`medtech-nav-item ${activeSection === 'dashboard' ? 'active' : ''}`}
             onClick={() => handleSectionClick('dashboard')}
           >
-            <span className="nav-icon">📊</span>
-            <span className="nav-text">Dashboard</span>
+            <span className="medtech-nav-text">Dashboard</span>
           </div>
 
-          <div className="dropdown">
-            <div className="nav-item-header" onClick={toggleSamples}>
-              <div className="nav-item-main">
-                <span className="nav-icon">🧪</span>
-                <span className="nav-text">Sample Management</span>
+          <div className="medtech-dropdown">
+            <div className="medtech-nav-item-header" onClick={toggleSamples}>
+              <div className="medtech-nav-item-main">
+                <span className="medtech-nav-text">Sample Management</span>
               </div>
-              <span className={`dropdown-arrow ${samplesOpen ? 'open' : ''}`}>▼</span>
+              <span className={`medtech-dropdown-arrow ${samplesOpen ? 'open' : ''}`}>▼</span>
             </div>
             {samplesOpen && (
-              <div className="nav-submenu">
+              <div className="medtech-nav-submenu">
                 <div 
-                  className={`nav-subitem ${activeSection === 'sample-collection' ? 'active' : ''}`}
+                  className={`medtech-nav-subitem ${activeSection === 'sample-collection' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('sample-collection')}
                 >
                   Collection
                 </div>
                 <div 
-                  className={`nav-subitem ${activeSection === 'sample-processing' ? 'active' : ''}`}
+                  className={`medtech-nav-subitem ${activeSection === 'sample-processing' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('sample-processing')}
                 >
                   Processing
                 </div>
                 <div 
-                  className={`nav-subitem ${activeSection === 'sample-tracking' ? 'active' : ''}`}
+                  className={`medtech-nav-subitem ${activeSection === 'sample-tracking' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('sample-tracking')}
                 >
                   Tracking
@@ -1184,30 +1182,29 @@ function MedTechDashboard({ currentUser, onLogout }) {
             )}
           </div>
 
-          <div className="dropdown">
-            <div className="nav-item-header" onClick={toggleResults}>
-              <div className="nav-item-main">
-                <span className="nav-icon">📝</span>
-                <span className="nav-text">Results & Testing</span>
+          <div className="medtech-dropdown">
+            <div className="medtech-nav-item-header" onClick={toggleResults}>
+              <div className="medtech-nav-item-main">
+                <span className="medtech-nav-text">Results & Testing</span>
               </div>
-              <span className={`dropdown-arrow ${resultsOpen ? 'open' : ''}`}>▼</span>
+              <span className={`medtech-dropdown-arrow ${resultsOpen ? 'open' : ''}`}>▼</span>
             </div>
             {resultsOpen && (
-              <div className="nav-submenu">
+              <div className="medtech-nav-submenu">
                 <div 
-                  className={`nav-subitem ${activeSection === 'result-entry' ? 'active' : ''}`}
+                  className={`medtech-nav-subitem ${activeSection === 'result-entry' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('result-entry')}
                 >
                   Result Entry
                 </div>
                 <div 
-                  className={`nav-subitem ${activeSection === 'result-validation' ? 'active' : ''}`}
+                  className={`medtech-nav-subitem ${activeSection === 'result-validation' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('result-validation')}
                 >
                   Validation
                 </div>
                 <div 
-                  className={`nav-subitem ${activeSection === 'analyzer-integration' ? 'active' : ''}`}
+                  className={`medtech-nav-subitem ${activeSection === 'analyzer-integration' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('analyzer-integration')}
                 >
                   Analyzer Integration
@@ -1217,82 +1214,75 @@ function MedTechDashboard({ currentUser, onLogout }) {
           </div>
 
           <div 
-            className={`nav-item ${activeSection === 'worklist' ? 'active' : ''}`}
+            className={`medtech-nav-item ${activeSection === 'worklist' ? 'active' : ''}`}
             onClick={() => handleSectionClick('worklist')}
           >
-            <span className="nav-icon">📋</span>
-            <span className="nav-text">Work List</span>
+            <span className="medtech-nav-text">Work List</span>
           </div>
 
           <div 
-            className={`nav-item ${activeSection === 'quality-control' ? 'active' : ''}`}
+            className={`medtech-nav-item ${activeSection === 'quality-control' ? 'active' : ''}`}
             onClick={() => handleSectionClick('quality-control')}
           >
-            <span className="nav-icon">🎯</span>
-            <span className="nav-text">Quality Control</span>
+            <span className="medtech-nav-text">Quality Control</span>
           </div>
 
           <div 
-            className={`nav-item ${activeSection === 'inventory' ? 'active' : ''}`}
+            className={`medtech-nav-item ${activeSection === 'inventory' ? 'active' : ''}`}
             onClick={() => handleSectionClick('inventory')}
           >
-            <span className="nav-icon">📦</span>
-            <span className="nav-text">Inventory</span>
+            <span className="medtech-nav-text">Inventory</span>
           </div>
 
           <div 
-            className={`nav-item ${activeSection === 'maintenance' ? 'active' : ''}`}
+            className={`medtech-nav-item ${activeSection === 'maintenance' ? 'active' : ''}`}
             onClick={() => handleSectionClick('maintenance')}
           >
-            <span className="nav-icon">🔧</span>
-            <span className="nav-text">Maintenance</span>
+            <span className="medtech-nav-text">Maintenance</span>
           </div>
 
           <div 
-            className={`nav-item ${activeSection === 'reports' ? 'active' : ''}`}
+            className={`medtech-nav-item ${activeSection === 'reports' ? 'active' : ''}`}
             onClick={() => handleSectionClick('reports')}
           >
-            <span className="nav-icon">📊</span>
-            <span className="nav-text">Reports</span>
+            <span className="medtech-nav-text">Reports</span>
           </div>
 
           <div 
-            className={`nav-item ${activeSection === 'profile' ? 'active' : ''}`}
+            className={`medtech-nav-item ${activeSection === 'profile' ? 'active' : ''}`}
             onClick={() => handleSectionClick('profile')}
           >
-            <span className="nav-icon">👤</span>
-            <span className="nav-text">My Profile</span>
+            <span className="medtech-nav-text">My Profile</span>
           </div>
         </nav>
 
-        <div className="sidebar-footer">
-          <div className="user-info">
-            <div className="user-avatar">
-              <span>{user?.firstName?.charAt(0) || user?.username?.charAt(0) || 'M'}</span>
+        <div className="medtech-sidebar-footer">
+          <div className="medtech-user-info">
+            <div className="medtech-user-avatar">
+              {user?.firstName?.charAt(0) || user?.username?.charAt(0) || 'M'}
             </div>
-            <div className="user-details">
-              <span className="user-role">{user?.role?.toUpperCase() || 'MEDTECH'}</span>
-              <span className="user-email">{user?.email || 'medtech@example.com'}</span>
-              <span className="user-name">{user?.fullName || `${user?.firstName} ${user?.lastName}` || user?.username}</span>
+            <div className="medtech-user-details">
+              <div className="medtech-user-role">MedTech</div>
+              <div className="medtech-user-email">{user?.email || 'medtech@mdlab.com'}</div>
             </div>
-            <button className="logout-btn" onClick={handleLogout} title="Logout">
-              🚪
+            <button className="medtech-logout-btn" onClick={handleLogout}>
+              ⏻
             </button>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="medtech-main">
-        <div className="medtech-header">
-          <h1 className="page-title">{renderPageTitle()}</h1>
-          <div className="header-actions">
-            <button className="notification-btn">🔔</button>
-            <div className="time-display">{new Date().toLocaleTimeString()}</div>
+      <div className="medtech-dashboard-main">
+        <div className="medtech-dashboard-header">
+          <h1 className="medtech-page-title">{renderPageTitle()}</h1>
+          <div className="medtech-header-actions">
+            <button className="medtech-notification-btn">🔔</button>
+            <div className="medtech-time-display">{new Date().toLocaleTimeString()}</div>
           </div>
         </div>
 
-        <div className="medtech-content">
+        <div className="medtech-dashboard-content">
           {renderContent()}
         </div>
       </div>
