@@ -652,6 +652,388 @@ export const authUtils = {
   },
 };
 
+// Appointment API functions
+export const appointmentAPI = {
+  // Get all appointments with filtering
+  getAppointments: async (params = {}) => {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      // Add query parameters if they exist
+      Object.keys(params).forEach(key => {
+        if (params[key] !== null && params[key] !== undefined && params[key] !== '') {
+          queryParams.append(key, params[key]);
+        }
+      });
+      
+      const queryString = queryParams.toString();
+      const url = `/appointments${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await api.get(url);
+      return {
+        success: true,
+        data: response.data.data,
+        pagination: response.data.pagination,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get appointments error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch appointments',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Get single appointment by ID
+  getAppointment: async (appointmentId) => {
+    try {
+      const response = await api.get(`/appointments/${appointmentId}`);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get appointment error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch appointment',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Create new appointment
+  createAppointment: async (appointmentData) => {
+    try {
+      const response = await api.post('/appointments', appointmentData);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Create appointment error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to create appointment',
+        error: error.response?.data?.error,
+        errors: error.response?.data?.errors
+      };
+    }
+  },
+
+  // Update appointment
+  updateAppointment: async (appointmentId, updateData) => {
+    try {
+      const response = await api.put(`/appointments/${appointmentId}`, updateData);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Update appointment error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to update appointment',
+        error: error.response?.data?.error,
+        errors: error.response?.data?.errors
+      };
+    }
+  },
+
+  // Cancel appointment
+  cancelAppointment: async (appointmentId, reason = '') => {
+    try {
+      const response = await api.put(`/appointments/${appointmentId}/cancel`, { reason });
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Cancel appointment error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to cancel appointment',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Check-in patient
+  checkInPatient: async (appointmentId) => {
+    try {
+      const response = await api.put(`/appointments/${appointmentId}/checkin`);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Check-in patient error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to check in patient',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Check-out patient
+  checkOutPatient: async (appointmentId, status = 'completed') => {
+    try {
+      const response = await api.put(`/appointments/${appointmentId}/checkout`, { status });
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Check-out patient error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to check out patient',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Get appointment statistics
+  getAppointmentStats: async (date = null, period = 'day') => {
+    try {
+      const params = new URLSearchParams();
+      if (date) params.append('date', date);
+      if (period) params.append('period', period);
+      
+      const queryString = params.toString();
+      const url = `/appointments/stats${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await api.get(url);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get appointment stats error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch appointment statistics',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Get today's appointments
+  getTodayAppointments: async (status = null) => {
+    try {
+      const params = new URLSearchParams();
+      if (status) params.append('status', status);
+      
+      const queryString = params.toString();
+      const url = `/appointments/today${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await api.get(url);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get today appointments error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch today\'s appointments',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Assign medical staff to appointment
+  assignMedicalStaff: async (appointmentId, staffData) => {
+    try {
+      const response = await api.put(`/appointments/${appointmentId}/assign`, staffData);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Assign medical staff error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to assign medical staff',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Register walk-in patient
+  registerWalkIn: async (walkInData) => {
+    try {
+      const appointmentData = {
+        ...walkInData,
+        type: 'walk-in',
+        appointmentDate: new Date().toISOString().split('T')[0],
+        appointmentTime: 'Walk-in'
+      };
+      
+      const response = await api.post('/appointments', appointmentData);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Register walk-in error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to register walk-in patient',
+        error: error.response?.data?.error,
+        errors: error.response?.data?.errors
+      };
+    }
+  },
+
+  // Get appointment history for a patient
+  getPatientAppointments: async (patientId, params = {}) => {
+    try {
+      const queryParams = new URLSearchParams({
+        ...params,
+        patientId
+      });
+      
+      const response = await api.get(`/appointments?${queryParams.toString()}`);
+      return {
+        success: true,
+        data: response.data.data,
+        pagination: response.data.pagination,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get patient appointments error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch patient appointments',
+        error: error.response?.data?.error
+      };
+    }
+  }
+};
+
+// Test Results API functions
+export const testResultsAPI = {
+  // Get all test results with filtering
+  getTestResults: async (params = {}) => {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      // Add query parameters if they exist
+      Object.keys(params).forEach(key => {
+        if (params[key] !== null && params[key] !== undefined && params[key] !== '') {
+          queryParams.append(key, params[key]);
+        }
+      });
+      
+      const queryString = queryParams.toString();
+      const url = `/test-results${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await api.get(url);
+      return {
+        success: true,
+        data: response.data.data,
+        pagination: response.data.pagination,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get test results error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch test results',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Get single test result by ID
+  getTestResult: async (testResultId) => {
+    try {
+      const response = await api.get(`/test-results/${testResultId}`);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get test result error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch test result',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Mark test result as viewed (patient only)
+  markAsViewed: async (testResultId) => {
+    try {
+      const response = await api.put(`/test-results/${testResultId}/mark-viewed`);
+      return {
+        success: true,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Mark as viewed error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to mark test result as viewed',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Get patient's test results (for patients)
+  getPatientTestResults: async (patientId = null, params = {}) => {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      // If patientId is provided, add it to params
+      if (patientId) {
+        queryParams.append('patientId', patientId);
+      }
+      
+      // Add other parameters
+      Object.keys(params).forEach(key => {
+        if (params[key] !== null && params[key] !== undefined && params[key] !== '') {
+          queryParams.append(key, params[key]);
+        }
+      });
+      
+      const queryString = queryParams.toString();
+      const url = `/test-results${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await api.get(url);
+      return {
+        success: true,
+        data: response.data.data,
+        pagination: response.data.pagination,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get patient test results error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch test results',
+        error: error.response?.data?.error
+      };
+    }
+  }
+};
+
 export async function updateUserProfile(data, token) {
   const res = await fetch('/api/users/me', {
     method: 'PUT',

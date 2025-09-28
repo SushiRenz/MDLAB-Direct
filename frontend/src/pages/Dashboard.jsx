@@ -243,8 +243,21 @@ function Dashboard({ currentUser, onLogout }) {
       // Fetch recent transactions
       const recentTransactionsResponse = await financeAPI.getTransactions({ limit: 5 });
       
-      // Fetch services statistics
-      const serviceStatsResponse = await servicesAPI.getServiceStats();
+      // Fetch services and calculate stats locally
+      let serviceStats = { totalServices: 0, activeServices: 0, topServices: [] };
+      try {
+        const servicesResponse = await servicesAPI.getServices();
+        if (servicesResponse.success && servicesResponse.data) {
+          const services = servicesResponse.data;
+          serviceStats = {
+            totalServices: services.length,
+            activeServices: services.filter(s => s.isActive).length,
+            topServices: services.filter(s => s.isPopular).slice(0, 5)
+          };
+        }
+      } catch (error) {
+        console.error('Error fetching services for stats:', error);
+      }
 
       if (userStatsResponse.success && financeStatsResponse.success) {
         setDashboardStats({
@@ -257,7 +270,9 @@ function Dashboard({ currentUser, onLogout }) {
           monthlyRevenue: financeStatsResponse.data?.monthlyRevenue || 0,
           completedPayments: financeStatsResponse.data?.completedPayments || 0,
           recentTransactions: recentTransactionsResponse.success ? (recentTransactionsResponse.data || []) : [],
-          topServices: serviceStatsResponse.success ? (serviceStatsResponse.data?.topServices || []) : []
+          topServices: serviceStats.topServices || [],
+          totalServices: serviceStats.totalServices || 0,
+          activeServices: serviceStats.activeServices || 0
         });
       } else {
         throw new Error('Failed to fetch dashboard data');
@@ -900,21 +915,44 @@ function Dashboard({ currentUser, onLogout }) {
     setServicesLoading(true);
     setServicesError('');
     try {
+      console.log('🔄 Fetching services for Dashboard...');
       const params = {
         page,
-        limit: servicePagination.limit,
-        ...serviceFilters
+        limit: servicePagination.limit
       };
+      
+      // Only add non-empty filters
+      Object.keys(serviceFilters).forEach(key => {
+        const value = serviceFilters[key];
+        if (value && value.trim() !== '') {
+          params[key] = value;
+        }
+      });
+      
+      console.log('📋 Service fetch params:', params);
+      console.log('📋 Service filters being applied:', JSON.stringify(serviceFilters, null, 2));
+      console.log('📋 Service pagination limit:', servicePagination.limit);
+      
+      // Let's also log what URL will be constructed
+      const urlParams = new URLSearchParams(params);
+      console.log('🌐 Full API URL params:', urlParams.toString());
 
       const data = await servicesAPI.getServices(params);
+      console.log('📦 Services API response:', data);
+      console.log('📦 Response data array:', data.data);
+      console.log('📦 Full response structure:', JSON.stringify(data, null, 2));
+      
       if (data.success) {
+        console.log('✅ Services loaded successfully:', data.data?.length || 0, 'services');
+        console.log('📋 Service names:', data.data?.map(s => s.serviceName) || []);
         setServices(data.data || []);
         setServicePagination(data.pagination || servicePagination);
       } else {
+        console.error('❌ Services fetch failed:', data.message);
         setServicesError(data.message || 'Failed to fetch services');
       }
     } catch (err) {
-      console.error('Failed to fetch services:', err);
+      console.error('💥 Failed to fetch services:', err);
       setServicesError(err.message || 'Failed to fetch services');
     } finally {
       setServicesLoading(false);
@@ -4061,7 +4099,7 @@ function Dashboard({ currentUser, onLogout }) {
           <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Active Services</div>
-            <div className="stat-value">{services.filter(s => s.isActive).length}</div>
+            <div className="stat-value">{dashboardStats.activeServices || 0}</div>
           </div>
         </div>
         <div className="stat-card">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../design/ReceptionistDashboard.css';
-import { userAPI, financeAPI, servicesAPI } from '../services/api';
+import { userAPI, financeAPI, servicesAPI, appointmentAPI } from '../services/api';
 
 function ReceptionistDashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('receptionist-dashboard');
@@ -60,6 +60,21 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
   const [showBillModal, setShowBillModal] = useState(false);
   const [billData, setBillData] = useState(null);
 
+  // Schedule appointment state
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleData, setScheduleData] = useState({
+    patientName: '',
+    contactNumber: '',
+    email: '',
+    serviceId: '',
+    serviceName: '',
+    appointmentDate: '',
+    appointmentTime: '',
+    priority: 'regular',
+    notes: '',
+    reasonForVisit: ''
+  });
+
   const user = currentUser;
 
   // Dashboard data fetching for receptionist
@@ -69,21 +84,38 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     try {
       // Fetch appointment statistics for today
       const today = new Date().toISOString().split('T')[0];
-      const appointmentStats = await fetchTodayAppointmentStats(today);
+      const appointmentStatsResponse = await appointmentAPI.getAppointmentStats(today, 'day');
       
       // Fetch services statistics  
       const serviceStatsResponse = await servicesAPI.getServiceStats();
 
-      setDashboardStats({
-        todayAppointments: appointmentStats?.total || 0,
-        pendingAppointments: appointmentStats?.pending || 0,
-        completedToday: appointmentStats?.completed || 0,
-        walkInPatients: appointmentStats?.walkIn || 0,
-        totalPatientsToday: appointmentStats?.totalPatients || 0,
-        recentAppointments: appointmentStats?.recent || [],
-        upcomingAppointments: appointmentStats?.upcoming || [],
-        popularServices: serviceStatsResponse.success ? (serviceStatsResponse.data?.popularServices || []) : []
-      });
+      if (appointmentStatsResponse.success) {
+        const stats = appointmentStatsResponse.data;
+        setDashboardStats({
+          todayAppointments: stats.total || 0,
+          pendingAppointments: stats.pending || 0,
+          completedToday: stats.completed || 0,
+          walkInPatients: stats.walkIn || 0,
+          totalPatientsToday: stats.total || 0,
+          recentAppointments: stats.recent ? stats.recent.map(apt => ({
+            appointmentId: apt.appointmentId,
+            patientName: apt.patientName,
+            service: apt.serviceName,
+            time: apt.appointmentTime,
+            status: apt.status
+          })) : [],
+          upcomingAppointments: stats.upcoming ? stats.upcoming.map(apt => ({
+            appointmentId: apt.appointmentId,
+            patientName: apt.patientName,
+            service: apt.serviceName,
+            time: apt.appointmentTime,
+            status: apt.status
+          })) : [],
+          popularServices: serviceStatsResponse.success ? (serviceStatsResponse.data?.popularServices || []) : []
+        });
+      } else {
+        throw new Error(appointmentStatsResponse.message || 'Failed to load appointment data');
+      }
     } catch (err) {
       console.error('Receptionist dashboard data fetch error:', err);
       setDashboardError(err.message || 'Failed to load dashboard data');
@@ -138,18 +170,59 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     }
   };
 
-  const fetchTodayAppointmentStats = async (date) => {
-    // This would normally call an API endpoint for appointment stats
-    // For now, return mock data
-    return {
-      total: 25,
-      pending: 8,
-      completed: 17,
-      walkIn: 6,
-      totalPatients: 31,
-      recent: [],
-      upcoming: []
-    };
+  // Appointment Management Functions
+  const fetchAppointments = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const params = {};
+      if (searchTerm) params.patientName = searchTerm;
+      if (filterStatus) params.status = filterStatus;
+      if (filterDate) params.date = filterDate;
+      
+      const response = await appointmentAPI.getAppointments(params);
+      
+      if (response.success) {
+        setAppointments(response.data);
+      } else {
+        throw new Error(response.message || 'Failed to fetch appointments');
+      }
+    } catch (err) {
+      console.error('Fetch appointments error:', err);
+      setError(err.message || 'Failed to fetch appointments');
+      
+      // Set fallback data for demo purposes
+      const mockAppointments = [
+        {
+          _id: '1',
+          appointmentId: 'APT-2025-001',
+          patientName: 'Maria Santos',
+          contactNumber: '+639123456789',
+          email: 'maria.santos@email.com',
+          serviceName: 'Complete Blood Count',
+          appointmentDate: new Date().toISOString(),
+          appointmentTime: '9:00 AM',
+          status: 'confirmed',
+          notes: 'Regular checkup'
+        },
+        {
+          _id: '2',
+          appointmentId: 'APT-2025-002',
+          patientName: 'Carlos Rodriguez',
+          contactNumber: '+639987654321',
+          email: 'carlos.rodriguez@email.com',
+          serviceName: 'X-Ray Chest',
+          appointmentDate: new Date().toISOString(),
+          appointmentTime: '10:30 AM',
+          status: 'pending',
+          notes: 'Follow-up examination'
+        }
+      ];
+      
+      setAppointments(mockAppointments);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Load dashboard data on component mount
@@ -186,55 +259,6 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     }
   };
 
-  // Appointment Management Functions
-  const fetchAppointments = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = {};
-      if (searchTerm) params.search = searchTerm;
-      if (filterStatus) params.status = filterStatus;
-      if (filterDate) params.date = filterDate;
-      
-      // This would call your appointment API
-      // const data = await appointmentAPI.getAppointments(params);
-      
-      // Mock data for now
-      const mockAppointments = [
-        {
-          _id: '1',
-          appointmentId: 'APT-2025-001',
-          patientName: 'Maria Santos',
-          contactNumber: '+639123456789',
-          email: 'maria.santos@email.com',
-          service: 'Complete Blood Count',
-          appointmentDate: new Date().toISOString(),
-          appointmentTime: '9:00 AM',
-          status: 'confirmed',
-          notes: 'Regular checkup'
-        },
-        {
-          _id: '2',
-          appointmentId: 'APT-2025-002',
-          patientName: 'Carlos Rodriguez',
-          contactNumber: '+639987654321',
-          email: 'carlos.rodriguez@email.com',
-          service: 'X-Ray Chest',
-          appointmentDate: new Date().toISOString(),
-          appointmentTime: '10:30 AM',
-          status: 'pending',
-          notes: 'Follow-up examination'
-        }
-      ];
-      
-      setAppointments(mockAppointments);
-    } catch (err) {
-      setError(err.message || 'Failed to fetch appointments');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Patient check-in/out functions
   const handleCheckIn = (appointment) => {
     setSelectedPatient(appointment);
@@ -248,65 +272,61 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
 
   const processCheckIn = async () => {
     try {
-      // Update appointment status to 'checked-in' - receptionist functionality
-      console.log('Receptionist checking in patient:', selectedPatient);
-      // API call would go here for receptionist check-in
+      const response = await appointmentAPI.checkInPatient(selectedPatient._id);
       
-      // Update local state
-      setAppointments(prev => 
-        prev.map(apt => 
-          apt._id === selectedPatient._id 
-            ? { 
-                ...apt, 
-                status: 'checked-in',
-                checkedInBy: currentUser.name || 'Receptionist',
-                checkedInTime: new Date().toISOString()
-              }
-            : apt
-        )
-      );
-      
-      setShowCheckInModal(false);
-      setSelectedPatient(null);
-      alert(`Patient ${selectedPatient.patientName} checked in successfully by ${currentUser.name || 'Receptionist'}!`);
-      
-      // Update dashboard stats
-      fetchReceptionistDashboardData();
+      if (response.success) {
+        // Update local state with the response data
+        setAppointments(prev => 
+          prev.map(apt => 
+            apt._id === selectedPatient._id 
+              ? { ...response.data }
+              : apt
+          )
+        );
+        
+        setShowCheckInModal(false);
+        setSelectedPatient(null);
+        alert(`Patient ${selectedPatient.patientName} checked in successfully by ${currentUser.name || 'Receptionist'}!`);
+        
+        // Update dashboard stats
+        fetchReceptionistDashboardData();
+      } else {
+        throw new Error(response.message || 'Failed to check in patient');
+      }
     } catch (error) {
       console.error('Check-in error:', error);
-      setError('Failed to check in patient');
+      setError('Failed to check in patient: ' + error.message);
+      alert('Failed to check in patient: ' + error.message);
     }
   };
 
   const processCheckOut = async () => {
     try {
-      // Update appointment status to 'completed' - receptionist functionality
-      console.log('Receptionist checking out patient:', selectedPatient);
-      // API call would go here for receptionist check-out
+      const response = await appointmentAPI.checkOutPatient(selectedPatient._id, 'completed');
       
-      // Update local state
-      setAppointments(prev => 
-        prev.map(apt => 
-          apt._id === selectedPatient._id 
-            ? { 
-                ...apt, 
-                status: 'completed',
-                checkedOutBy: currentUser.name || 'Receptionist',
-                checkedOutTime: new Date().toISOString()
-              }
-            : apt
-        )
-      );
-      
-      setShowCheckOutModal(false);
-      setSelectedPatient(null);
-      alert(`Patient ${selectedPatient.patientName} checked out successfully by ${currentUser.name || 'Receptionist'}!`);
-      
-      // Update dashboard stats
-      fetchReceptionistDashboardData();
+      if (response.success) {
+        // Update local state with the response data
+        setAppointments(prev => 
+          prev.map(apt => 
+            apt._id === selectedPatient._id 
+              ? { ...response.data }
+              : apt
+          )
+        );
+        
+        setShowCheckOutModal(false);
+        setSelectedPatient(null);
+        alert(`Patient ${selectedPatient.patientName} checked out successfully by ${currentUser.name || 'Receptionist'}!`);
+        
+        // Update dashboard stats
+        fetchReceptionistDashboardData();
+      } else {
+        throw new Error(response.message || 'Failed to check out patient');
+      }
     } catch (error) {
       console.error('Check-out error:', error);
-      setError('Failed to check out patient');
+      setError('Failed to check out patient: ' + error.message);
+      alert('Failed to check out patient: ' + error.message);
     }
   };
 
@@ -317,41 +337,51 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
 
   const processWalkInRegistration = async () => {
     try {
-      console.log('Registering walk-in patient:', walkInData);
-      // API call would go here for receptionist walk-in registration
+      // Get the service ID - for demo, we'll use a mock service ID
+      // In real implementation, this would come from a service selection
+      const mockServiceId = '507f1f77bcf86cd799439011'; // Replace with actual service selection
       
-      const newAppointment = {
-        _id: Date.now().toString(),
-        appointmentId: `WI-${Date.now()}`,
+      const walkInAppointmentData = {
         patientName: walkInData.patientName,
         contactNumber: walkInData.contactNumber,
         email: walkInData.email,
-        service: walkInData.services.join(', '),
-        appointmentDate: new Date().toISOString(),
+        serviceId: mockServiceId,
+        serviceName: walkInData.services.join(', ') || 'Walk-in Service',
+        appointmentDate: new Date().toISOString().split('T')[0],
         appointmentTime: 'Walk-in',
-        status: 'walk-in',
+        type: 'walk-in',
+        priority: walkInData.urgency,
         notes: walkInData.notes,
-        urgency: walkInData.urgency,
-        registeredBy: currentUser.name || 'Receptionist'
+        reasonForVisit: 'Walk-in patient registration'
       };
+
+      const response = await appointmentAPI.createAppointment(walkInAppointmentData);
       
-      setAppointments(prev => [newAppointment, ...prev]);
-      setShowWalkInModal(false);
-      setWalkInData({
-        patientName: '',
-        contactNumber: '',
-        email: '',
-        services: [],
-        notes: '',
-        urgency: 'regular'
-      });
-      alert(`Walk-in patient ${newAppointment.patientName} registered successfully by ${currentUser.name || 'Receptionist'}!`);
-      
-      // Update dashboard stats
-      fetchReceptionistDashboardData();
+      if (response.success) {
+        // Update local appointments list
+        setAppointments(prev => [response.data, ...prev]);
+        
+        setShowWalkInModal(false);
+        setWalkInData({
+          patientName: '',
+          contactNumber: '',
+          email: '',
+          services: [],
+          notes: '',
+          urgency: 'regular'
+        });
+        
+        alert(`Walk-in patient ${response.data.patientName} registered successfully by ${currentUser.name || 'Receptionist'}!`);
+        
+        // Update dashboard stats
+        fetchReceptionistDashboardData();
+      } else {
+        throw new Error(response.message || 'Failed to register walk-in patient');
+      }
     } catch (error) {
       console.error('Walk-in registration error:', error);
-      setError('Failed to register walk-in patient');
+      setError('Failed to register walk-in patient: ' + error.message);
+      alert('Failed to register walk-in patient: ' + error.message);
     }
   };
 
@@ -417,6 +447,92 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     setShowBillModal(true);
     console.log('Receptionist generated bill for:', appointment.patientName);
   };
+
+  // Schedule appointment functions
+  const handleScheduleAppointment = () => {
+    setShowScheduleModal(true);
+  };
+
+  const processScheduleAppointment = async () => {
+    try {
+      if (!scheduleData.patientName || !scheduleData.contactNumber || !scheduleData.email || 
+          !scheduleData.serviceId || !scheduleData.appointmentDate || !scheduleData.appointmentTime) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      const response = await appointmentAPI.createAppointment({
+        patientName: scheduleData.patientName,
+        contactNumber: scheduleData.contactNumber,
+        email: scheduleData.email,
+        serviceId: scheduleData.serviceId,
+        serviceName: scheduleData.serviceName,
+        appointmentDate: scheduleData.appointmentDate,
+        appointmentTime: scheduleData.appointmentTime,
+        type: 'scheduled',
+        priority: scheduleData.priority,
+        notes: scheduleData.notes,
+        reasonForVisit: scheduleData.reasonForVisit
+      });
+      
+      if (response.success) {
+        // Update local appointments list
+        setAppointments(prev => [response.data, ...prev]);
+        
+        setShowScheduleModal(false);
+        setScheduleData({
+          patientName: '',
+          contactNumber: '',
+          email: '',
+          serviceId: '',
+          serviceName: '',
+          appointmentDate: '',
+          appointmentTime: '',
+          priority: 'regular',
+          notes: '',
+          reasonForVisit: ''
+        });
+        
+        alert(`Appointment scheduled successfully for ${response.data.patientName}!`);
+        
+        // Update dashboard stats
+        fetchReceptionistDashboardData();
+      } else {
+        throw new Error(response.message || 'Failed to schedule appointment');
+      }
+    } catch (error) {
+      console.error('Schedule appointment error:', error);
+      setError('Failed to schedule appointment: ' + error.message);
+      alert('Failed to schedule appointment: ' + error.message);
+    }
+  };
+
+  // Load services for dropdown
+  const [availableServices, setAvailableServices] = useState([]);
+  
+  const fetchServices = async () => {
+    try {
+      const response = await servicesAPI.getServices();
+      if (response.success) {
+        setAvailableServices(response.data.services || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch services:', error);
+      // Set default services for demo
+      setAvailableServices([
+        { _id: '507f1f77bcf86cd799439011', serviceName: 'Complete Blood Count', price: 800 },
+        { _id: '507f1f77bcf86cd799439012', serviceName: 'X-Ray Chest', price: 1200 },
+        { _id: '507f1f77bcf86cd799439013', serviceName: 'Lipid Profile', price: 1500 },
+        { _id: '507f1f77bcf86cd799439014', serviceName: 'Urinalysis', price: 400 },
+        { _id: '507f1f77bcf86cd799439015', serviceName: 'Blood Sugar', price: 300 }
+      ]);
+    }
+  };
+
+  // Fetch services on component mount
+  useEffect(() => {
+    fetchServices();
+  }, []);
 
   // Effect to fetch appointments when section changes
   useEffect(() => {
@@ -630,7 +746,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                         <h3>Quick Actions</h3>
                       </div>
                       <div className="receptionist-quick-access-content">
-                        <button className="receptionist-quick-btn" onClick={() => handleSectionClick('schedule-appointment')}>
+                        <button className="receptionist-quick-btn" onClick={handleScheduleAppointment}>
                           Schedule Appointment
                         </button>
                         <button className="receptionist-quick-btn" onClick={handleWalkInRegistration}>
@@ -674,7 +790,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                   <h2>Appointment Management</h2>
                   <p>View and manage patient appointments</p>
                 </div>
-                <button className="receptionist-add-btn" onClick={() => handleSectionClick('schedule-appointment')}>
+                <button className="receptionist-add-btn" onClick={handleScheduleAppointment}>
                   + Schedule Appointment
                 </button>
               </div>
@@ -734,7 +850,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                           <tr key={appointment._id}>
                             <td>{appointment.appointmentId}</td>
                             <td>{appointment.patientName}</td>
-                            <td>{appointment.service}</td>
+                            <td>{appointment.serviceName}</td>
                             <td>
                               {new Date(appointment.appointmentDate).toLocaleDateString()} - {appointment.appointmentTime}
                             </td>
@@ -864,7 +980,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                         <div key={appointment._id} className="receptionist-queue-item">
                           <div className="receptionist-patient-info">
                             <strong>{appointment.patientName}</strong>
-                            <span>{appointment.service} - {appointment.appointmentTime}</span>
+                            <span>{appointment.serviceName} - {appointment.appointmentTime}</span>
                           </div>
                           <div className="receptionist-queue-actions">
                             {appointment.status === 'confirmed' && (
@@ -989,8 +1105,373 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
         </div>
       </div>
 
-      {/* Modals would go here - Check In, Check Out, Walk-in Registration, etc. */}
-      {/* For brevity, I'm not including all modal implementations */}
+      {/* Modals */}
+      
+      {/* Schedule Appointment Modal */}
+      {showScheduleModal && (
+        <div className="receptionist-modal-overlay" onClick={() => setShowScheduleModal(false)}>
+          <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="receptionist-modal-header">
+              <h3>Schedule New Appointment</h3>
+              <button className="receptionist-modal-close" onClick={() => setShowScheduleModal(false)}>×</button>
+            </div>
+            <div className="receptionist-modal-body">
+              <div className="receptionist-form-group">
+                <label>Patient Name *</label>
+                <input
+                  type="text"
+                  value={scheduleData.patientName}
+                  onChange={(e) => setScheduleData({...scheduleData, patientName: e.target.value})}
+                  placeholder="Enter patient name"
+                />
+              </div>
+              <div className="receptionist-form-row">
+                <div className="receptionist-form-group">
+                  <label>Contact Number *</label>
+                  <input
+                    type="text"
+                    value={scheduleData.contactNumber}
+                    onChange={(e) => setScheduleData({...scheduleData, contactNumber: e.target.value})}
+                    placeholder="+639XXXXXXXXX"
+                  />
+                </div>
+                <div className="receptionist-form-group">
+                  <label>Email *</label>
+                  <input
+                    type="email"
+                    value={scheduleData.email}
+                    onChange={(e) => setScheduleData({...scheduleData, email: e.target.value})}
+                    placeholder="patient@email.com"
+                  />
+                </div>
+              </div>
+              <div className="receptionist-form-group">
+                <label>Service *</label>
+                <select
+                  value={scheduleData.serviceId}
+                  onChange={(e) => {
+                    const selectedService = availableServices.find(s => s._id === e.target.value);
+                    setScheduleData({
+                      ...scheduleData, 
+                      serviceId: e.target.value,
+                      serviceName: selectedService?.serviceName || ''
+                    });
+                  }}
+                >
+                  <option value="">Select Service</option>
+                  {availableServices.map(service => (
+                    <option key={service._id} value={service._id}>
+                      {service.serviceName} - ₱{service.price}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="receptionist-form-row">
+                <div className="receptionist-form-group">
+                  <label>Appointment Date *</label>
+                  <input
+                    type="date"
+                    value={scheduleData.appointmentDate}
+                    onChange={(e) => setScheduleData({...scheduleData, appointmentDate: e.target.value})}
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+                <div className="receptionist-form-group">
+                  <label>Appointment Time *</label>
+                  <select
+                    value={scheduleData.appointmentTime}
+                    onChange={(e) => setScheduleData({...scheduleData, appointmentTime: e.target.value})}
+                  >
+                    <option value="">Select Time</option>
+                    <option value="8:00 AM">8:00 AM</option>
+                    <option value="9:00 AM">9:00 AM</option>
+                    <option value="10:00 AM">10:00 AM</option>
+                    <option value="11:00 AM">11:00 AM</option>
+                    <option value="1:00 PM">1:00 PM</option>
+                    <option value="2:00 PM">2:00 PM</option>
+                    <option value="3:00 PM">3:00 PM</option>
+                    <option value="4:00 PM">4:00 PM</option>
+                  </select>
+                </div>
+              </div>
+              <div className="receptionist-form-group">
+                <label>Priority</label>
+                <select
+                  value={scheduleData.priority}
+                  onChange={(e) => setScheduleData({...scheduleData, priority: e.target.value})}
+                >
+                  <option value="low">Low</option>
+                  <option value="regular">Regular</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+              <div className="receptionist-form-group">
+                <label>Reason for Visit</label>
+                <input
+                  type="text"
+                  value={scheduleData.reasonForVisit}
+                  onChange={(e) => setScheduleData({...scheduleData, reasonForVisit: e.target.value})}
+                  placeholder="Brief description"
+                />
+              </div>
+              <div className="receptionist-form-group">
+                <label>Notes</label>
+                <textarea
+                  value={scheduleData.notes}
+                  onChange={(e) => setScheduleData({...scheduleData, notes: e.target.value})}
+                  placeholder="Additional notes (optional)"
+                  rows="3"
+                />
+              </div>
+            </div>
+            <div className="receptionist-modal-footer">
+              <button className="receptionist-btn-secondary" onClick={() => setShowScheduleModal(false)}>
+                Cancel
+              </button>
+              <button className="receptionist-btn-primary" onClick={processScheduleAppointment}>
+                Schedule Appointment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Walk-in Registration Modal */}
+      {showWalkInModal && (
+        <div className="receptionist-modal-overlay" onClick={() => setShowWalkInModal(false)}>
+          <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="receptionist-modal-header">
+              <h3>Walk-in Patient Registration</h3>
+              <button className="receptionist-modal-close" onClick={() => setShowWalkInModal(false)}>×</button>
+            </div>
+            <div className="receptionist-modal-body">
+              <div className="receptionist-form-group">
+                <label>Patient Name *</label>
+                <input
+                  type="text"
+                  value={walkInData.patientName}
+                  onChange={(e) => setWalkInData({...walkInData, patientName: e.target.value})}
+                  placeholder="Enter patient name"
+                />
+              </div>
+              <div className="receptionist-form-row">
+                <div className="receptionist-form-group">
+                  <label>Contact Number *</label>
+                  <input
+                    type="text"
+                    value={walkInData.contactNumber}
+                    onChange={(e) => setWalkInData({...walkInData, contactNumber: e.target.value})}
+                    placeholder="+639XXXXXXXXX"
+                  />
+                </div>
+                <div className="receptionist-form-group">
+                  <label>Email *</label>
+                  <input
+                    type="email"
+                    value={walkInData.email}
+                    onChange={(e) => setWalkInData({...walkInData, email: e.target.value})}
+                    placeholder="patient@email.com"
+                  />
+                </div>
+              </div>
+              <div className="receptionist-form-group">
+                <label>Services Required</label>
+                <textarea
+                  value={walkInData.services.join(', ')}
+                  onChange={(e) => setWalkInData({...walkInData, services: e.target.value.split(', ').filter(s => s)})}
+                  placeholder="List services needed (comma separated)"
+                  rows="2"
+                />
+              </div>
+              <div className="receptionist-form-group">
+                <label>Urgency</label>
+                <select
+                  value={walkInData.urgency}
+                  onChange={(e) => setWalkInData({...walkInData, urgency: e.target.value})}
+                >
+                  <option value="regular">Regular</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+              <div className="receptionist-form-group">
+                <label>Notes</label>
+                <textarea
+                  value={walkInData.notes}
+                  onChange={(e) => setWalkInData({...walkInData, notes: e.target.value})}
+                  placeholder="Additional notes (optional)"
+                  rows="3"
+                />
+              </div>
+            </div>
+            <div className="receptionist-modal-footer">
+              <button className="receptionist-btn-secondary" onClick={() => setShowWalkInModal(false)}>
+                Cancel
+              </button>
+              <button className="receptionist-btn-primary" onClick={processWalkInRegistration}>
+                Register Walk-in Patient
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Check-in Confirmation Modal */}
+      {showCheckInModal && selectedPatient && (
+        <div className="receptionist-modal-overlay" onClick={() => setShowCheckInModal(false)}>
+          <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="receptionist-modal-header">
+              <h3>Check-in Patient</h3>
+              <button className="receptionist-modal-close" onClick={() => setShowCheckInModal(false)}>×</button>
+            </div>
+            <div className="receptionist-modal-body">
+              <p>Are you sure you want to check in the following patient?</p>
+              <div className="receptionist-patient-details">
+                <p><strong>Patient:</strong> {selectedPatient.patientName}</p>
+                <p><strong>Service:</strong> {selectedPatient.serviceName}</p>
+                <p><strong>Time:</strong> {selectedPatient.appointmentTime}</p>
+                <p><strong>Appointment ID:</strong> {selectedPatient.appointmentId}</p>
+              </div>
+            </div>
+            <div className="receptionist-modal-footer">
+              <button className="receptionist-btn-secondary" onClick={() => setShowCheckInModal(false)}>
+                Cancel
+              </button>
+              <button className="receptionist-btn-primary" onClick={processCheckIn}>
+                Confirm Check-in
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Check-out Confirmation Modal */}
+      {showCheckOutModal && selectedPatient && (
+        <div className="receptionist-modal-overlay" onClick={() => setShowCheckOutModal(false)}>
+          <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="receptionist-modal-header">
+              <h3>Check-out Patient</h3>
+              <button className="receptionist-modal-close" onClick={() => setShowCheckOutModal(false)}>×</button>
+            </div>
+            <div className="receptionist-modal-body">
+              <p>Are you sure you want to check out the following patient?</p>
+              <div className="receptionist-patient-details">
+                <p><strong>Patient:</strong> {selectedPatient.patientName}</p>
+                <p><strong>Service:</strong> {selectedPatient.serviceName}</p>
+                <p><strong>Time:</strong> {selectedPatient.appointmentTime}</p>
+                <p><strong>Appointment ID:</strong> {selectedPatient.appointmentId}</p>
+              </div>
+            </div>
+            <div className="receptionist-modal-footer">
+              <button className="receptionist-btn-secondary" onClick={() => setShowCheckOutModal(false)}>
+                Cancel
+              </button>
+              <button className="receptionist-btn-primary" onClick={processCheckOut}>
+                Confirm Check-out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Service Information Modal */}
+      {showServiceInfoModal && selectedService && (
+        <div className="receptionist-modal-overlay" onClick={() => setShowServiceInfoModal(false)}>
+          <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="receptionist-modal-header">
+              <h3>Service Information</h3>
+              <button className="receptionist-modal-close" onClick={() => setShowServiceInfoModal(false)}>×</button>
+            </div>
+            <div className="receptionist-modal-body">
+              <div className="receptionist-service-details">
+                <h4>{selectedService.serviceName}</h4>
+                <p><strong>Price:</strong> ₱{selectedService.price}</p>
+                <p><strong>Description:</strong> {selectedService.description}</p>
+                <p><strong>Duration:</strong> {selectedService.duration}</p>
+                <p><strong>Preparation:</strong> {selectedService.preparation}</p>
+                <p><strong>Sample Type:</strong> {selectedService.sampleType}</p>
+                <p><strong>Turnaround Time:</strong> {selectedService.turnaroundTime}</p>
+              </div>
+            </div>
+            <div className="receptionist-modal-footer">
+              <button className="receptionist-btn-primary" onClick={() => setShowServiceInfoModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Patient Information Modal */}
+      {showPatientInfoModal && patientInfo && (
+        <div className="receptionist-modal-overlay" onClick={() => setShowPatientInfoModal(false)}>
+          <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="receptionist-modal-header">
+              <h3>Patient Information</h3>
+              <button className="receptionist-modal-close" onClick={() => setShowPatientInfoModal(false)}>×</button>
+            </div>
+            <div className="receptionist-modal-body">
+              <div className="receptionist-patient-details">
+                <h4>{patientInfo.name}</h4>
+                <p><strong>Email:</strong> {patientInfo.email}</p>
+                <p><strong>Phone:</strong> {patientInfo.phone}</p>
+                <p><strong>Address:</strong> {patientInfo.address}</p>
+                <p><strong>Date of Birth:</strong> {new Date(patientInfo.dateOfBirth).toLocaleDateString()}</p>
+                <p><strong>Gender:</strong> {patientInfo.gender}</p>
+                <p><strong>Emergency Contact:</strong> {patientInfo.emergencyContact}</p>
+                <p><strong>Last Visit:</strong> {new Date(patientInfo.lastVisit).toLocaleDateString()}</p>
+                <div>
+                  <strong>Medical History:</strong>
+                  <ul>
+                    {patientInfo.medicalHistory.map((item, index) => (
+                      <li key={index}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div className="receptionist-modal-footer">
+              <button className="receptionist-btn-primary" onClick={() => setShowPatientInfoModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bill Generation Modal */}
+      {showBillModal && billData && (
+        <div className="receptionist-modal-overlay" onClick={() => setShowBillModal(false)}>
+          <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="receptionist-modal-header">
+              <h3>Bill Information</h3>
+              <button className="receptionist-modal-close" onClick={() => setShowBillModal(false)}>×</button>
+            </div>
+            <div className="receptionist-modal-body">
+              <div className="receptionist-bill-details">
+                <h4>Bill Summary</h4>
+                <p><strong>Appointment ID:</strong> {billData.appointmentId}</p>
+                <p><strong>Patient:</strong> {billData.patientName}</p>
+                <p><strong>Service:</strong> {billData.service}</p>
+                <p><strong>Amount:</strong> ₱{billData.amount}</p>
+                <p><strong>Date:</strong> {billData.date}</p>
+                <p><strong>Status:</strong> {billData.status}</p>
+                <p><strong>Generated by:</strong> {billData.generatedBy}</p>
+                <p><strong>Notes:</strong> {billData.notes}</p>
+              </div>
+            </div>
+            <div className="receptionist-modal-footer">
+              <button className="receptionist-btn-secondary" onClick={() => setShowBillModal(false)}>
+                Close
+              </button>
+              <button className="receptionist-btn-primary">
+                Print Bill
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

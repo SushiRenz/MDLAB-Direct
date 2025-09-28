@@ -3,7 +3,7 @@ const asyncHandler = require('../utils/asyncHandler');
 
 // @desc    Get all services with filtering and pagination
 // @route   GET /api/services
-// @access  Private (Admin and Staff)
+// @access  Public (with optional admin features when authenticated)
 const getServices = asyncHandler(async (req, res) => {
   const {
     page = 1,
@@ -22,12 +22,19 @@ const getServices = asyncHandler(async (req, res) => {
   // Build filter object
   const filter = {};
 
-  if (category) {
-    filter.category = category;
+  // For public access, only show active services unless user is admin
+  if (req.user && req.user.role === 'admin') {
+    // Admin can see all services, apply filters as requested
+    if (isActive !== undefined) {
+      filter.isActive = isActive === 'true';
+    }
+  } else {
+    // Public access - only show active services
+    filter.isActive = true;
   }
 
-  if (isActive !== undefined) {
-    filter.isActive = isActive === 'true';
+  if (category) {
+    filter.category = category;
   }
 
   if (isPopular !== undefined) {

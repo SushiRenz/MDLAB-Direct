@@ -13,6 +13,8 @@ const userRoutes = require('./routes/users');
 const financeRoutes = require('./routes/finance');
 const logsRoutes = require('./routes/logs');
 const servicesRoutes = require('./routes/services');
+const appointmentRoutes = require('./routes/appointments');
+// const testResultRoutes = require('./routes/testResults'); // Temporarily disabled
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -22,10 +24,10 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-// Rate limiting
+// Rate limiting - Increased for development
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 1000, // Increased from 100 to 1000 for development
   message: 'Too many requests from this IP, please try again later.'
 });
 app.use(limiter);
@@ -129,6 +131,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/services', servicesRoutes);
+app.use('/api/appointments', appointmentRoutes);
+// app.use('/api/test-results', testResultRoutes); // Temporarily disabled
 
 // 404 handler
 app.use('*', (req, res) => {

@@ -598,8 +598,7 @@
 }
 
 .appointment-time,
-.appointment-location,
-.appointment-doctor {
+.appointment-location {
   color: #666;
   font-size: 1rem;
   margin-bottom: 8px;

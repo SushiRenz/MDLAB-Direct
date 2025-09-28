@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import BookAppointmentModal from './BookAppointmentModal';
 import PatientProfile from './PatientProfile'; 
 import MobileLabScheduleModal from './MobileLabScheduleModal';
+import { appointmentAPI, servicesAPI, testResultsAPI } from '../services/api';
 import '../design/PatientDashboard.css';
 import '../design/BookAppointmentModal.css';
 
@@ -10,6 +11,8 @@ function PatientDashboard(props) {
   const [currentUser, setCurrentUser] = useState(props.currentUser);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [appointments, setAppointments] = useState([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentsError, setAppointmentsError] = useState('');
   const [isReschedulingModalOpen, setIsReschedulingModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [testTypeFilter, setTestTypeFilter] = useState('all');
@@ -18,9 +21,28 @@ function PatientDashboard(props) {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   
+  // Services state
+  const [availableServices, setAvailableServices] = useState([]);
+  
   // Test Results state - moved to component level
   const [testResults, setTestResults] = useState([]);
   const [filteredResults, setFilteredResults] = useState([]);
+
+  // Separate appointments into upcoming and past
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Set to start of today
+  
+  const upcomingAppointments = appointments.filter(appointment => {
+    const appointmentDate = new Date(appointment.date);
+    appointmentDate.setHours(0, 0, 0, 0);
+    return appointmentDate >= today;
+  });
+  
+  const pastAppointments = appointments.filter(appointment => {
+    const appointmentDate = new Date(appointment.date);
+    appointmentDate.setHours(0, 0, 0, 0);
+    return appointmentDate < today;
+  });
 
   // Sync currentUser state with props
   useEffect(() => {
@@ -29,68 +51,45 @@ function PatientDashboard(props) {
 
   // Load test results from localStorage
   useEffect(() => {
-    const loadResults = () => {
+    const fetchTestResults = async () => {
       try {
-        const savedResults = JSON.parse(localStorage.getItem('testResults') || '[]');
+        // For patients, the API automatically filters to their results
+        const response = await testResultsAPI.getTestResults({
+          sortBy: 'sampleDate',
+          sortOrder: 'desc'
+        });
         
-        // Add some default demo results if none exist
-        const defaultResults = [
-          {
-            sampleId: 'S001-DEMO',
-            patient: currentUser?.firstName + ' ' + currentUser?.lastName || 'Demo Patient',
-            patientId: 'current-user',
-            testType: 'Complete Blood Count (CBC)',
-            results: {
-              hemoglobin: '13.8',
-              hematocrit: '41.2',
-              wbc: '6.5',
-              rbc: '4.2',
-              platelets: '280'
-            },
-            date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
-            status: 'completed',
-            technician: 'medtech1',
-            isNew: true
-          },
-          {
-            sampleId: 'S002-DEMO',
-            patient: currentUser?.firstName + ' ' + currentUser?.lastName || 'Demo Patient',
-            patientId: 'current-user',
-            testType: 'Blood Sugar Test',
-            results: {
-              glucose: '95',
-              hba1c: '5.4'
-            },
-            date: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(), // 20 days ago
-            status: 'completed',
-            technician: 'medtech1',
-            isNew: false
-          }
-        ];
-
-        // Filter results for current user (in real app, this would be done by backend)
-        const currentUserResults = savedResults.filter(result => 
-          result.patientId === 'current-user' || 
-          result.patient === (currentUser?.firstName + ' ' + currentUser?.lastName)
-        );
-
-        const allResults = [...defaultResults, ...currentUserResults];
-        setTestResults(allResults);
+        if (response.success) {
+          // Transform API data to match component format
+          const transformedResults = response.data.map(result => ({
+            sampleId: result.sampleId,
+            patient: result.patientName || `${currentUser?.firstName} ${currentUser?.lastName}` || 'Patient',
+            patientId: result.patient,
+            testType: result.testType || result.serviceName,
+            results: Object.fromEntries(result.results || new Map()),
+            date: result.sampleDate,
+            status: result.status,
+            technician: result.medTech?.firstName ? `${result.medTech.firstName} ${result.medTech.lastName}` : 'medtech',
+            isNew: result.isNew,
+            isAbnormal: result.isAbnormal,
+            isCritical: result.isCritical,
+            _id: result._id
+          }));
+          setTestResults(transformedResults);
+        } else {
+          console.error('Failed to fetch test results:', response.message);
+          setTestResults([]);
+        }
       } catch (error) {
         console.error('Error loading test results:', error);
         setTestResults([]);
       }
     };
 
-    loadResults();
-    
-    // Set up interval to check for new results
-    const interval = setInterval(loadResults, 5000); // Check every 5 seconds
-    
-    return () => clearInterval(interval);
-  }, [currentUser]);
-
-  // Filter results based on current filters
+    if (currentUser) {
+      fetchTestResults();
+    }
+  }, [currentUser]);  // Filter results based on current filters
   useEffect(() => {
     let filtered = [...testResults];
 
@@ -154,6 +153,104 @@ function PatientDashboard(props) {
 
   const handleSectionClick = (section) => setActiveSection(section);
 
+  // Fetch appointments from API
+  const fetchAppointments = async () => {
+    setAppointmentsLoading(true);
+    setAppointmentsError('');
+    try {
+      const response = await appointmentAPI.getAppointments({
+        patientId: currentUser._id || currentUser.id
+      });
+      
+      if (response.success) {
+        // Transform API data to match component format
+        const transformedAppointments = response.data.map(apt => ({
+          id: apt._id,
+          _id: apt._id, // Keep original ID for API calls
+          date: apt.appointmentDate,
+          time: apt.appointmentTime,
+          testType: apt.service?.serviceName || apt.serviceName || 'Lab Test',
+          location: 'MDLAB Direct - Main Branch',
+          status: apt.status,
+          appointmentId: apt.appointmentId,
+          notes: apt.notes || ''
+        }));
+        setAppointments(transformedAppointments);
+      } else {
+        throw new Error(response.message || 'Failed to fetch appointments');
+      }
+    } catch (error) {
+      console.error('Error fetching appointments:', error);
+      setAppointmentsError(error.message || 'Failed to load appointments');
+      // Don't set fallback data - show empty state instead
+      setAppointments([]);
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  };
+
+  // Fetch available services
+  const fetchServices = async () => {
+    console.log('🔄 Starting fetchServices...');
+    try {
+      console.log('📡 Calling servicesAPI.getServices()...');
+      const response = await servicesAPI.getServices();
+      console.log('✅ Services API response received:', response); // Debug log
+      if (response.success) {
+        // API returns services directly in response.data (array)
+        console.log('✅ Setting available services:', response.data); // Debug log
+        setAvailableServices(response.data || []);
+      } else {
+        console.error('❌ API response indicates failure:', response);
+        throw new Error(response.message || 'API returned success: false');
+      }
+    } catch (error) {
+      console.error('❌ Error in fetchServices:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      // Set fallback services
+      console.log('🔄 Setting fallback services...');
+      setAvailableServices([
+        { _id: '507f1f77bcf86cd799439011', serviceName: 'Complete Blood Count (CBC)', price: 800 },
+        { _id: '507f1f77bcf86cd799439012', serviceName: 'Blood Sugar Test', price: 300 },
+        { _id: '507f1f77bcf86cd799439013', serviceName: 'Lipid Profile', price: 1500 },
+        { _id: '507f1f77bcf86cd799439014', serviceName: 'Urinalysis', price: 400 },
+        { _id: '507f1f77bcf86cd799439015', serviceName: 'X-Ray Chest', price: 1200 }
+      ]);
+    }
+  };
+
+  // Load data on component mount and when user changes
+  useEffect(() => {
+    console.log('🔍 useEffect triggered, currentUser:', currentUser);
+    console.log('🔍 currentUser._id:', currentUser?._id);
+    console.log('🔍 currentUser.id:', currentUser?.id);
+    
+    if (currentUser && currentUser._id) {
+      console.log('🔄 Loading services and appointments for user:', currentUser._id);
+      fetchAppointments();
+      fetchServices();
+    } else if (currentUser && currentUser.id) {
+      console.log('🔄 Loading services and appointments for user (using .id):', currentUser.id);
+      fetchAppointments();
+      fetchServices();
+    } else {
+      console.log('❌ currentUser is missing _id or id, not loading services');
+    }
+  }, [currentUser]);
+
+  // Debug: log availableServices whenever it changes
+  useEffect(() => {
+    console.log('📋 Available services updated:', availableServices);
+    console.log('📋 Services count:', availableServices.length);
+    if (availableServices.length > 0) {
+      console.log('📋 Service names:', availableServices.map(s => s.serviceName));
+    }
+  }, [availableServices]);
+
   const handleLogout = async () => {
     // Show custom logout modal
     setIsLogoutModalOpen(true);
@@ -184,32 +281,152 @@ function PatientDashboard(props) {
 
   const handleAppointmentSubmit = async (appointmentData) => {
     try {
-      // Create a new appointment object
-      const newAppointment = {
-        id: Date.now(), // temporary ID for demo
-        date: appointmentData.date,
-        time: appointmentData.time,
-        testType: appointmentData.testType,
-        location: appointmentData.location === 'main' ? 'MDLAB Direct - Main Branch' : 'Mobile Lab Service',
-        status: 'Confirmed',
-        doctor: 'Dr. Maria Santos' // You can make this dynamic later
+      console.log('=== APPOINTMENT SUBMISSION DEBUG ===');
+      console.log('appointmentData:', appointmentData);
+      console.log('appointmentData.testType:', appointmentData.testType);
+      console.log('availableServices:', availableServices);
+      console.log('availableServices length:', availableServices.length);
+      
+      // Find the selected service by serviceName (testType contains the serviceName)
+      const selectedService = availableServices.find(service => 
+        service.serviceName === appointmentData.testType ||
+        service._id === appointmentData.testType
+      );
+      
+      console.log('selectedService found:', selectedService);
+      console.log('Trying to match testType:', appointmentData.testType);
+      console.log('Against serviceName options:', availableServices.map(s => s.serviceName));
+
+      if (!selectedService) {
+        console.error('❌ Selected service not found!');
+        console.log('Appointment testType received:', appointmentData.testType);
+        console.log('Available service names:', availableServices.map(s => s.serviceName));
+        console.log('Available services full data:', availableServices);
+        alert('Selected service not found. Please try again.');
+        return;
+      }
+
+      console.log('✅ Selected service found:', selectedService);
+      console.log('Service ID:', selectedService._id);
+      console.log('Service Name:', selectedService.serviceName);
+
+      // Validate required fields
+      if (!appointmentData.date) {
+        console.error('❌ No date selected!');
+        alert('Please select a date for your appointment.');
+        return;
+      }
+
+      if (!appointmentData.time) {
+        console.error('❌ No time selected!');
+        alert('Please select a time for your appointment.');
+        return;
+      }
+
+      // Helper function to convert 12-hour to 24-hour format
+      const convertTo24HourFormat = (time12h) => {
+        const [time, modifier] = time12h.split(' ');
+        let [hours, minutes] = time.split(':');
+        if (hours === '12') {
+          hours = '00';
+        }
+        if (modifier === 'PM') {
+          hours = parseInt(hours, 10) + 12;
+        }
+        return `${hours.padStart(2, '0')}:${minutes}:00`;
       };
 
-      // Add the new appointment to the state
-      setAppointments([...appointments, newAppointment]);
+      console.log('Current user phone:', currentUser.phone);
+      console.log('Current user contactNumber:', currentUser.contactNumber);
+      console.log('All current user data:', currentUser);
+
+      // Convert time format from "7:00 AM" to "07:00:00" for proper date construction
+      const timeString = appointmentData.time.split(' - ')[0]; // Get "7:00 AM"
+      const convertedTime = convertTo24HourFormat(timeString); // Convert to "07:00:00"
       
-      // Close the modal
-      setIsBookingModalOpen(false);
+      console.log('Original time:', timeString);
+      console.log('Converted time:', convertedTime);
+      console.log('Raw date object:', appointmentData.date);
+      console.log('Date toISOString():', appointmentData.date.toISOString());
+      console.log('Date split result:', appointmentData.date.toISOString().split('T')[0]);
       
-      // Show success message
-      alert('Appointment booked successfully!');
+      // Fix timezone issue - format date in local timezone
+      const year = appointmentData.date.getFullYear();
+      const month = String(appointmentData.date.getMonth() + 1).padStart(2, '0');
+      const day = String(appointmentData.date.getDate()).padStart(2, '0');
+      const localDateString = `${year}-${month}-${day}`;
       
-      // TODO: Send appointment data to backend
-      // const response = await axios.post('/api/appointments', appointmentData);
+      console.log('Local date string (fixed):', localDateString);
+
+      // Create appointment data for API
+      const apiAppointmentData = {
+        patientId: currentUser._id || currentUser.id, // Controller expects patientId
+        patientName: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.name || 'Patient',
+        contactNumber: currentUser.phone || currentUser.contactNumber || '09123456789', // Fallback phone number
+        email: currentUser.email || '',
+        serviceId: selectedService._id, // Controller expects serviceId
+        serviceName: selectedService.serviceName,
+        appointmentDate: localDateString, // Use local timezone date instead of UTC
+        appointmentTime: timeString, // Keep original format for display
+        type: 'scheduled',
+        priority: 'regular',
+        notes: 'Patient booking',
+        reasonForVisit: `${appointmentData.testType} - Patient self-booking`
+      };
+
+      console.log('Creating appointment with data:', apiAppointmentData);
+      console.log('📋 Appointment data details:');
+      console.log('  - patientId:', apiAppointmentData.patientId);
+      console.log('  - patientName:', apiAppointmentData.patientName);
+      console.log('  - contactNumber:', apiAppointmentData.contactNumber);
+      console.log('  - email:', apiAppointmentData.email);
+      console.log('  - serviceId:', apiAppointmentData.serviceId);
+      console.log('  - appointmentDate:', apiAppointmentData.appointmentDate);
+      console.log('  - appointmentTime:', apiAppointmentData.appointmentTime);
       
+      console.log('🚀 About to call appointmentAPI.createAppointment...');
+      
+      const response = await appointmentAPI.createAppointment(apiAppointmentData);
+      
+      console.log('📦 Received response from API!');
+      console.log('✅ Appointment creation response:', response);
+      console.log('Response success:', response.success);
+      console.log('Response message:', response.message);
+      console.log('Response error:', response.error);
+      console.log('Full response object:', JSON.stringify(response, null, 2));
+      
+      if (response.success) {
+        // Transform API response to match component format
+        const newAppointment = {
+          id: response.data._id,
+          _id: response.data._id, // Keep original ID for API calls
+          date: new Date(response.data.appointmentDate),
+          time: response.data.appointmentTime,
+          testType: response.data.serviceName,
+          location: appointmentData.location === 'main' ? 'MDLAB Direct - Main Branch' : 'Mobile Lab Service',
+          status: response.data.status,
+          appointmentId: response.data.appointmentId,
+          notes: response.data.notes || ''
+        };
+
+        // Add the new appointment to the state
+        setAppointments([...appointments, newAppointment]);
+        setIsBookingModalOpen(false);
+        alert('Appointment booked successfully! Your appointment ID is: ' + response.data.appointmentId);
+      } else {
+        console.error('❌ Appointment creation failed:', response.message);
+        console.error('❌ Validation errors:', response.errors);
+        if (response.errors && response.errors.length > 0) {
+          console.log('Detailed validation errors:');
+          response.errors.forEach((error, index) => {
+            console.log(`Error ${index + 1}:`, error);
+          });
+        }
+        throw new Error(response.message || 'Failed to create appointment');
+      }
     } catch (error) {
       console.error('Error booking appointment:', error);
-      alert('Failed to book appointment');
+      alert('Failed to book appointment: ' + (error.message || 'Please try again'));
     }
   };
 
@@ -218,29 +435,72 @@ function PatientDashboard(props) {
     setIsReschedulingModalOpen(true);
   };
 
-  const handleRescheduleSubmit = (updatedData) => {
-    const updatedAppointments = appointments.map(apt => 
-      apt.id === selectedAppointment.id 
-        ? { 
-            ...apt, 
-            date: updatedData.date,
-            time: updatedData.time,
-            doctor: updatedData.doctor
-          } 
-        : apt
-    );
-    
-    setAppointments(updatedAppointments);
-    setIsReschedulingModalOpen(false);
-    setSelectedAppointment(null);
-    alert('Appointment rescheduled successfully!');
+  const handleRescheduleSubmit = async (updatedData) => {
+    try {
+      // Use the API ID for the backend call
+      const apiId = selectedAppointment._id || selectedAppointment.id;
+      
+      const updatePayload = {
+        appointmentDate: updatedData.date,
+        appointmentTime: updatedData.time,
+        status: 'confirmed' // Ensure rescheduled appointment is confirmed
+      };
+
+      const result = await appointmentAPI.updateAppointment(apiId, updatePayload);
+      
+      if (result.success) {
+        // Update local state with the updated appointment
+        const updatedAppointments = appointments.map(apt => 
+          apt.id === selectedAppointment.id 
+            ? { 
+                ...apt, 
+                date: updatedData.date,
+                time: updatedData.time,
+                status: 'confirmed',
+                updatedAt: new Date()
+              } 
+            : apt
+        );
+        
+        setAppointments(updatedAppointments);
+        setIsReschedulingModalOpen(false);
+        setSelectedAppointment(null);
+        alert('Appointment rescheduled successfully!');
+      } else {
+        throw new Error(result.message || 'Failed to reschedule appointment');
+      }
+    } catch (error) {
+      console.error('Error rescheduling appointment:', error);
+      alert(error.message || 'Failed to reschedule appointment. Please try again.');
+    }
   };
 
-  const handleCancel = (appointmentId) => {
+  const handleCancel = async (appointmentId) => {
     if (window.confirm('Are you sure you want to cancel this appointment?')) {
-      const updatedAppointments = appointments.filter(apt => apt.id !== appointmentId);
-      setAppointments(updatedAppointments);
-      alert('Appointment cancelled successfully!');
+      try {
+        // Find the appointment to get the correct API ID
+        const appointment = appointments.find(apt => apt.id === appointmentId);
+        const apiId = appointment._id || appointmentId;
+        
+        const result = await appointmentAPI.cancelAppointment(apiId, 'Cancelled by patient');
+        
+        if (result.success) {
+          // Update local state by removing the cancelled appointment or updating its status
+          const updatedAppointments = appointments.map(apt => 
+            apt.id === appointmentId 
+              ? { ...apt, status: 'cancelled', cancelledAt: new Date() }
+              : apt
+          );
+          
+          setAppointments(updatedAppointments);
+          alert('Appointment cancelled successfully!');
+        } else {
+          throw new Error(result.message || 'Failed to cancel appointment');
+        }
+      } catch (error) {
+        console.error('Error cancelling appointment:', error);
+        alert(error.message || 'Failed to cancel appointment. Please try again.');
+      }
     }
   };
 
@@ -283,16 +543,16 @@ function PatientDashboard(props) {
           </div>
           <div className="welcome-stats">
             <div className="stat-item">
-              <div className="stat-number">0</div>
+              <div className="stat-number">{upcomingAppointments.length}</div>
               <div className="stat-label">Upcoming Appointments</div>
               </div>
             <div className="stat-item">
-              <div className="stat-number">0</div>
-              <div className="stat-label">New Results</div>
+              <div className="stat-number">{pastAppointments.length}</div>
+              <div className="stat-label">Past Appointments</div>
             </div>
             <div className="stat-item">
-              <div className="stat-number">0</div>
-              <div className="stat-label">Total Tests</div>
+              <div className="stat-number">{appointments.length}</div>
+              <div className="stat-label">Total Appointments</div>
             </div>
           </div>
         </div>
@@ -421,61 +681,62 @@ function PatientDashboard(props) {
       <div className="appointments-section">
         <h3>Upcoming Appointments</h3>
         <div className="appointments-grid">
-          {appointments.map(appointment => (
-            <div key={appointment.id} className="appointment-card upcoming">
-              <div className="appointment-header">
-                <div className="appointment-date">
-                  <div className="date-day">
-                    {new Date(appointment.date).getDate().toString().padStart(2, '0')}
-                  </div>
-                  <div className="date-month">
-                    {new Date(appointment.date).toLocaleString('default', { month: 'short' }).toUpperCase()}
-                  </div>
-                </div>
-                <div className="appointment-status">{appointment.status}</div>
-              </div>
-              <div className="appointment-details">
-                <h4>{appointment.testType}</h4>
-                <div className="appointment-time">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                    <polyline points="12,6 12,12 16,14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  {appointment.time}
-                </div>
-                <div className="appointment-location">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" stroke="currentColor" strokeWidth="2"/>
-                    <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="2"/>
-                  </svg>
-                  {appointment.location}
-                </div>
-                <div className="appointment-doctor">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
-                    <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  {appointment.doctor}
-                </div>
-              </div>
-              <div className="appointment-actions">
-                <button 
-                  className="btn-reschedule"
-                  onClick={() => handleReschedule(appointment)}
-                >
-                  Reschedule
-                </button>
-                <button 
-                  className="btn-cancel"
-                  onClick={() => handleCancel(appointment.id)}
-                >
-                  Cancel
-                </button>
-              </div>
+          {appointmentsLoading ? (
+            <div style={{ textAlign: 'center', padding: '20px' }}>
+              Loading appointments...
             </div>
-          ))}
-
-          {/* Show existing hardcoded appointments if needed */}
-          {/* ...existing appointment cards... */}
+          ) : upcomingAppointments.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+              No upcoming appointments. Book one to get started!
+            </div>
+          ) : (
+            upcomingAppointments.map(appointment => (
+              <div key={appointment.id} className="appointment-card upcoming">
+                <div className="appointment-header">
+                  <div className="appointment-date">
+                    <div className="date-day">
+                      {new Date(appointment.date).getDate().toString().padStart(2, '0')}
+                    </div>
+                    <div className="date-month">
+                      {new Date(appointment.date).toLocaleString('default', { month: 'short' }).toUpperCase()}
+                    </div>
+                  </div>
+                  <div className="appointment-status">{appointment.status}</div>
+                </div>
+                <div className="appointment-details">
+                  <h4>{appointment.testType}</h4>
+                  <div className="appointment-time">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                      <polyline points="12,6 12,12 16,14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    {appointment.time}
+                  </div>
+                  <div className="appointment-location">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" stroke="currentColor" strokeWidth="2"/>
+                      <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="2"/>
+                    </svg>
+                    {appointment.location}
+                  </div>
+                </div>
+                <div className="appointment-actions">
+                  <button 
+                    className="btn-reschedule"
+                    onClick={() => handleReschedule(appointment)}
+                  >
+                    Reschedule
+                  </button>
+                  <button 
+                    className="btn-cancel"
+                    onClick={() => handleCancel(appointment.id)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -483,53 +744,39 @@ function PatientDashboard(props) {
       <div className="appointments-section">
         <h3>Past Appointments</h3>
         <div className="appointments-list">
-          <div className="appointment-item completed">
-            <div className="appointment-info">
-              <div className="appointment-name">Blood Sugar Test</div>
-              <div className="appointment-meta">
-                <span>August 25, 2025</span>
-                <span>•</span>
-                <span>Dr. Ana Cruz</span>
-                <span>•</span>
-                <span>Mobile Lab Service</span>
+          {appointmentsLoading ? (
+            <div style={{ textAlign: 'center', padding: '20px' }}>
+              Loading past appointments...
+            </div>
+          ) : pastAppointments.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+              No past appointments found.
+            </div>
+          ) : (
+            pastAppointments.map(appointment => (
+              <div key={appointment.id} className="appointment-item completed">
+                <div className="appointment-info">
+                  <div className="appointment-name">{appointment.testType}</div>
+                  <div className="appointment-meta">
+                    <span>{new Date(appointment.date).toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}</span>
+                    <span>•</span>
+                    <span>{appointment.time}</span>
+                    <span>•</span>
+                    <span>{appointment.location}</span>
+                  </div>
+                </div>
+                <div className="appointment-result">
+                  <span className={`result-status ${appointment.status?.toLowerCase() || 'completed'}`}>
+                    {appointment.status === 'completed' ? 'Results Available' : appointment.status || 'Completed'}
+                  </span>
+                </div>
               </div>
-            </div>
-            <div className="appointment-result">
-              <span className="result-status completed">Results Available</span>
-            </div>
-          </div>
-
-          <div className="appointment-item completed">
-            <div className="appointment-info">
-              <div className="appointment-name">Urinalysis</div>
-              <div className="appointment-meta">
-                <span>August 15, 2025</span>
-                <span>•</span>
-                <span>Dr. Roberto Kim</span>
-                <span>•</span>
-                <span>Main Branch</span>
-              </div>
-            </div>
-            <div className="appointment-result">
-              <span className="result-status completed">Results Available</span>
-            </div>
-          </div>
-
-          <div className="appointment-item completed">
-            <div className="appointment-info">
-              <div className="appointment-name">X-Ray Chest</div>
-              <div className="appointment-meta">
-                <span>July 30, 2025</span>
-                <span>•</span>
-                <span>Dr. Lisa Wong</span>
-                <span>•</span>
-                <span>Main Branch</span>
-              </div>
-            </div>
-            <div className="appointment-result">
-              <span className="result-status completed">Results Available</span>
-            </div>
-          </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -542,6 +789,7 @@ function PatientDashboard(props) {
             setSelectedAppointment(null);
           }}
           onSubmit={handleRescheduleSubmit}
+          availableServices={availableServices}
           initialData={selectedAppointment}
           isRescheduling={true}
         />
@@ -993,6 +1241,7 @@ function PatientDashboard(props) {
         isOpen={isBookingModalOpen}
         onClose={() => setIsBookingModalOpen(false)}
         onSubmit={handleAppointmentSubmit}
+        availableServices={availableServices}
       />
       <MobileLabScheduleModal
         isOpen={isScheduleModalOpen}

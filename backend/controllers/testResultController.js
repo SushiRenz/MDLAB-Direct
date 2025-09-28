@@ -1,0 +1,716 @@
+const { validationResult } = require('express-validator');
+const TestResult = require('../models/TestResult');
+const Service = require('../models/Service');
+const User = require('../models/User');
+const Appointment = require('../models/Appointment');
+const asyncHandler = require('../utils/asyncHandler');
+
+// @desc    Get all test results with filtering and pagination
+// @route   GET /api/test-results
+// @access  Private (All authenticated users see their own, staff see all)
+const getTestResults = asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: errors.array()
+    });
+  }
+
+  const {
+    page = 1,
+    limit = 20,
+    status,
+    testType,
+    patientId,
+    patientName,
+    sampleId,
+    fromDate,
+    toDate,
+    isAbnormal,
+    isCritical,
+    isNew,
+    medTech,
+    pathologist,
+    sortBy = 'sampleDate',
+    sortOrder = 'desc'
+  } = req.query;
+
+  // Build query object
+  let query = { isDeleted: false };
+
+  // Role-based filtering
+  if (req.user.role === 'patient') {
+    // Patients can only see their own results
+    query.patient = req.user._id;
+  } else if (req.user.role === 'medtech') {
+    // MedTechs can see results they're assigned to or unassigned ones
+    if (!patientId) {
+      query.$or = [
+        { medTech: req.user._id },
+        { medTech: null }
+      ];
+    }
+  }
+  // Admin, receptionist, pathologist can see all results
+
+  // Apply filters
+  if (status) {
+    if (Array.isArray(status)) {
+      query.status = { $in: status };
+    } else {
+      query.status = status;
+    }
+  }
+
+  if (testType) {
+    query.testType = { $regex: testType, $options: 'i' };
+  }
+
+  if (patientId) {
+    query.patient = patientId;
+  }
+
+  if (sampleId) {
+    query.sampleId = { $regex: sampleId, $options: 'i' };
+  }
+
+  // Date range filtering
+  if (fromDate || toDate) {
+    query.sampleDate = {};
+    if (fromDate) {
+      query.sampleDate.$gte = new Date(fromDate);
+    }
+    if (toDate) {
+      const endDate = new Date(toDate);
+      endDate.setHours(23, 59, 59, 999);
+      query.sampleDate.$lte = endDate;
+    }
+  }
+
+  // Boolean filters
+  if (isAbnormal !== undefined) {
+    query.isAbnormal = isAbnormal === 'true';
+  }
+
+  if (isCritical !== undefined) {
+    query.isCritical = isCritical === 'true';
+  }
+
+  if (isNew !== undefined) {
+    query.isNew = isNew === 'true';
+  }
+
+  if (medTech) {
+    query.medTech = medTech;
+  }
+
+  if (pathologist) {
+    query.pathologist = pathologist;
+  }
+
+  // Patient name search (requires population)
+  let pipeline = [
+    { $match: query }
+  ];
+
+  // Add patient name search if needed
+  if (patientName) {
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'patient',
+          foreignField: '_id',
+          as: 'patientInfo'
+        }
+      },
+      {
+        $match: {
+          $or: [
+            { 'patientInfo.firstName': { $regex: patientName, $options: 'i' } },
+            { 'patientInfo.lastName': { $regex: patientName, $options: 'i' } },
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $concat: ['$patientInfo.firstName', ' ', '$patientInfo.lastName'] },
+                  regex: patientName,
+                  options: 'i'
+                }
+              }
+            }
+          ]
+        }
+      }
+    );
+  }
+
+  // Sort
+  const sortOptions = {};
+  sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+  pipeline.push({ $sort: sortOptions });
+
+  // Get total count
+  const totalPipeline = [...pipeline, { $count: 'total' }];
+  const totalResults = await TestResult.aggregate(totalPipeline);
+  const total = totalResults[0]?.total || 0;
+
+  // Add pagination
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+  pipeline.push(
+    { $skip: skip },
+    { $limit: parseInt(limit) }
+  );
+
+  // Execute aggregation
+  let testResults = await TestResult.aggregate(pipeline);
+
+  // If we didn't use patient name search, do regular population
+  if (!patientName) {
+    testResults = await TestResult.populate(testResults, [
+      {
+        path: 'patient',
+        select: 'firstName lastName email phone'
+      },
+      {
+        path: 'service',
+        select: 'serviceName category price'
+      },
+      {
+        path: 'medTech',
+        select: 'firstName lastName'
+      },
+      {
+        path: 'pathologist',
+        select: 'firstName lastName'
+      },
+      {
+        path: 'appointment',
+        select: 'appointmentId appointmentDate appointmentTime'
+      }
+    ]);
+  }
+
+  // Calculate pagination
+  const totalPages = Math.ceil(total / parseInt(limit));
+  const hasNextPage = parseInt(page) < totalPages;
+  const hasPrevPage = parseInt(page) > 1;
+
+  res.status(200).json({
+    success: true,
+    message: 'Test results retrieved successfully',
+    data: testResults,
+    pagination: {
+      currentPage: parseInt(page),
+      totalPages,
+      totalResults: total,
+      hasNextPage,
+      hasPrevPage,
+      limit: parseInt(limit)
+    }
+  });
+});
+
+// @desc    Get single test result by ID
+// @route   GET /api/test-results/:id
+// @access  Private
+const getTestResult = asyncHandler(async (req, res) => {
+  const testResult = await TestResult.findOne({
+    _id: req.params.id,
+    isDeleted: false
+  })
+    .populate('patient', 'firstName lastName email phone address dateOfBirth gender')
+    .populate('service', 'serviceName category price description')
+    .populate('medTech', 'firstName lastName email')
+    .populate('pathologist', 'firstName lastName email')
+    .populate('appointment', 'appointmentId appointmentDate appointmentTime')
+    .populate('createdBy', 'firstName lastName');
+
+  if (!testResult) {
+    return res.status(404).json({
+      success: false,
+      message: 'Test result not found'
+    });
+  }
+
+  // Permission check
+  if (req.user.role === 'patient' && testResult.patient._id.toString() !== req.user._id.toString()) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. You can only view your own test results.'
+    });
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'Test result retrieved successfully',
+    data: testResult
+  });
+});
+
+// @desc    Create new test result
+// @route   POST /api/test-results
+// @access  Private (MedTech, Pathologist, Admin)
+const createTestResult = asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: errors.array()
+    });
+  }
+
+  // Check permission
+  if (!['medtech', 'pathologist', 'admin'].includes(req.user.role)) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Only medical staff can create test results.'
+    });
+  }
+
+  const {
+    patientId,
+    appointmentId,
+    serviceId,
+    testType,
+    results,
+    status = 'pending',
+    sampleDate,
+    notes,
+    medTechNotes,
+    pathologistNotes
+  } = req.body;
+
+  // Validate patient exists
+  const patient = await User.findById(patientId);
+  if (!patient || patient.role !== 'patient') {
+    return res.status(404).json({
+      success: false,
+      message: 'Patient not found'
+    });
+  }
+
+  // Validate service exists
+  const service = await Service.findById(serviceId);
+  if (!service) {
+    return res.status(404).json({
+      success: false,
+      message: 'Service not found'
+    });
+  }
+
+  // Validate appointment if provided
+  let appointment = null;
+  if (appointmentId) {
+    appointment = await Appointment.findById(appointmentId);
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found'
+      });
+    }
+  }
+
+  // Get reference ranges for the test type
+  const referenceRanges = TestResult.getDefaultReferenceRanges(testType);
+
+  // Create test result
+  const testResult = new TestResult({
+    patient: patientId,
+    appointment: appointmentId,
+    service: serviceId,
+    testType,
+    results: new Map(Object.entries(results)),
+    referenceRanges: new Map(Object.entries(referenceRanges)),
+    status,
+    sampleDate: sampleDate ? new Date(sampleDate) : new Date(),
+    notes,
+    medTechNotes,
+    pathologistNotes,
+    createdBy: req.user._id,
+    medTech: req.user.role === 'medtech' ? req.user._id : null
+  });
+
+  await testResult.save();
+
+  // Populate the created result
+  await testResult.populate([
+    {
+      path: 'patient',
+      select: 'firstName lastName email phone'
+    },
+    {
+      path: 'service',
+      select: 'serviceName category price'
+    },
+    {
+      path: 'createdBy',
+      select: 'firstName lastName'
+    }
+  ]);
+
+  res.status(201).json({
+    success: true,
+    message: 'Test result created successfully',
+    data: testResult
+  });
+});
+
+// @desc    Update test result
+// @route   PUT /api/test-results/:id
+// @access  Private (MedTech, Pathologist, Admin)
+const updateTestResult = asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: errors.array()
+    });
+  }
+
+  // Check permission
+  if (!['medtech', 'pathologist', 'admin'].includes(req.user.role)) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Only medical staff can update test results.'
+    });
+  }
+
+  const testResult = await TestResult.findOne({
+    _id: req.params.id,
+    isDeleted: false
+  });
+
+  if (!testResult) {
+    return res.status(404).json({
+      success: false,
+      message: 'Test result not found'
+    });
+  }
+
+  const {
+    results,
+    status,
+    notes,
+    medTechNotes,
+    pathologistNotes,
+    qcPassed,
+    qcNotes,
+    medTech,
+    pathologist
+  } = req.body;
+
+  // Update fields
+  if (results) {
+    testResult.results = new Map(Object.entries(results));
+  }
+  if (status) testResult.status = status;
+  if (notes !== undefined) testResult.notes = notes;
+  if (medTechNotes !== undefined) testResult.medTechNotes = medTechNotes;
+  if (pathologistNotes !== undefined) testResult.pathologistNotes = pathologistNotes;
+  if (qcPassed !== undefined) testResult.qcPassed = qcPassed;
+  if (qcNotes !== undefined) testResult.qcNotes = qcNotes;
+  if (medTech) testResult.medTech = medTech;
+  if (pathologist) testResult.pathologist = pathologist;
+
+  testResult.lastModifiedBy = req.user._id;
+
+  await testResult.save();
+
+  // Populate the updated result
+  await testResult.populate([
+    {
+      path: 'patient',
+      select: 'firstName lastName email phone'
+    },
+    {
+      path: 'service',
+      select: 'serviceName category price'
+    },
+    {
+      path: 'medTech',
+      select: 'firstName lastName'
+    },
+    {
+      path: 'pathologist',
+      select: 'firstName lastName'
+    }
+  ]);
+
+  res.status(200).json({
+    success: true,
+    message: 'Test result updated successfully',
+    data: testResult
+  });
+});
+
+// @desc    Delete test result (soft delete)
+// @route   DELETE /api/test-results/:id
+// @access  Private (Admin only)
+const deleteTestResult = asyncHandler(async (req, res) => {
+  // Only admin can delete
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Only admin can delete test results.'
+    });
+  }
+
+  const testResult = await TestResult.findOne({
+    _id: req.params.id,
+    isDeleted: false
+  });
+
+  if (!testResult) {
+    return res.status(404).json({
+      success: false,
+      message: 'Test result not found'
+    });
+  }
+
+  // Soft delete
+  testResult.isDeleted = true;
+  testResult.lastModifiedBy = req.user._id;
+  await testResult.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Test result deleted successfully'
+  });
+});
+
+// @desc    Release test result to patient
+// @route   PUT /api/test-results/:id/release
+// @access  Private (Pathologist, Admin)
+const releaseTestResult = asyncHandler(async (req, res) => {
+  // Only pathologist or admin can release results
+  if (!['pathologist', 'admin'].includes(req.user.role)) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Only pathologists can release test results.'
+    });
+  }
+
+  const testResult = await TestResult.findOne({
+    _id: req.params.id,
+    isDeleted: false
+  });
+
+  if (!testResult) {
+    return res.status(404).json({
+      success: false,
+      message: 'Test result not found'
+    });
+  }
+
+  // Update status and dates
+  testResult.status = 'released';
+  testResult.releasedDate = new Date();
+  testResult.pathologist = req.user._id;
+  testResult.isNew = true; // Mark as new for patient
+  testResult.lastModifiedBy = req.user._id;
+
+  await testResult.save();
+
+  // Populate the updated result
+  await testResult.populate([
+    {
+      path: 'patient',
+      select: 'firstName lastName email phone'
+    },
+    {
+      path: 'service',
+      select: 'serviceName category price'
+    },
+    {
+      path: 'pathologist',
+      select: 'firstName lastName'
+    }
+  ]);
+
+  res.status(200).json({
+    success: true,
+    message: 'Test result released successfully',
+    data: testResult
+  });
+});
+
+// @desc    Mark test result as viewed by patient
+// @route   PUT /api/test-results/:id/mark-viewed
+// @access  Private (Patient only)
+const markAsViewed = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'patient') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied.'
+    });
+  }
+
+  const testResult = await TestResult.findOne({
+    _id: req.params.id,
+    patient: req.user._id,
+    isDeleted: false
+  });
+
+  if (!testResult) {
+    return res.status(404).json({
+      success: false,
+      message: 'Test result not found'
+    });
+  }
+
+  testResult.isNew = false;
+  await testResult.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Test result marked as viewed'
+  });
+});
+
+// @desc    Get test result statistics
+// @route   GET /api/test-results/stats
+// @access  Private (Staff only)
+const getTestResultStats = asyncHandler(async (req, res) => {
+  // Only staff can view stats
+  if (req.user.role === 'patient') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied.'
+    });
+  }
+
+  const { date, period = 'day' } = req.query;
+
+  let dateFilter = {};
+  if (date) {
+    const targetDate = new Date(date);
+    
+    switch (period) {
+      case 'day':
+        const startOfDay = new Date(targetDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(targetDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        
+        dateFilter = {
+          sampleDate: {
+            $gte: startOfDay,
+            $lte: endOfDay
+          }
+        };
+        break;
+        
+      case 'week':
+        const startOfWeek = new Date(targetDate);
+        startOfWeek.setDate(targetDate.getDate() - targetDate.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+        
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        endOfWeek.setHours(23, 59, 59, 999);
+        
+        dateFilter = {
+          sampleDate: {
+            $gte: startOfWeek,
+            $lte: endOfWeek
+          }
+        };
+        break;
+        
+      case 'month':
+        const startOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+        const endOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
+        endOfMonth.setHours(23, 59, 59, 999);
+        
+        dateFilter = {
+          sampleDate: {
+            $gte: startOfMonth,
+            $lte: endOfMonth
+          }
+        };
+        break;
+    }
+  }
+
+  const stats = await TestResult.aggregate([
+    {
+      $match: {
+        isDeleted: false,
+        ...dateFilter
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        totalResults: { $sum: 1 },
+        pendingResults: {
+          $sum: {
+            $cond: [{ $eq: ['$status', 'pending'] }, 1, 0]
+          }
+        },
+        inProgressResults: {
+          $sum: {
+            $cond: [{ $eq: ['$status', 'in-progress'] }, 1, 0]
+          }
+        },
+        completedResults: {
+          $sum: {
+            $cond: [{ $eq: ['$status', 'completed'] }, 1, 0]
+          }
+        },
+        releasedResults: {
+          $sum: {
+            $cond: [{ $eq: ['$status', 'released'] }, 1, 0]
+          }
+        },
+        abnormalResults: {
+          $sum: {
+            $cond: ['$isAbnormal', 1, 0]
+          }
+        },
+        criticalResults: {
+          $sum: {
+            $cond: ['$isCritical', 1, 0]
+          }
+        },
+        newResults: {
+          $sum: {
+            $cond: ['$isNew', 1, 0]
+          }
+        }
+      }
+    }
+  ]);
+
+  const result = stats[0] || {
+    totalResults: 0,
+    pendingResults: 0,
+    inProgressResults: 0,
+    completedResults: 0,
+    releasedResults: 0,
+    abnormalResults: 0,
+    criticalResults: 0,
+    newResults: 0
+  };
+
+  res.status(200).json({
+    success: true,
+    message: 'Test result statistics retrieved successfully',
+    data: result
+  });
+});
+
+module.exports = {
+  getTestResults,
+  getTestResult,
+  createTestResult,
+  updateTestResult,
+  deleteTestResult,
+  releaseTestResult,
+  markAsViewed,
+  getTestResultStats
+};
