@@ -1034,6 +1034,234 @@ export const testResultsAPI = {
   }
 };
 
+// Mobile Lab API functions
+export const mobileLabAPI = {
+  // Get all mobile lab schedules with filtering
+  getMobileLabSchedules: async (params = {}) => {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      // Add query parameters if they exist
+      Object.keys(params).forEach(key => {
+        if (params[key] !== null && params[key] !== undefined && params[key] !== '') {
+          queryParams.append(key, params[key]);
+        }
+      });
+      
+      const queryString = queryParams.toString();
+      const url = `/mobile-lab${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await api.get(url);
+      return {
+        success: true,
+        data: response.data.data,
+        pagination: response.data.pagination,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get mobile lab schedules error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch mobile lab schedules',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Get current week's mobile lab schedule (public)
+  getCurrentWeekSchedule: async () => {
+    try {
+      const response = await api.get('/mobile-lab/current-week');
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get current week schedule error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch current week schedule',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Get currently active mobile lab location (public)
+  getCurrentActiveLocation: async () => {
+    try {
+      const response = await api.get('/mobile-lab/current-active');
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get current active location error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch current active location',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Get next scheduled mobile lab location (public)
+  getNextLocation: async () => {
+    try {
+      const response = await api.get('/mobile-lab/next-location');
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get next location error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch next location',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Get mobile lab statistics (admin only)
+  getMobileLabStats: async () => {
+    try {
+      const response = await api.get('/mobile-lab/stats');
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get mobile lab stats error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch mobile lab statistics',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Get single mobile lab schedule by ID
+  getMobileLabSchedule: async (scheduleId) => {
+    try {
+      const response = await api.get(`/mobile-lab/${scheduleId}`);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get mobile lab schedule error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch mobile lab schedule',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Create new mobile lab schedule (admin only)
+  createMobileLabSchedule: async (scheduleData) => {
+    try {
+      const response = await api.post('/mobile-lab', scheduleData);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Create mobile lab schedule error:', error);
+      console.error('Error response data:', error.response?.data);
+      console.error('Full error details:', JSON.stringify(error.response?.data, null, 2));
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to create mobile lab schedule',
+        error: error.response?.data?.error,
+        errors: error.response?.data?.errors
+      };
+    }
+  },
+
+  // Update mobile lab schedule (admin only)
+  updateMobileLabSchedule: async (scheduleId, updateData) => {
+    try {
+      const response = await api.put(`/mobile-lab/${scheduleId}`, updateData);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Update mobile lab schedule error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to update mobile lab schedule',
+        error: error.response?.data?.error,
+        errors: error.response?.data?.errors
+      };
+    }
+  },
+
+  // Delete mobile lab schedule (admin only) - soft delete
+  deleteMobileLabSchedule: async (scheduleId) => {
+    try {
+      const response = await api.delete(`/mobile-lab/${scheduleId}`);
+      return {
+        success: true,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Delete mobile lab schedule error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to delete mobile lab schedule',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Update mobile lab schedule status (admin/staff only)
+  updateScheduleStatus: async (scheduleId, status) => {
+    try {
+      const response = await api.put(`/mobile-lab/${scheduleId}/status`, { status });
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Update schedule status error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to update schedule status',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Update booking count for mobile lab schedule
+  updateBookingCount: async (scheduleId, increment = 1) => {
+    try {
+      const response = await api.put(`/mobile-lab/${scheduleId}/booking-count`, { increment });
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Update booking count error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to update booking count',
+        error: error.response?.data?.error
+      };
+    }
+  }
+};
+
 export async function updateUserProfile(data, token) {
   const res = await fetch('/api/users/me', {
     method: 'PUT',

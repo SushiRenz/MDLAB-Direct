@@ -1933,3 +1933,105 @@
     flex: none;
   }
 }
+
+/* Mobile Lab States */
+.loading-state,
+.error-state,
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  border-radius: 12px;
+  margin: 20px 0;
+}
+
+.loading-state {
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+  color: #64748b;
+}
+
+.error-state {
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.empty-state {
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+  color: #64748b;
+}
+
+.empty-state p {
+  margin: 8px 0;
+  font-size: 1rem;
+}
+
+.retry-btn {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 15px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.retry-btn:hover {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+/* Schedule card enhancements */
+.schedule-card {
+  position: relative;
+}
+
+.schedule-address {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 8px 0 4px;
+}
+
+.schedule-status {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.schedule-status.active {
+  background: #10b981;
+  color: white;
+}
+
+.schedule-status.scheduled {
+  background: #6b7280;
+  color: white;
+}
+
+.schedule-status.next-location {
+  background: #3b82f6;
+  color: white;
+}
+
+.schedule-status.on-call {
+  background: #f59e0b;
+  color: white;
+}
+
+.schedule-status.cancelled {
+  background: #ef4444;
+  color: white;
+}
+
+.schedule-status.completed {
+  background: #10b981;
+  color: white;
+}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../design/Dashboard.css';
-import { userAPI, financeAPI, logsAPI, servicesAPI } from '../services/api';
+import { userAPI, financeAPI, logsAPI, servicesAPI, mobileLabAPI } from '../services/api';
 
 function Dashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -319,6 +319,71 @@ function Dashboard({ currentUser, onLogout }) {
       setDashboardLoading(false);
     }
   };
+
+  // Mobile Lab Management State
+  const [mobileLabSchedules, setMobileLabSchedules] = useState([]);
+  const [mobileLabStats, setMobileLabStats] = useState(null);
+  const [mobileLabLoading, setMobileLabLoading] = useState(false);
+  const [mobileLabError, setMobileLabError] = useState('');
+  const [showMobileLabModal, setShowMobileLabModal] = useState(false);
+  const [editingMobileLabSchedule, setEditingMobileLabSchedule] = useState(null);
+  const [mobileLabFilters, setMobileLabFilters] = useState({
+    dayOfWeek: '',
+    status: '',
+    municipality: '',
+    barangay: '',
+    isActive: '',
+    search: ''
+  });
+  const [mobileLabPagination, setMobileLabPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalSchedules: 0,
+    limit: 20
+  });
+
+  // Mobile Lab Form State
+  const [mobileLabFormData, setMobileLabFormData] = useState({
+    dayOfWeek: 0,
+    location: {
+      name: '',
+      address: '',
+      barangay: '',
+      municipality: ''
+    },
+    timeSlot: {
+      startTime: '',
+      endTime: '',
+      timeDisplay: ''
+    },
+    status: 'Scheduled',
+    availableServices: [],
+    capacity: {
+      maxPatients: 50,
+      currentBookings: 0
+    },
+    notes: '',
+    contactInfo: {
+      phone: '',
+      email: '',
+      contactPerson: ''
+    },
+    assignedTeam: {
+      medTech: '',
+      driver: '',
+      coordinator: ''
+    },
+    equipment: [],
+    recurring: {
+      isRecurring: true,
+      frequency: 'Weekly',
+      startDate: '',
+      endDate: ''
+    },
+    weatherDependent: false,
+    priority: 'Medium',
+    isActive: true
+  });
 
   // Load dashboard data on component mount
   useEffect(() => {
@@ -745,6 +810,10 @@ function Dashboard({ currentUser, onLogout }) {
       fetchServices();
       fetchServiceStats();
     }
+    if (activeSection === 'mobile-lab') {
+      fetchMobileLabSchedules();
+      fetchMobileLabStats();
+    }
   }, [activeSection, searchTerm, filterStatus]);
 
   // Logs data fetching functions
@@ -1097,6 +1166,272 @@ function Dashboard({ currentUser, onLogout }) {
       isActive: true,
       isPopular: false,
       homeVisitAvailable: false
+    });
+  };
+
+  // Mobile Lab Management Functions
+  const fetchMobileLabSchedules = async (page = 1) => {
+    setMobileLabLoading(true);
+    setMobileLabError('');
+    try {
+      const params = {
+        page,
+        limit: mobileLabPagination.limit,
+        ...mobileLabFilters
+      };
+
+      // Remove empty filters
+      Object.keys(params).forEach(key => {
+        if (params[key] === '') {
+          delete params[key];
+        }
+      });
+
+      const data = await mobileLabAPI.getMobileLabSchedules(params);
+      if (data.success) {
+        setMobileLabSchedules(data.data);
+        setMobileLabPagination({
+          currentPage: data.pagination?.currentPage || 1,
+          totalPages: data.pagination?.totalPages || 1,
+          totalSchedules: data.pagination?.totalItems || 0,
+          limit: data.pagination?.limit || 20
+        });
+      } else {
+        setMobileLabError(data.message || 'Failed to fetch mobile lab schedules');
+      }
+    } catch (err) {
+      setMobileLabError(err.message || 'Failed to fetch mobile lab schedules');
+      console.error('Mobile lab fetch error:', err);
+    } finally {
+      setMobileLabLoading(false);
+    }
+  };
+
+  const fetchMobileLabStats = async () => {
+    try {
+      const data = await mobileLabAPI.getMobileLabStats();
+      if (data.success) {
+        setMobileLabStats(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch mobile lab stats:', err);
+    }
+  };
+
+  const handleCreateMobileLabSchedule = async (scheduleData) => {
+    try {
+      // Clean up the data before sending
+      const cleanedData = {
+        ...scheduleData,
+        // Clean up timeSlot - remove empty timeDisplay to let backend auto-generate it
+        timeSlot: {
+          startTime: scheduleData.timeSlot.startTime,
+          endTime: scheduleData.timeSlot.endTime,
+          // Only include timeDisplay if it has a value
+          ...(scheduleData.timeSlot.timeDisplay && scheduleData.timeSlot.timeDisplay.trim() !== '' && {
+            timeDisplay: scheduleData.timeSlot.timeDisplay
+          })
+        },
+        // Remove dayName field to let backend auto-generate it from dayOfWeek
+        // Don't send dayName at all, let the pre-save hook handle it
+        ...(scheduleData.dayName && { dayName: undefined }),
+        // Remove empty strings for optional ObjectId fields
+        assignedTeam: scheduleData.assignedTeam && Object.keys(scheduleData.assignedTeam).length > 0 ? {
+          medTech: scheduleData.assignedTeam.medTech || undefined,
+          driver: scheduleData.assignedTeam.driver || undefined,
+          coordinator: scheduleData.assignedTeam.coordinator || undefined
+        } : undefined,
+        // Remove empty strings for optional date fields
+        recurring: {
+          isRecurring: scheduleData.recurring?.isRecurring !== false,
+          frequency: scheduleData.recurring?.frequency || 'Weekly',
+          startDate: scheduleData.recurring?.startDate || undefined,
+          endDate: scheduleData.recurring?.endDate || undefined
+        },
+        // Remove empty strings for optional contact fields
+        contactInfo: {
+          phone: scheduleData.contactInfo?.phone || undefined,
+          email: scheduleData.contactInfo?.email || undefined,
+          contactPerson: scheduleData.contactInfo?.contactPerson || undefined
+        }
+      };
+
+      console.log('Sending mobile lab schedule data:', JSON.stringify(cleanedData, null, 2));
+      const data = await mobileLabAPI.createMobileLabSchedule(cleanedData);
+      if (data.success) {
+        setShowMobileLabModal(false);
+        setEditingMobileLabSchedule(null);
+        resetMobileLabForm();
+        fetchMobileLabSchedules();
+        fetchMobileLabStats();
+        alert('Mobile lab schedule created successfully!');
+      } else {
+        console.error('API Error Response:', data);
+        console.error('Validation errors:', data.errors);
+        setMobileLabError(data.message || 'Failed to create mobile lab schedule');
+        if (data.errors && Array.isArray(data.errors)) {
+          console.error('Detailed validation errors:', data.errors.map(err => `${err.path}: ${err.msg}`));
+        }
+      }
+    } catch (err) {
+      console.error('Request Error:', err);
+      setMobileLabError(err.message || 'Failed to create mobile lab schedule');
+    }
+  };
+
+  const handleUpdateMobileLabSchedule = async (scheduleId, scheduleData) => {
+    try {
+      const data = await mobileLabAPI.updateMobileLabSchedule(scheduleId, scheduleData);
+      if (data.success) {
+        setShowMobileLabModal(false);
+        setEditingMobileLabSchedule(null);
+        resetMobileLabForm();
+        fetchMobileLabSchedules();
+        fetchMobileLabStats();
+        alert('Mobile lab schedule updated successfully!');
+      } else {
+        setMobileLabError(data.message || 'Failed to update mobile lab schedule');
+      }
+    } catch (err) {
+      setMobileLabError(err.message || 'Failed to update mobile lab schedule');
+    }
+  };
+
+  const handleDeleteMobileLabSchedule = async (scheduleId) => {
+    if (window.confirm('Are you sure you want to delete this mobile lab schedule?')) {
+      try {
+        const data = await mobileLabAPI.deleteMobileLabSchedule(scheduleId);
+        if (data.success) {
+          fetchMobileLabSchedules();
+          fetchMobileLabStats();
+          alert('Mobile lab schedule deleted successfully');
+        } else {
+          setMobileLabError(data.message || 'Failed to delete mobile lab schedule');
+        }
+      } catch (err) {
+        setMobileLabError(err.message || 'Failed to delete mobile lab schedule');
+      }
+    }
+  };
+
+  const handleUpdateScheduleStatus = async (scheduleId, status) => {
+    try {
+      const data = await mobileLabAPI.updateScheduleStatus(scheduleId, status);
+      if (data.success) {
+        fetchMobileLabSchedules();
+        fetchMobileLabStats();
+        alert('Schedule status updated successfully');
+      } else {
+        setMobileLabError(data.message || 'Failed to update schedule status');
+      }
+    } catch (err) {
+      setMobileLabError(err.message || 'Failed to update schedule status');
+    }
+  };
+
+  const openMobileLabModal = (schedule = null) => {
+    setEditingMobileLabSchedule(schedule);
+    setShowMobileLabModal(true);
+    
+    // Pre-populate form if editing
+    if (schedule) {
+      setMobileLabFormData({
+        dayOfWeek: schedule.dayOfWeek || 0,
+        location: {
+          name: schedule.location?.name || '',
+          address: schedule.location?.address || '',
+          barangay: schedule.location?.barangay || '',
+          municipality: schedule.location?.municipality || '',
+          coordinates: {
+            lat: schedule.location?.coordinates?.lat || '',
+            lng: schedule.location?.coordinates?.lng || ''
+          }
+        },
+        timeSlot: {
+          startTime: schedule.timeSlot?.startTime || '',
+          endTime: schedule.timeSlot?.endTime || '',
+          timeDisplay: schedule.timeSlot?.timeDisplay || ''
+        },
+        status: schedule.status || 'Scheduled',
+        availableServices: schedule.availableServices || [],
+        capacity: {
+          maxPatients: schedule.capacity?.maxPatients || 50,
+          currentBookings: schedule.capacity?.currentBookings || 0
+        },
+        notes: schedule.notes || '',
+        contactInfo: {
+          phone: schedule.contactInfo?.phone || '',
+          email: schedule.contactInfo?.email || '',
+          contactPerson: schedule.contactInfo?.contactPerson || ''
+        },
+        assignedTeam: {
+          medTech: schedule.assignedTeam?.medTech || '',
+          driver: schedule.assignedTeam?.driver || '',
+          coordinator: schedule.assignedTeam?.coordinator || ''
+        },
+        equipment: schedule.equipment || [],
+        recurring: {
+          isRecurring: schedule.recurring?.isRecurring !== false,
+          frequency: schedule.recurring?.frequency || 'Weekly',
+          startDate: schedule.recurring?.startDate || '',
+          endDate: schedule.recurring?.endDate || ''
+        },
+        weatherDependent: schedule.weatherDependent || false,
+        priority: schedule.priority || 'Medium',
+        isActive: schedule.isActive !== false
+      });
+    } else {
+      resetMobileLabForm();
+    }
+  };
+
+  const closeMobileLabModal = () => {
+    setEditingMobileLabSchedule(null);
+    setShowMobileLabModal(false);
+    resetMobileLabForm();
+  };
+
+  const resetMobileLabForm = () => {
+    setMobileLabFormData({
+      dayOfWeek: 0,
+      location: {
+        name: '',
+        address: '',
+        barangay: '',
+        municipality: 'Nueva Vizcaya'
+      },
+      timeSlot: {
+        startTime: '',
+        endTime: '',
+        timeDisplay: ''
+      },
+      status: 'Scheduled',
+      availableServices: [],
+      capacity: {
+        maxPatients: 50,
+        currentBookings: 0
+      },
+      notes: '',
+      contactInfo: {
+        phone: '',
+        email: '',
+        contactPerson: ''
+      },
+      assignedTeam: {
+        medTech: '',
+        driver: '',
+        coordinator: ''
+      },
+      equipment: [],
+      recurring: {
+        isRecurring: true,
+        frequency: 'Weekly',
+        startDate: '',
+        endDate: ''
+      },
+      weatherDependent: false,
+      priority: 'Medium',
+      isActive: true
     });
   };
 
@@ -2216,9 +2551,504 @@ function Dashboard({ currentUser, onLogout }) {
       case 'reports': return renderFinancialReports();
       case 'logs': return renderSystemLogs();
       case 'services': return renderServices();
+      case 'mobile-lab': return renderMobileLabManagement();
       default: return renderDashboardHome();
     }
   };
+
+  // Mobile Lab Management Function
+  const renderMobileLabManagement = () => (
+    <div className="management-container mobile-lab-management">
+      <div className="management-header">
+        <div className="management-title">
+          <h2>Mobile Lab Schedules</h2>
+          <p>Manage monthly mobile laboratory visits to Nueva Vizcaya with special discounted rates</p>
+        </div>
+        <button className="add-btn" onClick={() => openMobileLabModal()}>
+          + Add New Schedule
+        </button>
+      </div>
+
+      <div className="management-stats mobile-lab-stats">
+        <div className="stat-card mobile-lab-stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Total Schedules</div>
+            <div className="stat-value">{mobileLabSchedules.length}</div>
+          </div>
+        </div>
+        <div className="stat-card mobile-lab-stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Active Schedules</div>
+            <div className="stat-value">{mobileLabSchedules.filter(s => s.isActive).length}</div>
+          </div>
+        </div>
+        <div className="stat-card mobile-lab-stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Locations</div>
+            <div className="stat-value">{new Set(mobileLabSchedules.map(s => s.location?.barangay)).size}</div>
+          </div>
+        </div>
+        <div className="stat-card mobile-lab-stat-card">
+          <div className="stat-info">
+            <div className="stat-label">This Month</div>
+            <div className="stat-value">{mobileLabSchedules.filter(s => s.status === 'Active' || s.status === 'Scheduled').length}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="management-filters">
+        <div className="filter-group">
+          <select 
+            value={mobileLabFilters.dayOfWeek} 
+            onChange={(e) => setMobileLabFilters({...mobileLabFilters, dayOfWeek: e.target.value})}
+          >
+            <option value="">All Days</option>
+            <option value="0">Sunday</option>
+            <option value="1">Monday</option>
+            <option value="2">Tuesday</option>
+            <option value="3">Wednesday</option>
+            <option value="4">Thursday</option>
+            <option value="5">Friday</option>
+            <option value="6">Saturday</option>
+          </select>
+        </div>
+        <div className="filter-group">
+          <select 
+            value={mobileLabFilters.status} 
+            onChange={(e) => setMobileLabFilters({...mobileLabFilters, status: e.target.value})}
+          >
+            <option value="">All Status</option>
+            <option value="Active">Active</option>
+            <option value="Scheduled">Scheduled</option>
+            <option value="Next Location">Next Location</option>
+            <option value="On Call">On Call</option>
+            <option value="Cancelled">Cancelled</option>
+            <option value="Completed">Completed</option>
+          </select>
+        </div>
+        <div className="filter-group">
+          <input
+            type="text"
+            placeholder="Search municipality..."
+            value={mobileLabFilters.municipality}
+            onChange={(e) => setMobileLabFilters({...mobileLabFilters, municipality: e.target.value})}
+          />
+        </div>
+        <div className="filter-group">
+          <input
+            type="text"
+            placeholder="Search barangay..."
+            value={mobileLabFilters.barangay}
+            onChange={(e) => setMobileLabFilters({...mobileLabFilters, barangay: e.target.value})}
+          />
+        </div>
+        <button className="filter-btn" onClick={() => fetchMobileLabSchedules(1)}>
+          Apply Filters
+        </button>
+        <button 
+          className="clear-filters-btn" 
+          onClick={() => {
+            setMobileLabFilters({
+              dayOfWeek: '',
+              status: '',
+              municipality: '',
+              barangay: '',
+              isActive: '',
+              search: ''
+            });
+            fetchMobileLabSchedules(1);
+          }}
+        >
+          Clear
+        </button>
+      </div>
+
+      <div className="table-container">
+        {mobileLabError && (
+          <div className="error-message">{mobileLabError}</div>
+        )}
+        
+        {mobileLabLoading ? (
+          <div className="loading-state">Loading mobile lab schedules...</div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Location</th>
+                <th>Time</th>
+                <th>Status</th>
+                <th>Capacity</th>
+                <th>Team</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mobileLabSchedules.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="no-data">
+                    📋 No mobile lab schedules found
+                    <br />
+                    <small>Create your first schedule to get started</small>
+                  </td>
+                </tr>
+              ) : (
+                mobileLabSchedules.map((schedule) => (
+                  <tr key={schedule._id}>
+                    <td>
+                      <strong>
+                        {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][schedule.dayOfWeek]}
+                      </strong>
+                    </td>
+                    <td>
+                      <div className="location-details">
+                        <div className="location-name">{schedule.location?.name}</div>
+                        <div className="location-address">
+                          {schedule.location?.barangay}
+                          {schedule.location?.municipality && `, ${schedule.location?.municipality}`}
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <strong>
+                        {schedule.timeSlot?.timeDisplay || 
+                         `${schedule.timeSlot?.startTime} - ${schedule.timeSlot?.endTime}`}
+                      </strong>
+                    </td>
+                    <td>
+                      <select 
+                        value={schedule.status} 
+                        onChange={(e) => handleUpdateScheduleStatus(schedule._id, e.target.value)}
+                        className={`status-select status-${schedule.status?.toLowerCase().replace(' ', '-')}`}
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Scheduled">Scheduled</option>
+                        <option value="Next Location">Next Location</option>
+                        <option value="On Call">On Call</option>
+                        <option value="Cancelled">Cancelled</option>
+                        <option value="Completed">Completed</option>
+                      </select>
+                    </td>
+                    <td>
+                      <div className="capacity-display">
+                        <div className="capacity-numbers">
+                          {schedule.capacity?.currentBookings || 0} / {schedule.capacity?.maxPatients || 0}
+                        </div>
+                        <div className="capacity-bar">
+                          <div 
+                            className="capacity-fill" 
+                            style={{ 
+                              width: `${schedule.capacity?.maxPatients > 0 
+                                ? (schedule.capacity?.currentBookings || 0) / schedule.capacity?.maxPatients * 100
+                                : 0}%` 
+                            }}
+                          />
+                        </div>
+                        <div className="capacity-percentage">
+                          {schedule.capacity?.maxPatients > 0 
+                            ? `${Math.round((schedule.capacity?.currentBookings || 0) / schedule.capacity?.maxPatients * 100)}% filled`
+                            : '0% filled'
+                          }
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="team-assignment">
+                        {schedule.assignedTeam?.medTech && (
+                          <div className="team-member">
+                            <span className="team-member-role">MedTech:</span>
+                            {schedule.assignedTeam.medTech}
+                          </div>
+                        )}
+                        {schedule.assignedTeam?.driver && (
+                          <div className="team-member">
+                            <span className="team-member-role">Driver:</span>
+                            {schedule.assignedTeam.driver}
+                          </div>
+                        )}
+                        {!schedule.assignedTeam?.medTech && !schedule.assignedTeam?.driver && (
+                          <div className="team-unassigned">Not assigned</div>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="table-actions">
+                        <button 
+                          className="edit-btn"
+                          onClick={() => openMobileLabModal(schedule)}
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          className="delete-btn"
+                          onClick={() => handleDeleteMobileLabSchedule(schedule._id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
+
+        {/* Pagination */}
+        {mobileLabPagination.totalPages > 1 && (
+          <div className="pagination">
+            <button 
+              onClick={() => fetchMobileLabSchedules(mobileLabPagination.currentPage - 1)}
+              disabled={mobileLabPagination.currentPage === 1}
+            >
+              ← Previous
+            </button>
+            <span>
+              Page {mobileLabPagination.currentPage} of {mobileLabPagination.totalPages}
+            </span>
+            <button 
+              onClick={() => fetchMobileLabSchedules(mobileLabPagination.currentPage + 1)}
+              disabled={mobileLabPagination.currentPage === mobileLabPagination.totalPages}
+            >
+              Next →
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Mobile Lab Modal */}
+      {showMobileLabModal && (
+        <div className="modal-overlay" onClick={closeMobileLabModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>
+                {editingMobileLabSchedule ? 'Edit Mobile Lab Schedule' : 'Add New Mobile Lab Schedule'}
+              </h3>
+              <button className="modal-close" onClick={closeMobileLabModal}>×</button>
+            </div>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (editingMobileLabSchedule) {
+                handleUpdateMobileLabSchedule(editingMobileLabSchedule._id, mobileLabFormData);
+              } else {
+                handleCreateMobileLabSchedule(mobileLabFormData);
+              }
+            }}>
+              <div className="modal-body">
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Day of Week</label>
+                    <select 
+                      value={mobileLabFormData.dayOfWeek}
+                      onChange={(e) => setMobileLabFormData({
+                        ...mobileLabFormData, 
+                        dayOfWeek: parseInt(e.target.value)
+                      })}
+                      required
+                    >
+                      <option value={0}>Sunday</option>
+                      <option value={1}>Monday</option>
+                      <option value={2}>Tuesday</option>
+                      <option value={3}>Wednesday</option>
+                      <option value={4}>Thursday</option>
+                      <option value={5}>Friday</option>
+                      <option value={6}>Saturday</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Location Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., Bayombong Community Center"
+                      value={mobileLabFormData.location.name}
+                      onChange={(e) => setMobileLabFormData({
+                        ...mobileLabFormData,
+                        location: { ...mobileLabFormData.location, name: e.target.value }
+                      })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Address</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., National Highway, Bayombong"
+                      value={mobileLabFormData.location.address}
+                      onChange={(e) => setMobileLabFormData({
+                        ...mobileLabFormData,
+                        location: { ...mobileLabFormData.location, address: e.target.value }
+                      })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Barangay</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., Poblacion"
+                      value={mobileLabFormData.location.barangay}
+                      onChange={(e) => setMobileLabFormData({
+                        ...mobileLabFormData,
+                        location: { ...mobileLabFormData.location, barangay: e.target.value }
+                      })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Municipality</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., Bayombong (Nueva Vizcaya only)"
+                      value={mobileLabFormData.location.municipality}
+                      onChange={(e) => setMobileLabFormData({
+                        ...mobileLabFormData,
+                        location: { ...mobileLabFormData.location, municipality: e.target.value }
+                      })}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Start Time</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., 8:00 AM, 8 AM, 8:30 in the morning"
+                      value={mobileLabFormData.timeSlot.startTime}
+                      onChange={(e) => setMobileLabFormData({
+                        ...mobileLabFormData,
+                        timeSlot: { ...mobileLabFormData.timeSlot, startTime: e.target.value }
+                      })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>End Time</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., 12:00 PM, 12 PM, 12 noon"
+                      value={mobileLabFormData.timeSlot.endTime}
+                      onChange={(e) => setMobileLabFormData({
+                        ...mobileLabFormData,
+                        timeSlot: { ...mobileLabFormData.timeSlot, endTime: e.target.value }
+                      })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Max Patients</label>
+                    <input
+                      type="number"
+                      placeholder="e.g., 30 (monthly visit capacity)"
+                      value={mobileLabFormData.capacity.maxPatients}
+                      onChange={(e) => setMobileLabFormData({
+                        ...mobileLabFormData,
+                        capacity: { ...mobileLabFormData.capacity, maxPatients: parseInt(e.target.value) }
+                      })}
+                      min="1"
+                      max="100"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group full-width">
+                    <label>Notes</label>
+                    <textarea
+                      placeholder="Special instructions, discounted packages available, or important reminders for this monthly visit..."
+                      value={mobileLabFormData.notes}
+                      onChange={(e) => setMobileLabFormData({
+                        ...mobileLabFormData,
+                        notes: e.target.value
+                      })}
+                      rows="3"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Contact Phone</label>
+                    <input
+                      type="tel"
+                      placeholder="e.g., +63 912 345 6789"
+                      value={mobileLabFormData.contactInfo.phone}
+                      onChange={(e) => setMobileLabFormData({
+                        ...mobileLabFormData,
+                        contactInfo: { ...mobileLabFormData.contactInfo, phone: e.target.value }
+                      })}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Contact Person</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., Juan Dela Cruz"
+                      value={mobileLabFormData.contactInfo.contactPerson}
+                      onChange={(e) => setMobileLabFormData({
+                        ...mobileLabFormData,
+                        contactInfo: { ...mobileLabFormData.contactInfo, contactPerson: e.target.value }
+                      })}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-checkboxes">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={mobileLabFormData.isActive}
+                      onChange={(e) => setMobileLabFormData({
+                        ...mobileLabFormData,
+                        isActive: e.target.checked
+                      })}
+                    />
+                    <span>Active Schedule</span>
+                  </label>
+
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={mobileLabFormData.weatherDependent}
+                      onChange={(e) => setMobileLabFormData({
+                        ...mobileLabFormData,
+                        weatherDependent: e.target.checked
+                      })}
+                    />
+                    <span>Weather Dependent</span>
+                  </label>
+
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={mobileLabFormData.recurring.isRecurring}
+                      onChange={(e) => setMobileLabFormData({
+                        ...mobileLabFormData,
+                        recurring: { ...mobileLabFormData.recurring, isRecurring: e.target.checked }
+                      })}
+                    />
+                    <span>Monthly Recurring</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button type="button" className="btn-cancel" onClick={closeMobileLabModal}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-save" disabled={mobileLabLoading}>
+                  {mobileLabLoading ? 'Saving...' : (editingMobileLabSchedule ? 'Update Schedule' : 'Create Schedule')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   const renderDashboardHome = () => {
     if (dashboardLoading) {
@@ -7960,6 +8790,13 @@ function Dashboard({ currentUser, onLogout }) {
                 </div>
               </div>
             )}
+          </div>
+
+          <div 
+            className={`dashboard-nav-item ${activeSection === 'mobile-lab' ? 'active' : ''}`}
+            onClick={() => handleSectionClick('mobile-lab')}
+          >
+            <span className="dashboard-nav-text">Mobile Lab</span>
           </div>
 
           <div className="dashboard-dropdown">

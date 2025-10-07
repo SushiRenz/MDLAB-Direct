@@ -14,6 +14,7 @@ const financeRoutes = require('./routes/finance');
 const logsRoutes = require('./routes/logs');
 const servicesRoutes = require('./routes/services');
 const appointmentRoutes = require('./routes/appointments');
+const mobileLabRoutes = require('./routes/mobileLab');
 // const testResultRoutes = require('./routes/testResults'); // Temporarily disabled
 
 // Import middleware
@@ -37,6 +38,8 @@ app.use(cors({
   origin: [
     'http://localhost:5173',
     'http://localhost:5174',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174',
     /^http:\/\/192\.168\.\d+\.\d+:5173$/, // Allow any 192.168.x.x IP on port 5173
     /^http:\/\/192\.168\.\d+\.\d+:5174$/, // Allow any 192.168.x.x IP on port 5174
     /^http:\/\/10\.\d+\.\d+\.\d+:5173$/,   // Allow any 10.x.x.x IP on port 5173
@@ -132,6 +135,7 @@ app.use('/api/finance', financeRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/services', servicesRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/mobile-lab', mobileLabRoutes);
 // app.use('/api/test-results', testResultRoutes); // Temporarily disabled
 
 // 404 handler

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import BookAppointmentModal from './BookAppointmentModal';
 import PatientProfile from './PatientProfile'; 
 import MobileLabScheduleModal from './MobileLabScheduleModal';
-import { appointmentAPI, servicesAPI, testResultsAPI } from '../services/api';
+import { appointmentAPI, servicesAPI, testResultsAPI, mobileLabAPI } from '../services/api';
 import '../design/PatientDashboard.css';
 import '../design/BookAppointmentModal.css';
 
@@ -27,6 +27,13 @@ function PatientDashboard(props) {
   // Test Results state - moved to component level
   const [testResults, setTestResults] = useState([]);
   const [filteredResults, setFilteredResults] = useState([]);
+
+  // Mobile Lab state
+  const [mobileLabSchedules, setMobileLabSchedules] = useState([]);
+  const [currentActiveLocation, setCurrentActiveLocation] = useState(null);
+  const [nextLocation, setNextLocation] = useState(null);
+  const [mobileLabLoading, setMobileLabLoading] = useState(false);
+  const [mobileLabError, setMobileLabError] = useState('');
 
   // Separate appointments into upcoming and past
   const today = new Date();
@@ -223,6 +230,52 @@ function PatientDashboard(props) {
     }
   };
 
+  // Fetch mobile lab schedules (public API)
+  const fetchMobileLabSchedules = async () => {
+    setMobileLabLoading(true);
+    setMobileLabError('');
+    try {
+      const response = await mobileLabAPI.getCurrentWeekSchedule();
+      if (response.success) {
+        setMobileLabSchedules(response.data || []);
+      } else {
+        throw new Error(response.message || 'Failed to fetch mobile lab schedules');
+      }
+    } catch (error) {
+      console.error('Error fetching mobile lab schedules:', error);
+      setMobileLabError(error.message || 'Failed to load mobile lab schedules');
+      setMobileLabSchedules([]);
+    } finally {
+      setMobileLabLoading(false);
+    }
+  };
+
+  // Fetch current active location
+  const fetchCurrentActiveLocation = async () => {
+    try {
+      const response = await mobileLabAPI.getCurrentActiveLocation();
+      if (response.success) {
+        setCurrentActiveLocation(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching current active location:', error);
+      setCurrentActiveLocation(null);
+    }
+  };
+
+  // Fetch next location
+  const fetchNextLocation = async () => {
+    try {
+      const response = await mobileLabAPI.getNextLocation();
+      if (response.success) {
+        setNextLocation(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching next location:', error);
+      setNextLocation(null);
+    }
+  };
+
   // Load data on component mount and when user changes
   useEffect(() => {
     console.log('🔍 useEffect triggered, currentUser:', currentUser);
@@ -233,10 +286,16 @@ function PatientDashboard(props) {
       console.log('🔄 Loading services and appointments for user:', currentUser._id);
       fetchAppointments();
       fetchServices();
+      fetchMobileLabSchedules();
+      fetchCurrentActiveLocation();
+      fetchNextLocation();
     } else if (currentUser && currentUser.id) {
       console.log('🔄 Loading services and appointments for user (using .id):', currentUser.id);
       fetchAppointments();
       fetchServices();
+      fetchMobileLabSchedules();
+      fetchCurrentActiveLocation();
+      fetchNextLocation();
     } else {
       console.log('❌ currentUser is missing _id or id, not loading services');
     }
@@ -1041,39 +1100,41 @@ function PatientDashboard(props) {
 
       {/* Service Schedule */}
       <div className="service-schedule">
-        <h3>Weekly Community Visit Schedule</h3>
-        <div className="schedule-grid">
-          <div className="schedule-card">
-            <div className="schedule-day">Monday</div>
-            <div className="schedule-location">Bayombong Public Plaza</div>
-            <div className="schedule-time">8:00 AM - 12:00 PM</div>
+        <h3>Mobile Lab Schedule</h3>
+        {mobileLabLoading ? (
+          <div className="loading-state">Loading mobile lab schedules...</div>
+        ) : mobileLabError ? (
+          <div className="error-state">
+            <p>Unable to load mobile lab schedules: {mobileLabError}</p>
+            <button onClick={fetchMobileLabSchedules} className="retry-btn">Retry</button>
           </div>
-          <div className="schedule-card">
-            <div className="schedule-day">Tuesday</div>
-            <div className="schedule-location">Solano Town Center</div>
-            <div className="schedule-time">8:00 AM - 12:00 PM</div>
+        ) : mobileLabSchedules.length === 0 ? (
+          <div className="empty-state">
+            <p>No mobile lab schedules are currently available.</p>
+            <p>Please check back later or contact us for more information.</p>
           </div>
-          <div className="schedule-card">
-            <div className="schedule-day">Wednesday</div>
-            <div className="schedule-location">Bambang Barangay Hall</div>
-            <div className="schedule-time">8:00 AM - 12:00 PM</div>
+        ) : (
+          <div className="schedule-grid">
+            {mobileLabSchedules.map((schedule) => (
+              <div key={schedule._id} className="schedule-card">
+                <div className="schedule-day">
+                  {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][schedule.dayOfWeek]}
+                </div>
+                <div className="schedule-location">{schedule.location?.name}</div>
+                <div className="schedule-time">
+                  {schedule.timeSlot?.startTime} - {schedule.timeSlot?.endTime}
+                </div>
+                <div className="schedule-address">
+                  {schedule.location?.barangay}
+                  {schedule.location?.municipality && `, ${schedule.location?.municipality}`}
+                </div>
+                <div className={`schedule-status ${schedule.status?.toLowerCase().replace(' ', '-')}`}>
+                  {schedule.status}
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="schedule-card">
-            <div className="schedule-day">Thursday</div>
-            <div className="schedule-location">Dupax Community Center</div>
-            <div className="schedule-time">8:00 AM - 12:00 PM</div>
-          </div>
-          <div className="schedule-card">
-            <div className="schedule-day">Friday</div>
-            <div className="schedule-location">Kasibu Municipal Hall</div>
-            <div className="schedule-time">8:00 AM - 12:00 PM</div>
-          </div>
-          <div className="schedule-card weekend">
-            <div className="schedule-day">Saturday</div>
-            <div className="schedule-location">Special Community Events</div>
-            <div className="schedule-time">By Schedule</div>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Available Tests */}
@@ -1246,6 +1307,11 @@ function PatientDashboard(props) {
       <MobileLabScheduleModal
         isOpen={isScheduleModalOpen}
         onClose={() => setIsScheduleModalOpen(false)}
+        schedules={mobileLabSchedules}
+        currentActiveLocation={currentActiveLocation}
+        nextLocation={nextLocation}
+        loading={mobileLabLoading}
+        error={mobileLabError}
       />
       
       {/* Logout Confirmation Modal */}
