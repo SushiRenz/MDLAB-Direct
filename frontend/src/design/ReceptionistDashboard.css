@@ -680,6 +680,11 @@
   color: #155724;
 }
 
+.receptionist-status.in-progress {
+  background: #cce5ff;
+  color: #0066cc;
+}
+
 .receptionist-status.walk-in {
   background: #e2e3e5;
   color: #383d41;
@@ -1406,6 +1411,37 @@
   border-radius: 0 0 12px 12px;
 }
 
+/* Large Modal for Complex Forms */
+.receptionist-large-modal {
+  max-width: 800px !important;
+  width: 95% !important;
+}
+
+.receptionist-form-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.receptionist-form-row .receptionist-form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+/* Modal-specific form styling to override any dark themes */
+.receptionist-modal-content .receptionist-form-group input,
+.receptionist-modal-content .receptionist-form-group select,
+.receptionist-modal-content .receptionist-form-group textarea {
+  background-color: #ffffff !important;
+  color: #2d3748 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.receptionist-modal-content .receptionist-form-group input::placeholder,
+.receptionist-modal-content .receptionist-form-group textarea::placeholder {
+  color: #a0aec0 !important;
+}
+
 /* Form Styles */
 .receptionist-form-group {
   margin-bottom: 20px;
@@ -1429,6 +1465,8 @@
   font-size: 0.9rem;
   transition: border-color 0.2s, box-shadow 0.2s;
   box-sizing: border-box;
+  background-color: #ffffff;
+  color: #2d3748;
 }
 
 .receptionist-form-group input:focus,

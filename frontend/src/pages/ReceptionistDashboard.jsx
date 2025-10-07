@@ -62,6 +62,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
 
   // Schedule appointment state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [appointmentType, setAppointmentType] = useState('scheduled'); // 'scheduled', 'follow-up', 'walk-in'
   const [scheduleData, setScheduleData] = useState({
     patientName: '',
     contactNumber: '',
@@ -70,9 +71,11 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     serviceName: '',
     appointmentDate: '',
     appointmentTime: '',
-    priority: 'regular',
     notes: '',
-    reasonForVisit: ''
+    reasonForVisit: '',
+    followUpFor: '', // For follow-up appointments
+    groupSize: 1, // For group appointments
+    groupMembers: [] // For group appointments
   });
 
   const user = currentUser;
@@ -84,35 +87,39 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     try {
       // Fetch appointment statistics for today
       const today = new Date().toISOString().split('T')[0];
-      const appointmentStatsResponse = await appointmentAPI.getAppointmentStats(today, 'day');
+      console.log('Fetching appointment stats for:', today);
       
-      // Fetch services statistics  
-      const serviceStatsResponse = await servicesAPI.getServiceStats();
+      const appointmentStatsResponse = await appointmentAPI.getAppointmentStats(today, 'day');
+      console.log('Appointment stats response:', appointmentStatsResponse);
 
       if (appointmentStatsResponse.success) {
         const stats = appointmentStatsResponse.data;
+        console.log('Processing stats:', stats);
+        
         setDashboardStats({
           todayAppointments: stats.total || 0,
           pendingAppointments: stats.pending || 0,
           completedToday: stats.completed || 0,
           walkInPatients: stats.walkIn || 0,
           totalPatientsToday: stats.total || 0,
-          recentAppointments: stats.recent ? stats.recent.map(apt => ({
-            appointmentId: apt.appointmentId,
-            patientName: apt.patientName,
-            service: apt.serviceName,
+          recentAppointments: stats.recent ? stats.recent.slice(0, 5).map(apt => ({
+            appointmentId: apt._id || apt.appointmentId,
+            patientName: apt.patientName || apt.patient?.name || 'Unknown Patient',
+            service: apt.serviceName || apt.service?.serviceName || 'Unknown Service',
             time: apt.appointmentTime,
             status: apt.status
           })) : [],
-          upcomingAppointments: stats.upcoming ? stats.upcoming.map(apt => ({
-            appointmentId: apt.appointmentId,
-            patientName: apt.patientName,
-            service: apt.serviceName,
+          upcomingAppointments: stats.upcoming ? stats.upcoming.slice(0, 5).map(apt => ({
+            appointmentId: apt._id || apt.appointmentId,
+            patientName: apt.patientName || apt.patient?.name || 'Unknown Patient', 
+            service: apt.serviceName || apt.service?.serviceName || 'Unknown Service',
             time: apt.appointmentTime,
             status: apt.status
           })) : [],
-          popularServices: serviceStatsResponse.success ? (serviceStatsResponse.data?.popularServices || []) : []
+          popularServices: []
         });
+        
+        console.log('Dashboard stats set successfully');
       } else {
         throw new Error(appointmentStatsResponse.message || 'Failed to load appointment data');
       }
@@ -120,50 +127,16 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
       console.error('Receptionist dashboard data fetch error:', err);
       setDashboardError(err.message || 'Failed to load dashboard data');
       
-      // Set fallback data for demo purposes
+      // Set fallback data for demo purposes - but try to keep it minimal since we want real data
       setDashboardStats({
-        todayAppointments: 25,
-        pendingAppointments: 8,
-        completedToday: 17,
-        walkInPatients: 6,
-        totalPatientsToday: 31,
-        recentAppointments: [
-          {
-            appointmentId: 'APT-2025-001',
-            patientName: 'Maria Santos',
-            service: 'Complete Blood Count',
-            time: '9:00 AM',
-            status: 'completed'
-          },
-          {
-            appointmentId: 'APT-2025-002',
-            patientName: 'Carlos Rodriguez',
-            service: 'X-Ray Chest',
-            time: '10:30 AM',
-            status: 'in-progress'
-          }
-        ],
-        upcomingAppointments: [
-          {
-            appointmentId: 'APT-2025-003',
-            patientName: 'Ana Dela Cruz',
-            service: 'Lipid Profile',
-            time: '2:00 PM',
-            status: 'confirmed'
-          },
-          {
-            appointmentId: 'APT-2025-004',
-            patientName: 'Juan Mendoza',
-            service: 'Urinalysis',
-            time: '3:30 PM',
-            status: 'pending'
-          }
-        ],
-        popularServices: [
-          { serviceName: 'Complete Blood Count', count: 12, percentage: 35 },
-          { serviceName: 'X-Ray Chest', count: 8, percentage: 23 },
-          { serviceName: 'Lipid Profile', count: 6, percentage: 17 }
-        ]
+        todayAppointments: 0,
+        pendingAppointments: 0,
+        completedToday: 0,
+        walkInPatients: 0,
+        totalPatientsToday: 0,
+        recentAppointments: [],
+        upcomingAppointments: [],
+        popularServices: []
       });
     } finally {
       setDashboardLoading(false);
@@ -178,12 +151,15 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
       const params = {};
       if (searchTerm) params.patientName = searchTerm;
       if (filterStatus) params.status = filterStatus;
-      if (filterDate) params.date = filterDate;
+      if (filterDate) params.appointmentDate = filterDate;
       
+      console.log('Fetching appointments with params:', params);
       const response = await appointmentAPI.getAppointments(params);
+      console.log('Appointments response:', response);
       
       if (response.success) {
-        setAppointments(response.data);
+        setAppointments(response.data || []);
+        console.log('Appointments loaded:', response.data?.length || 0, 'appointments');
       } else {
         throw new Error(response.message || 'Failed to fetch appointments');
       }
@@ -191,35 +167,8 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
       console.error('Fetch appointments error:', err);
       setError(err.message || 'Failed to fetch appointments');
       
-      // Set fallback data for demo purposes
-      const mockAppointments = [
-        {
-          _id: '1',
-          appointmentId: 'APT-2025-001',
-          patientName: 'Maria Santos',
-          contactNumber: '+639123456789',
-          email: 'maria.santos@email.com',
-          serviceName: 'Complete Blood Count',
-          appointmentDate: new Date().toISOString(),
-          appointmentTime: '9:00 AM',
-          status: 'confirmed',
-          notes: 'Regular checkup'
-        },
-        {
-          _id: '2',
-          appointmentId: 'APT-2025-002',
-          patientName: 'Carlos Rodriguez',
-          contactNumber: '+639987654321',
-          email: 'carlos.rodriguez@email.com',
-          serviceName: 'X-Ray Chest',
-          appointmentDate: new Date().toISOString(),
-          appointmentTime: '10:30 AM',
-          status: 'pending',
-          notes: 'Follow-up examination'
-        }
-      ];
-      
-      setAppointments(mockAppointments);
+      // Set empty array instead of mock data to show real situation
+      setAppointments([]);
     } finally {
       setLoading(false);
     }
@@ -429,6 +378,156 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     }
   };
 
+  // Validate appointment form data
+  const validateAppointmentForm = () => {
+    const errors = [];
+
+    // Required field validation
+    if (!scheduleData.patientName.trim()) {
+      errors.push('Patient name is required');
+    }
+    
+    if (!scheduleData.contactNumber.trim()) {
+      errors.push('Contact number is required');
+    } else if (!/^\+?[0-9\s\-\(\)]{10,}$/.test(scheduleData.contactNumber)) {
+      errors.push('Please enter a valid contact number');
+    }
+    
+    if (!scheduleData.email.trim()) {
+      errors.push('Email is required');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(scheduleData.email)) {
+      errors.push('Please enter a valid email address');
+    }
+    
+    if (!scheduleData.serviceId) {
+      errors.push('Please select a service');
+    }
+    
+    if (!scheduleData.appointmentDate) {
+      errors.push('Appointment date is required');
+    } else {
+      const selectedDate = new Date(scheduleData.appointmentDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (selectedDate < today) {
+        errors.push('Appointment date cannot be in the past');
+      }
+    }
+    
+    if (!scheduleData.appointmentTime) {
+      errors.push('Please select an appointment time slot');
+    }
+    
+    if (!scheduleData.reasonForVisit.trim()) {
+      errors.push('Reason for visit is required');
+    }
+
+    // Appointment type specific validation
+    if (appointmentType === 'group' && scheduleData.groupSize < 1) {
+      errors.push('Group size must be at least 1');
+    }
+
+    return errors;
+  };
+
+  // Handle appointment form submission
+  const handleScheduleSubmit = async () => {
+    try {
+      // Validate form
+      const validationErrors = validateAppointmentForm();
+      if (validationErrors.length > 0) {
+        alert('Please fix the following errors:\n\n' + validationErrors.join('\n'));
+        return;
+      }
+
+      // Prepare appointment data based on type
+      const appointmentData = {
+        patientId: null, // Explicitly null for walk-in patients
+        patientName: scheduleData.patientName,
+        contactNumber: scheduleData.contactNumber,
+        email: scheduleData.email,
+        serviceId: scheduleData.serviceId,
+        serviceName: scheduleData.serviceName,
+        appointmentDate: scheduleData.appointmentDate,
+        appointmentTime: scheduleData.appointmentTime,
+        type: appointmentType, // 'scheduled', 'follow-up', 'walk-in', 'emergency'
+        priority: 'regular', // Default priority
+        notes: scheduleData.notes,
+        reasonForVisit: scheduleData.reasonForVisit,
+        receptionistNotes: `Scheduled via receptionist portal by ${user.name || user.email || 'Receptionist'}`
+      };
+
+      // Add type-specific data
+      if (appointmentType === 'follow-up' && scheduleData.followUpFor) {
+        appointmentData.followUpFor = scheduleData.followUpFor;
+      }
+      
+      if (appointmentType === 'group') {
+        appointmentData.groupSize = scheduleData.groupSize;
+        appointmentData.groupMembers = scheduleData.groupMembers;
+      }
+
+      const response = await appointmentAPI.createAppointment(appointmentData);
+      
+      if (response.success) {
+        // Update local appointments list
+        setAppointments(prev => [response.data, ...prev]);
+        
+        setShowScheduleModal(false);
+        setScheduleData({
+          patientName: '',
+          contactNumber: '',
+          email: '',
+          serviceId: '',
+          serviceName: '',
+          appointmentDate: '',
+          appointmentTime: '',
+          notes: '',
+          reasonForVisit: '',
+          followUpFor: '',
+          groupSize: 1,
+          groupMembers: []
+        });
+        setError(''); // Clear any previous errors
+        
+        alert(`${appointmentType === 'scheduled' ? 'Scheduled' : appointmentType === 'follow-up' ? 'Follow-up' : appointmentType === 'walk-in' ? 'Walk-in' : 'Emergency'} appointment scheduled successfully for ${response.data.patientName}!`);
+        
+        // Update dashboard stats
+        fetchReceptionistDashboardData();
+      } else {
+        // Handle API response with errors
+        let errorMessage = response.message || 'Failed to schedule appointment';
+        
+        if (response.errors && Array.isArray(response.errors)) {
+          const validationErrors = response.errors.map(err => err.msg || err.message || err).join('\n');
+          errorMessage = `Validation failed:\n${validationErrors}`;
+        }
+        
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      console.error('Schedule appointment error:', error);
+      console.error('Error response:', error.response);
+      console.error('Error response data:', error.response?.data);
+      console.error('Full error object:', JSON.stringify(error, null, 2));
+      
+      let errorMessage = 'Failed to schedule appointment';
+      
+      // Check if it's a validation error with specific errors array
+      if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+        const validationErrors = error.response.data.errors.map(err => err.msg).join('\n');
+        errorMessage = `Validation failed:\n${validationErrors}`;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setError('Failed to schedule appointment: ' + errorMessage);
+      alert('Failed to schedule appointment:\n' + errorMessage);
+    }
+  };
+
   // Bill generation functions - limited for receptionist
   const handleGenerateBill = (appointment) => {
     // Receptionists can view and generate basic billing information
@@ -508,24 +607,15 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
   };
 
   // Load services for dropdown
-  const [availableServices, setAvailableServices] = useState([]);
-  
   const fetchServices = async () => {
     try {
       const response = await servicesAPI.getServices();
       if (response.success) {
-        setAvailableServices(response.data.services || []);
+        setServices(response.data || []);
       }
     } catch (error) {
       console.error('Failed to fetch services:', error);
-      // Set default services for demo
-      setAvailableServices([
-        { _id: '507f1f77bcf86cd799439011', serviceName: 'Complete Blood Count', price: 800 },
-        { _id: '507f1f77bcf86cd799439012', serviceName: 'X-Ray Chest', price: 1200 },
-        { _id: '507f1f77bcf86cd799439013', serviceName: 'Lipid Profile', price: 1500 },
-        { _id: '507f1f77bcf86cd799439014', serviceName: 'Urinalysis', price: 400 },
-        { _id: '507f1f77bcf86cd799439015', serviceName: 'Blood Sugar', price: 300 }
-      ]);
+      setServices([]);
     }
   };
 
@@ -571,12 +661,6 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                   onClick={() => handleSectionClick('appointments')}
                 >
                   View Appointments
-                </div>
-                <div
-                  className={`receptionist-nav-subitem ${activeSection === 'schedule-appointment' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('schedule-appointment')}
-                >
-                  Schedule Appointment
                 </div>
                 <div
                   className={`receptionist-nav-subitem ${activeSection === 'walk-in-registration' ? 'active' : ''}`}
@@ -649,7 +733,6 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
           <h1 className="receptionist-page-title">
             {activeSection === 'receptionist-dashboard' && 'Dashboard'}
             {activeSection === 'appointments' && 'Appointment Management'}
-            {activeSection === 'schedule-appointment' && 'Schedule New Appointment'}
             {activeSection === 'walk-in-registration' && 'Walk-in Registration'}
             {activeSection === 'check-in-out' && 'Patient Check-In/Check-Out'}
             {activeSection === 'patient-information' && 'Patient Information'}
@@ -901,26 +984,6 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
             </div>
           )}
 
-          {/* Other sections tailored for receptionist */}
-          {activeSection === 'schedule-appointment' && (
-            <div className="receptionist-management-container">
-              <div className="receptionist-management-header">
-                <div className="receptionist-management-title">
-                  <h2>Schedule New Appointment</h2>
-                  <p>Book appointments for patients - Receptionist Portal</p>
-                </div>
-              </div>
-              <div className="receptionist-form-container">
-                <p>Receptionist appointment scheduling form would go here...</p>
-                <div className="receptionist-quick-actions">
-                  <button className="receptionist-btn-primary">Schedule Regular Appointment</button>
-                  <button className="receptionist-btn-secondary">Schedule Follow-up</button>
-                  <button className="receptionist-btn-secondary">Schedule Group Appointment</button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {activeSection === 'walk-in-registration' && (
             <div className="receptionist-management-container">
               <div className="receptionist-management-header">
@@ -1150,7 +1213,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                 <select
                   value={scheduleData.serviceId}
                   onChange={(e) => {
-                    const selectedService = availableServices.find(s => s._id === e.target.value);
+                    const selectedService = services.find(s => s._id === e.target.value);
                     setScheduleData({
                       ...scheduleData, 
                       serviceId: e.target.value,
@@ -1159,7 +1222,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                   }}
                 >
                   <option value="">Select Service</option>
-                  {availableServices.map(service => (
+                  {services.map(service => (
                     <option key={service._id} value={service._id}>
                       {service.serviceName} - ₱{service.price}
                     </option>
@@ -1434,6 +1497,170 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
             <div className="receptionist-modal-footer">
               <button className="receptionist-btn-primary" onClick={() => setShowPatientInfoModal(false)}>
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Appointment Scheduling Modal */}
+      {showScheduleModal && (
+        <div className="receptionist-modal-overlay" onClick={() => setShowScheduleModal(false)}>
+          <div className="receptionist-modal-content receptionist-large-modal" onClick={e => e.stopPropagation()}>
+            <div className="receptionist-modal-header">
+              <h3>Schedule {appointmentType === 'scheduled' ? 'Scheduled' : appointmentType === 'follow-up' ? 'Follow-up' : appointmentType === 'walk-in' ? 'Walk-in' : 'Emergency'} Appointment</h3>
+              <button className="receptionist-modal-close" onClick={() => setShowScheduleModal(false)}>×</button>
+            </div>
+            <div className="receptionist-modal-body">
+              
+              {/* Patient Details for Walk-in */}
+              <div className="receptionist-form-row">
+                <div className="receptionist-form-group">
+                  <label>Patient Name *</label>
+                  <input
+                    type="text"
+                    value={scheduleData.patientName}
+                    onChange={(e) => setScheduleData({...scheduleData, patientName: e.target.value})}
+                    placeholder="Enter patient name"
+                    required
+                  />
+                </div>
+                <div className="receptionist-form-group">
+                  <label>Contact Number *</label>
+                  <input
+                    type="text"
+                    value={scheduleData.contactNumber}
+                    onChange={(e) => setScheduleData({...scheduleData, contactNumber: e.target.value})}
+                    placeholder="+639XXXXXXXXX"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="receptionist-form-group">
+                <label>Email *</label>
+                <input
+                  type="email"
+                  value={scheduleData.email}
+                  onChange={(e) => setScheduleData({...scheduleData, email: e.target.value})}
+                  placeholder="patient@email.com"
+                  required
+                />
+              </div>
+
+              {/* Service Selection */}
+              <div className="receptionist-form-group">
+                <label>Service *</label>
+                <select
+                  value={scheduleData.serviceId}
+                  onChange={(e) => {
+                    const selectedService = services.find(s => s._id === e.target.value);
+                    setScheduleData({
+                      ...scheduleData,
+                      serviceId: e.target.value,
+                      serviceName: selectedService ? selectedService.serviceName : ''
+                    });
+                  }}
+                  required
+                >
+                  <option value="">Select a service...</option>
+                  {services.map(service => (
+                    <option key={service._id} value={service._id}>
+                      {service.serviceName} - ₱{service.price}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date and Time */}
+              <div className="receptionist-form-row">
+                <div className="receptionist-form-group">
+                  <label>Appointment Date *</label>
+                  <input
+                    type="date"
+                    value={scheduleData.appointmentDate}
+                    onChange={(e) => setScheduleData({...scheduleData, appointmentDate: e.target.value})}
+                    min={new Date().toISOString().split('T')[0]}
+                    required
+                  />
+                </div>
+                <div className="receptionist-form-group">
+                  <label>Appointment Time *</label>
+                  <select
+                    value={scheduleData.appointmentTime}
+                    onChange={(e) => setScheduleData({...scheduleData, appointmentTime: e.target.value})}
+                    required
+                  >
+                    <option value="">Select time slot...</option>
+                    <option value="7:00 AM - 10:00 AM">7:00 AM - 10:00 AM (Morning - Fasting Tests)</option>
+                    <option value="1:00 PM - 4:00 PM">1:00 PM - 4:00 PM (Afternoon - After Lunch)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Follow-up specific fields */}
+              {appointmentType === 'follow-up' && (
+                <div className="receptionist-form-group">
+                  <label>Follow-up for (Previous Appointment ID)</label>
+                  <input
+                    type="text"
+                    value={scheduleData.followUpFor}
+                    onChange={(e) => setScheduleData({...scheduleData, followUpFor: e.target.value})}
+                    placeholder="Enter previous appointment ID"
+                  />
+                </div>
+              )}
+
+              {/* Group appointment specific fields */}
+              {appointmentType === 'group' && (
+                <div className="receptionist-form-group">
+                  <label>Group Size</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={scheduleData.groupSize}
+                    onChange={(e) => setScheduleData({...scheduleData, groupSize: parseInt(e.target.value)})}
+                  />
+                </div>
+              )}
+
+              {/* Reason for Visit */}
+              <div className="receptionist-form-group">
+                <label>Reason for Visit *</label>
+                <textarea
+                  value={scheduleData.reasonForVisit}
+                  onChange={(e) => setScheduleData({...scheduleData, reasonForVisit: e.target.value})}
+                  placeholder="Describe the reason for this appointment"
+                  rows="3"
+                  required
+                />
+              </div>
+
+              {/* Notes */}
+              <div className="receptionist-form-group">
+                <label>Additional Notes</label>
+                <textarea
+                  value={scheduleData.notes}
+                  onChange={(e) => setScheduleData({...scheduleData, notes: e.target.value})}
+                  placeholder="Any additional information or special instructions"
+                  rows="2"
+                />
+              </div>
+
+            </div>
+            <div className="receptionist-modal-footer">
+              <button 
+                className="receptionist-btn-secondary" 
+                onClick={() => setShowScheduleModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="receptionist-btn-primary"
+                onClick={handleScheduleSubmit}
+              >
+                Schedule Appointment
               </button>
             </div>
           </div>

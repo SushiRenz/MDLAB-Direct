@@ -55,7 +55,7 @@ router.post('/',
     body('contactNumber')
       .notEmpty()
       .withMessage('Contact number is required')
-      .matches(/^(\+63|0)[0-9]{10}$/)
+      .matches(/^(\+63|0)[0-9]{9,10}$/)
       .withMessage('Please provide a valid Philippine phone number'),
     
     body('email')
@@ -72,14 +72,14 @@ router.post('/',
     body('appointmentDate')
       .notEmpty()
       .withMessage('Appointment date is required')
-      .isISO8601()
+      .isDate()
       .withMessage('Please provide a valid date'),
     
     body('appointmentTime')
       .notEmpty()
       .withMessage('Appointment time is required')
-      .matches(/^(0?[1-9]|1[012]):[0-5][0-9] [AP]M$/)
-      .withMessage('Please provide time in format HH:MM AM/PM'),
+      .isIn(['7:00 AM - 10:00 AM', '1:00 PM - 4:00 PM'])
+      .withMessage('Please select a valid time slot'),
     
     body('type')
       .optional()

@@ -3415,6 +3415,127 @@ select:focus {
   color: #dc2626;
 }
 
+/* History Sections Styles */
+.history-section {
+  margin-top: 20px;
+  background: white;
+  border-radius: 6px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+}
+
+.history-section h5 {
+  margin: 0 0 12px 0;
+  color: #374151;
+  font-size: 1rem;
+  font-weight: 600;
+  border-bottom: 2px solid #21AEA8;
+  padding-bottom: 8px;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  background: #f9fafb;
+  border-radius: 4px;
+  border-left: 3px solid #21AEA8;
+}
+
+.history-date {
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 0.875rem;
+  min-width: 100px;
+  margin-right: 12px;
+}
+
+.history-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.history-service {
+  font-weight: 500;
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.history-status {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+.history-status.completed {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.history-status.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.history-status.cancelled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.history-status.scheduled {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.history-location {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.history-time {
+  font-size: 0.75rem;
+  color: #21AEA8;
+  font-weight: 500;
+}
+
+.history-more {
+  padding: 8px;
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+  font-size: 0.875rem;
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+.loading-message {
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+  padding: 20px;
+}
+
+.no-history {
+  text-align: center;
+  color: #9ca3af;
+  font-style: italic;
+  padding: 20px;
+  background: #f9fafb;
+  border-radius: 4px;
+}
+
 /* Staff Schedule Table Styling */
 .schedule-table {
   width: 100%;

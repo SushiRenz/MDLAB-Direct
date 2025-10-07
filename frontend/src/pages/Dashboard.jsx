@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../design/Dashboard.css';
-import { userAPI, financeAPI, logsAPI, servicesAPI, mobileLabAPI } from '../services/api';
+import { userAPI, financeAPI, logsAPI, servicesAPI, mobileLabAPI, appointmentAPI } from '../services/api';
 
 function Dashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -51,6 +51,11 @@ function Dashboard({ currentUser, onLogout }) {
   // Patient view modal
   const [showViewPatientModal, setShowViewPatientModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
+  
+  // Patient history data
+  const [patientAppointments, setPatientAppointments] = useState([]);
+  const [patientMobileLabHistory, setPatientMobileLabHistory] = useState([]);
+  const [patientHistoryLoading, setPatientHistoryLoading] = useState(false);
 
   // MedTech view modal
   const [showViewMedTechModal, setShowViewMedTechModal] = useState(false);
@@ -572,11 +577,19 @@ function Dashboard({ currentUser, onLogout }) {
   const openViewPatientModal = (patient) => {
     setSelectedPatient(patient);
     setShowViewPatientModal(true);
+    // Fetch patient history when opening the modal
+    if (patient?._id) {
+      fetchPatientHistory(patient._id);
+    }
   };
 
   const closePatientModal = () => {
     setSelectedPatient(null);
     setShowViewPatientModal(false);
+    // Clear patient history data
+    setPatientAppointments([]);
+    setPatientMobileLabHistory([]);
+    setPatientHistoryLoading(false);
   };
 
   // MedTech modal functions
@@ -1433,6 +1446,49 @@ function Dashboard({ currentUser, onLogout }) {
       priority: 'Medium',
       isActive: true
     });
+  };
+
+  // Patient history data fetching functions
+  const fetchPatientAppointments = async (patientId) => {
+    try {
+      setPatientHistoryLoading(true);
+      const data = await appointmentAPI.getAppointments({ patientId });
+      if (data.success) {
+        setPatientAppointments(data.appointments || []);
+      } else {
+        console.error('Failed to fetch patient appointments:', data.message);
+        setPatientAppointments([]);
+      }
+    } catch (error) {
+      console.error('Error fetching patient appointments:', error);
+      setPatientAppointments([]);
+    }
+  };
+
+  const fetchPatientMobileLabHistory = async (patientId) => {
+    try {
+      // For now, we'll fetch general mobile lab schedules since there might not be patient-specific mobile lab bookings yet
+      // In the future, this could be modified to fetch patient-specific mobile lab appointments
+      const data = await mobileLabAPI.getMobileLabSchedules({ limit: 10 });
+      if (data.success) {
+        setPatientMobileLabHistory(data.schedules || []);
+      } else {
+        console.error('Failed to fetch mobile lab history:', data.message);
+        setPatientMobileLabHistory([]);
+      }
+    } catch (error) {
+      console.error('Error fetching mobile lab history:', error);
+      setPatientMobileLabHistory([]);
+    } finally {
+      setPatientHistoryLoading(false);
+    }
+  };
+
+  const fetchPatientHistory = async (patientId) => {
+    await Promise.all([
+      fetchPatientAppointments(patientId),
+      fetchPatientMobileLabHistory(patientId)
+    ]);
   };
 
   // Finance data fetching functions
@@ -7660,6 +7716,75 @@ function Dashboard({ currentUser, onLogout }) {
                       <span className="summary-label">Contact:</span>
                       <span className="summary-value">{email} | {phone}</span>
                     </div>
+                  </div>
+
+                  {/* Appointment History Section */}
+                  <div className="history-section">
+                    <h5>Appointment History</h5>
+                    {patientHistoryLoading ? (
+                      <div className="loading-message">Loading appointment history...</div>
+                    ) : patientAppointments.length > 0 ? (
+                      <div className="history-list">
+                        {patientAppointments.slice(0, 5).map((appointment, index) => (
+                          <div key={appointment._id || index} className="history-item">
+                            <div className="history-date">
+                              {new Date(appointment.appointmentDate || appointment.createdAt).toLocaleDateString()}
+                            </div>
+                            <div className="history-details">
+                              <span className="history-service">
+                                {appointment.serviceType || 'General Consultation'}
+                              </span>
+                              <span className={`history-status ${appointment.status?.toLowerCase()}`}>
+                                {appointment.status || 'Completed'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                        {patientAppointments.length > 5 && (
+                          <div className="history-more">
+                            +{patientAppointments.length - 5} more appointments
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="no-history">No appointment history found</div>
+                    )}
+                  </div>
+
+                  {/* Mobile Lab History Section */}
+                  <div className="history-section">
+                    <h5>Mobile Lab Services</h5>
+                    {patientHistoryLoading ? (
+                      <div className="loading-message">Loading mobile lab history...</div>
+                    ) : patientMobileLabHistory.length > 0 ? (
+                      <div className="history-list">
+                        {patientMobileLabHistory.slice(0, 3).map((schedule, index) => (
+                          <div key={schedule._id || index} className="history-item">
+                            <div className="history-date">
+                              {schedule.dayName || 'Available'}
+                            </div>
+                            <div className="history-details">
+                              <span className="history-service">
+                                {schedule.location?.name || 'Mobile Lab Service'}
+                              </span>
+                              <span className="history-location">
+                                {schedule.location?.barangay}, {schedule.location?.municipality}
+                              </span>
+                              <span className="history-time">
+                                {schedule.timeSlot?.timeDisplay || `${schedule.timeSlot?.startTime} - ${schedule.timeSlot?.endTime}`}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                        {patientMobileLabHistory.length > 3 && (
+                          <div className="history-more">
+                            +{patientMobileLabHistory.length - 3} more schedules available
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="no-history">No mobile lab services available</div>
+                    )}
                   </div>
                 </div>
               </div>

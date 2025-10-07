@@ -9,7 +9,8 @@ const appointmentSchema = new mongoose.Schema({
   patient: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false, // Allow null for walk-in patients
+    default: null
   },
   patientName: {
     type: String,
