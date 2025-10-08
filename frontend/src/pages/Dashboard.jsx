@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../design/Dashboard.css';
-import { userAPI, financeAPI, logsAPI, servicesAPI, mobileLabAPI, appointmentAPI } from '../services/api';
+import { userAPI, financeAPI, logsAPI, servicesAPI, mobileLabAPI, appointmentAPI, testResultsAPI } from '../services/api';
 
 function Dashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -48,6 +48,19 @@ function Dashboard({ currentUser, onLogout }) {
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [showCheckOutModal, setShowCheckOutModal] = useState(false);
   const [selectedAppointmentPatient, setSelectedAppointmentPatient] = useState(null);
+
+  // Results management state
+  const [testResults, setTestResults] = useState([]);
+  const [resultsLoading, setResultsLoading] = useState(false);
+  const [resultsError, setResultsError] = useState('');
+  const [resultSearchTerm, setResultSearchTerm] = useState('');
+  const [resultFilterStatus, setResultFilterStatus] = useState('');
+  const [resultFilterType, setResultFilterType] = useState('');
+  const [resultFilterDate, setResultFilterDate] = useState('');
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [showProcessResultModal, setShowProcessResultModal] = useState(false);
+  const [editingResult, setEditingResult] = useState(null);
+  const [selectedResult, setSelectedResult] = useState(null);
 
   // Services state for appointment booking
   const [appointmentServices, setAppointmentServices] = useState([]);
@@ -824,6 +837,160 @@ function Dashboard({ currentUser, onLogout }) {
       onLogout();
     }
   };
+
+  // Test Results Management Functions
+  const fetchTestResults = async () => {
+    setResultsLoading(true);
+    setResultsError('');
+    try {
+      const params = {};
+      if (resultSearchTerm) params.search = resultSearchTerm;
+      if (resultFilterStatus) params.status = resultFilterStatus;
+      if (resultFilterType) params.testType = resultFilterType;
+      if (resultFilterDate) params.fromDate = resultFilterDate;
+      
+      const response = await testResultsAPI.getTestResults(params);
+      if (response.success) {
+        setTestResults(response.data || []);
+      } else {
+        throw new Error(response.message || 'Failed to fetch test results');
+      }
+    } catch (error) {
+      console.error('Fetch test results error:', error);
+      setResultsError('Failed to fetch test results: ' + error.message);
+      setTestResults([]);
+    } finally {
+      setResultsLoading(false);
+    }
+  };
+
+  const viewResult = (result) => {
+    setSelectedResult(result);
+    setShowResultModal(true);
+  };
+
+  const editResult = (result) => {
+    setEditingResult(result);
+    setShowProcessResultModal(true);
+  };
+
+  const processResult = async (result) => {
+    try {
+      const response = await testResultsAPI.updateTestResult(result._id, {
+        status: 'in-progress',
+        medTech: currentUser._id
+      });
+      
+      if (response.success) {
+        alert('Result processing started successfully!');
+        fetchTestResults();
+      } else {
+        throw new Error(response.message || 'Failed to process result');
+      }
+    } catch (error) {
+      console.error('Process result error:', error);
+      alert('Failed to process result: ' + error.message);
+    }
+  };
+
+  const releaseResult = async (result) => {
+    if (!confirm('Are you sure you want to release this result to the patient?')) {
+      return;
+    }
+    
+    try {
+      const response = await testResultsAPI.releaseTestResult(result._id);
+      
+      if (response.success) {
+        alert('Result released to patient successfully!');
+        fetchTestResults();
+      } else {
+        throw new Error(response.message || 'Failed to release result');
+      }
+    } catch (error) {
+      console.error('Release result error:', error);
+      alert('Failed to release result: ' + error.message);
+    }
+  };
+
+  const printResult = async (result) => {
+    try {
+      // Create a printable version of the result
+      const printWindow = window.open('', '_blank');
+      const printContent = `
+        <html>
+          <head>
+            <title>Test Result - ${result.sampleId}</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              .header { text-align: center; margin-bottom: 30px; }
+              .patient-info { margin-bottom: 20px; }
+              .results-table { width: 100%; border-collapse: collapse; }
+              .results-table th, .results-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              .results-table th { background-color: #f2f2f2; }
+              .abnormal { color: red; font-weight: bold; }
+              .critical { color: red; font-weight: bold; background-color: #ffeeee; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>MDLAB DIRECT</h1>
+              <h2>Laboratory Test Result</h2>
+            </div>
+            <div class="patient-info">
+              <p><strong>Patient:</strong> ${result.patient ? result.patient.firstName + ' ' + result.patient.lastName : 'Unknown'}</p>
+              <p><strong>Sample ID:</strong> ${result.sampleId}</p>
+              <p><strong>Test Type:</strong> ${result.testType}</p>
+              <p><strong>Sample Date:</strong> ${new Date(result.sampleDate).toLocaleDateString()}</p>
+              <p><strong>Report Date:</strong> ${new Date().toLocaleDateString()}</p>
+            </div>
+            <table class="results-table">
+              <thead>
+                <tr>
+                  <th>Parameter</th>
+                  <th>Result</th>
+                  <th>Reference Range</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${Object.entries(result.results || {}).map(([key, value]) => {
+                  const range = result.referenceRanges && result.referenceRanges[key];
+                  const isAbnormal = range && result.isValueNormal && !result.isValueNormal(key, value);
+                  return `
+                    <tr>
+                      <td>${key}</td>
+                      <td class="${isAbnormal ? 'abnormal' : ''}">${value}</td>
+                      <td>${range ? `${range.min} - ${range.max} ${range.unit || ''}` : 'N/A'}</td>
+                      <td class="${isAbnormal ? 'abnormal' : ''}">
+                        ${isAbnormal ? 'ABNORMAL' : 'NORMAL'}
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+            ${result.notes ? `<div style="margin-top: 20px;"><strong>Notes:</strong> ${result.notes}</div>` : ''}
+            ${result.pathologistNotes ? `<div><strong>Pathologist Notes:</strong> ${result.pathologistNotes}</div>` : ''}
+          </body>
+        </html>
+      `;
+      
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
+    } catch (error) {
+      console.error('Print result error:', error);
+      alert('Failed to print result: ' + error.message);
+    }
+  };
+
+  // Effect to fetch test results when section changes
+  useEffect(() => {
+    if (activeSection === 'results') {
+      fetchTestResults();
+    }
+  }, [activeSection, resultSearchTerm, resultFilterStatus, resultFilterType, resultFilterDate]);
 
   // User Management Functions
   const fetchUsers = async (role = '') => {
@@ -3010,6 +3177,8 @@ function Dashboard({ currentUser, onLogout }) {
       case 'logs': return 'System Logs';
       case 'services': return 'Lab Services';
       case 'appointments': return 'Appointment Management';
+      case 'results': return 'Test Results Management';
+      case 'mobile-lab': return 'Mobile Lab Management';
       default: return 'Dashboard';
     }
   };
@@ -3029,10 +3198,249 @@ function Dashboard({ currentUser, onLogout }) {
       case 'logs': return renderSystemLogs();
       case 'services': return renderServices();
       case 'appointments': return renderAppointmentManagement();
+      case 'results': return renderResultsManagement();
       case 'mobile-lab': return renderMobileLabManagement();
       default: return renderDashboardHome();
     }
   };
+
+  // Results Management Function
+  const renderResultsManagement = () => (
+    <div className="management-container results-management">
+      <div className="management-header">
+        <div className="management-title">
+          <h2>Test Results Management</h2>
+          <p>View, process, and manage laboratory test results</p>
+        </div>
+        <button className="add-btn" onClick={() => setShowProcessResultModal(true)}>
+          + Process New Result
+        </button>
+      </div>
+
+      <div className="management-stats">
+        <div className="stat-card">
+          <div className="stat-icon result-pending-icon"></div>
+          <div className="stat-info">
+            <div className="stat-label">Pending Results</div>
+            <div className="stat-value">{testResults.filter(result => result.status === 'pending').length}</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon result-progress-icon"></div>
+          <div className="stat-info">
+            <div className="stat-label">In Progress</div>
+            <div className="stat-value">{testResults.filter(result => result.status === 'in-progress').length}</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon result-completed-icon"></div>
+          <div className="stat-info">
+            <div className="stat-label">Completed Today</div>
+            <div className="stat-value">{testResults.filter(result => {
+              const today = new Date().toISOString().split('T')[0];
+              const resultDate = new Date(result.completedDate).toISOString().split('T')[0];
+              return result.status === 'completed' && resultDate === today;
+            }).length}</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon result-critical-icon"></div>
+          <div className="stat-info">
+            <div className="stat-label">Critical Results</div>
+            <div className="stat-value">{testResults.filter(result => result.isCritical).length}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="search-filter">
+        <input
+          type="text"
+          placeholder="Search by patient name, sample ID..."
+          className="search-input"
+          value={resultSearchTerm}
+          onChange={(e) => setResultSearchTerm(e.target.value)}
+        />
+        <select
+          className="filter-select"
+          value={resultFilterStatus}
+          onChange={(e) => setResultFilterStatus(e.target.value)}
+        >
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="in-progress">In Progress</option>
+          <option value="completed">Completed</option>
+          <option value="reviewed">Reviewed</option>
+          <option value="released">Released</option>
+        </select>
+        <select
+          className="filter-select"
+          value={resultFilterType}
+          onChange={(e) => setResultFilterType(e.target.value)}
+        >
+          <option value="">All Test Types</option>
+          <option value="Complete Blood Count (CBC)">CBC</option>
+          <option value="Blood Sugar Test">Blood Sugar</option>
+          <option value="Lipid Profile">Lipid Profile</option>
+          <option value="Urinalysis">Urinalysis</option>
+          <option value="X-Ray">X-Ray</option>
+          <option value="ECG">ECG</option>
+        </select>
+        <input
+          type="date"
+          className="date-filter"
+          value={resultFilterDate}
+          onChange={(e) => setResultFilterDate(e.target.value)}
+        />
+      </div>
+
+      <div className="management-content">
+        <div className="data-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Sample ID</th>
+                <th>Patient Name</th>
+                <th>Test Type</th>
+                <th>Sample Date</th>
+                <th>Status</th>
+                <th>Flags</th>
+                <th>Assigned Staff</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {resultsLoading ? (
+                <tr>
+                  <td colSpan="8">Loading test results...</td>
+                </tr>
+              ) : testResults.length === 0 ? (
+                <tr>
+                  <td colSpan="8">No test results found</td>
+                </tr>
+              ) : (
+                testResults
+                  .filter(result => {
+                    const matchesSearch = !resultSearchTerm || 
+                      result.sampleId.toLowerCase().includes(resultSearchTerm.toLowerCase()) ||
+                      (result.patient && (result.patient.firstName + ' ' + result.patient.lastName).toLowerCase().includes(resultSearchTerm.toLowerCase()));
+                    const matchesStatus = !resultFilterStatus || result.status === resultFilterStatus;
+                    const matchesType = !resultFilterType || result.testType === resultFilterType;
+                    const matchesDate = !resultFilterDate || new Date(result.sampleDate).toISOString().split('T')[0] === resultFilterDate;
+                    return matchesSearch && matchesStatus && matchesType && matchesDate;
+                  })
+                  .map(result => (
+                    <tr key={result._id}>
+                      <td>
+                        <div className="sample-id">
+                          {result.sampleId}
+                          {result.isNew && <span className="new-badge">NEW</span>}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="patient-info">
+                          <div className="patient-name">
+                            {result.patient ? `${result.patient.firstName} ${result.patient.lastName}` : 'Unknown Patient'}
+                          </div>
+                          <div className="patient-id">ID: {result.patient?.username || 'N/A'}</div>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="test-type">
+                          <div className="test-name">{result.testType}</div>
+                          {result.appointment && <div className="appointment-ref">Appt: {result.appointment.appointmentId}</div>}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="date-info">
+                          <div className="sample-date">{new Date(result.sampleDate).toLocaleDateString()}</div>
+                          <div className="sample-time">{new Date(result.sampleDate).toLocaleTimeString()}</div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`status ${result.status}`}>
+                          {result.status}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="result-flags">
+                          {result.isCritical && <span className="flag critical">CRITICAL</span>}
+                          {result.isAbnormal && <span className="flag abnormal">ABNORMAL</span>}
+                          {result.qcPassed && <span className="flag qc-passed">QC PASSED</span>}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="staff-assignments">
+                          {result.medTech && (
+                            <div className="medtech-assigned">
+                              MedTech: {result.medTech.firstName} {result.medTech.lastName}
+                            </div>
+                          )}
+                          {result.pathologist && (
+                            <div className="pathologist-assigned">
+                              Pathologist: {result.pathologist.firstName} {result.pathologist.lastName}
+                            </div>
+                          )}
+                          {!result.medTech && !result.pathologist && (
+                            <span className="unassigned">Unassigned</span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          <button 
+                            className="action-btn view-btn"
+                            onClick={() => viewResult(result)}
+                            title="View Details"
+                          >
+                            👁️
+                          </button>
+                          <button 
+                            className="action-btn edit-btn"
+                            onClick={() => editResult(result)}
+                            title="Edit Result"
+                          >
+                            ✏️
+                          </button>
+                          {result.status === 'pending' && (
+                            <button 
+                              className="action-btn process-btn"
+                              onClick={() => processResult(result)}
+                              title="Process Result"
+                            >
+                              ⚙️
+                            </button>
+                          )}
+                          {result.status === 'completed' && (
+                            <button 
+                              className="action-btn release-btn"
+                              onClick={() => releaseResult(result)}
+                              title="Release Result"
+                            >
+                              📤
+                            </button>
+                          )}
+                          <button 
+                            className="action-btn print-btn"
+                            onClick={() => printResult(result)}
+                            title="Print Result"
+                          >
+                            🖨️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {resultsError && (
+        <div className="error-message">{resultsError}</div>
+      )}
+    </div>
+  );
 
   // Mobile Lab Management Function
   const renderMobileLabManagement = () => (
@@ -8412,6 +8820,294 @@ function Dashboard({ currentUser, onLogout }) {
     );
   };
 
+  // Test Result View Modal Component
+  const renderViewResultModal = () => {
+    if (!showResultModal || !selectedResult) return null;
+    
+    const result = selectedResult;
+    const patientName = result.patient ? `${result.patient.firstName} ${result.patient.lastName}` : 'Unknown Patient';
+    
+    return (
+      <div className="modal-overlay" onClick={() => setShowResultModal(false)}>
+        <div className="modal-content result-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h3>Test Result Details</h3>
+            <button className="close-button" onClick={() => setShowResultModal(false)}>✕</button>
+          </div>
+          
+          <div className="modal-body">
+            <div className="result-details">
+              <div className="detail-section">
+                <h4>Basic Information</h4>
+                <div className="detail-grid">
+                  <div className="detail-item">
+                    <label>Sample ID:</label>
+                    <span>{result.sampleId}</span>
+                  </div>
+                  <div className="detail-item">
+                    <label>Patient:</label>
+                    <span>{patientName}</span>
+                  </div>
+                  <div className="detail-item">
+                    <label>Test Type:</label>
+                    <span>{result.testType}</span>
+                  </div>
+                  <div className="detail-item">
+                    <label>Status:</label>
+                    <span className={`status ${result.status}`}>{result.status}</span>
+                  </div>
+                  <div className="detail-item">
+                    <label>Sample Date:</label>
+                    <span>{new Date(result.sampleDate).toLocaleDateString()}</span>
+                  </div>
+                  {result.completedDate && (
+                    <div className="detail-item">
+                      <label>Completed Date:</label>
+                      <span>{new Date(result.completedDate).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="detail-section">
+                <h4>Test Results</h4>
+                <div className="results-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Parameter</th>
+                        <th>Result</th>
+                        <th>Reference Range</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(result.results || {}).map(([key, value]) => {
+                        const range = result.referenceRanges && result.referenceRanges[key];
+                        return (
+                          <tr key={key}>
+                            <td>{key}</td>
+                            <td>{value}</td>
+                            <td>{range ? `${range.min} - ${range.max} ${range.unit || ''}` : 'N/A'}</td>
+                            <td>
+                              <span className={range && result.isValueNormal && !result.isValueNormal(key, value) ? 'abnormal' : 'normal'}>
+                                {range && result.isValueNormal && !result.isValueNormal(key, value) ? 'ABNORMAL' : 'NORMAL'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              <div className="detail-section">
+                <h4>Quality Control & Flags</h4>
+                <div className="detail-grid">
+                  <div className="detail-item">
+                    <label>QC Passed:</label>
+                    <span className={result.qcPassed ? 'status passed' : 'status failed'}>
+                      {result.qcPassed ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <label>Abnormal:</label>
+                    <span className={result.isAbnormal ? 'flag abnormal' : ''}>
+                      {result.isAbnormal ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <label>Critical:</label>
+                    <span className={result.isCritical ? 'flag critical' : ''}>
+                      {result.isCritical ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {(result.notes || result.medTechNotes || result.pathologistNotes) && (
+                <div className="detail-section">
+                  <h4>Notes</h4>
+                  {result.notes && (
+                    <div className="note-item">
+                      <label>General Notes:</label>
+                      <p>{result.notes}</p>
+                    </div>
+                  )}
+                  {result.medTechNotes && (
+                    <div className="note-item">
+                      <label>MedTech Notes:</label>
+                      <p>{result.medTechNotes}</p>
+                    </div>
+                  )}
+                  {result.pathologistNotes && (
+                    <div className="note-item">
+                      <label>Pathologist Notes:</label>
+                      <p>{result.pathologistNotes}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={() => setShowResultModal(false)}>
+              Close
+            </button>
+            <button className="btn btn-primary" onClick={() => printResult(result)}>
+              Print Result
+            </button>
+            {result.status === 'completed' && (
+              <button className="btn btn-success" onClick={() => releaseResult(result)}>
+                Release to Patient
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Process Result Modal Component
+  const renderProcessResultModal = () => {
+    if (!showProcessResultModal) return null;
+    
+    const [resultData, setResultData] = useState(editingResult || {
+      sampleId: '',
+      testType: '',
+      results: {},
+      status: 'in-progress',
+      notes: '',
+      medTechNotes: '',
+      qcPassed: false
+    });
+    
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      try {
+        let response;
+        if (editingResult) {
+          response = await testResultsAPI.updateTestResult(editingResult._id, resultData);
+        } else {
+          response = await testResultsAPI.createTestResult(resultData);
+        }
+        
+        if (response.success) {
+          alert(`Test result ${editingResult ? 'updated' : 'created'} successfully!`);
+          setShowProcessResultModal(false);
+          setEditingResult(null);
+          fetchTestResults();
+        } else {
+          throw new Error(response.message || `Failed to ${editingResult ? 'update' : 'create'} test result`);
+        }
+      } catch (error) {
+        console.error('Process result error:', error);
+        alert(`Failed to ${editingResult ? 'update' : 'create'} test result: ` + error.message);
+      }
+    };
+    
+    return (
+      <div className="modal-overlay" onClick={() => setShowProcessResultModal(false)}>
+        <div className="modal-content process-result-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h3>{editingResult ? 'Edit Test Result' : 'Process New Test Result'}</h3>
+            <button className="close-button" onClick={() => setShowProcessResultModal(false)}>✕</button>
+          </div>
+          
+          <form onSubmit={handleSubmit}>
+            <div className="modal-body">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Sample ID</label>
+                  <input
+                    type="text"
+                    value={resultData.sampleId}
+                    onChange={(e) => setResultData({...resultData, sampleId: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Test Type</label>
+                  <select
+                    value={resultData.testType}
+                    onChange={(e) => setResultData({...resultData, testType: e.target.value})}
+                    required
+                  >
+                    <option value="">Select Test Type</option>
+                    <option value="Complete Blood Count (CBC)">Complete Blood Count (CBC)</option>
+                    <option value="Blood Sugar Test">Blood Sugar Test</option>
+                    <option value="Lipid Profile">Lipid Profile</option>
+                    <option value="Urinalysis">Urinalysis</option>
+                    <option value="X-Ray">X-Ray</option>
+                    <option value="ECG">ECG</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Status</label>
+                  <select
+                    value={resultData.status}
+                    onChange={(e) => setResultData({...resultData, status: e.target.value})}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="reviewed">Reviewed</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="form-group">
+                <label>Notes</label>
+                <textarea
+                  value={resultData.notes}
+                  onChange={(e) => setResultData({...resultData, notes: e.target.value})}
+                  rows="3"
+                  placeholder="General notes about the test result..."
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>MedTech Notes</label>
+                <textarea
+                  value={resultData.medTechNotes}
+                  onChange={(e) => setResultData({...resultData, medTechNotes: e.target.value})}
+                  rows="3"
+                  placeholder="Technical notes from medical technologist..."
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={resultData.qcPassed}
+                    onChange={(e) => setResultData({...resultData, qcPassed: e.target.checked})}
+                  />
+                  Quality Control Passed
+                </label>
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => setShowProcessResultModal(false)}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary">
+                {editingResult ? 'Update Result' : 'Process Result'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
   // Patient View Modal Component
   const renderViewPatientModal = () => {
     if (!showViewPatientModal || !selectedPatient) return null;
@@ -9758,6 +10454,12 @@ function Dashboard({ currentUser, onLogout }) {
                 >
                   Appointments
                 </div>
+                <div 
+                  className={`dashboard-nav-subitem ${activeSection === 'results' ? 'active' : ''}`}
+                  onClick={() => handleSectionClick('results')}
+                >
+                  Test Results
+                </div>
               </div>
             )}
           </div>
@@ -9836,6 +10538,10 @@ function Dashboard({ currentUser, onLogout }) {
       
       {/* Service Modal */}
       {ServiceModal()}
+
+      {/* Test Results Modals */}
+      {renderViewResultModal()}
+      {renderProcessResultModal()}
 
       {/* Appointment Management Modals */}
       {/* Schedule Appointment Modal */}
