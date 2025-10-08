@@ -7,6 +7,7 @@ function Dashboard({ currentUser, onLogout }) {
   const [userManagementOpen, setUserManagementOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
+  const [appointmentManagementOpen, setAppointmentManagementOpen] = useState(false);
   
   // Dashboard Overview State
   const [dashboardStats, setDashboardStats] = useState({
@@ -32,6 +33,55 @@ function Dashboard({ currentUser, onLogout }) {
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [userStats, setUserStats] = useState(null);
+
+  // Appointment management state
+  const [appointments, setAppointments] = useState([]);
+  const [appointmentLoading, setAppointmentLoading] = useState(false);
+  const [appointmentError, setAppointmentError] = useState('');
+  const [appointmentSearchTerm, setAppointmentSearchTerm] = useState('');
+  const [appointmentFilterStatus, setAppointmentFilterStatus] = useState('');
+  const [appointmentFilterDate, setAppointmentFilterDate] = useState('');
+  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState(null);
+
+  // Patient check-in/out state for appointments
+  const [showCheckInModal, setShowCheckInModal] = useState(false);
+  const [showCheckOutModal, setShowCheckOutModal] = useState(false);
+  const [selectedAppointmentPatient, setSelectedAppointmentPatient] = useState(null);
+
+  // Services state for appointment booking
+  const [appointmentServices, setAppointmentServices] = useState([]);
+  const [showServiceInfoModal, setShowServiceInfoModal] = useState(false);
+  const [selectedAppointmentService, setSelectedAppointmentService] = useState(null);
+
+  // Walk-in registration state
+  const [showWalkInModal, setShowWalkInModal] = useState(false);
+  const [walkInData, setWalkInData] = useState({
+    patientName: '',
+    contactNumber: '',
+    email: '',
+    services: [],
+    notes: '',
+    urgency: 'regular'
+  });
+
+  // Schedule appointment state
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [appointmentType, setAppointmentType] = useState('scheduled');
+  const [scheduleData, setScheduleData] = useState({
+    patientName: '',
+    contactNumber: '',
+    email: '',
+    serviceId: '',
+    serviceName: '',
+    appointmentDate: '',
+    appointmentTime: '',
+    notes: '',
+    reasonForVisit: '',
+    followUpFor: '',
+    groupSize: 1,
+    groupMembers: []
+  });
 
   // Finance management state
   const [financeStats, setFinanceStats] = useState(null);
@@ -438,6 +488,327 @@ function Dashboard({ currentUser, onLogout }) {
   const toggleLogs = () => {
     setLogsOpen(!logsOpen);
   };
+
+  // Appointment Management Functions
+  const fetchAppointments = async () => {
+    setAppointmentLoading(true);
+    setAppointmentError('');
+    try {
+      const params = {};
+      if (appointmentSearchTerm) params.patientName = appointmentSearchTerm;
+      if (appointmentFilterStatus) params.status = appointmentFilterStatus;
+      if (appointmentFilterDate) params.appointmentDate = appointmentFilterDate;
+      
+      console.log('Fetching appointments with params:', params);
+      const response = await appointmentAPI.getAppointments(params);
+      console.log('Appointments response:', response);
+      
+      if (response.success) {
+        setAppointments(response.data || []);
+        console.log('Appointments loaded:', response.data?.length || 0, 'appointments');
+      } else {
+        throw new Error(response.message || 'Failed to fetch appointments');
+      }
+    } catch (err) {
+      console.error('Fetch appointments error:', err);
+      setAppointmentError(err.message || 'Failed to fetch appointments');
+      setAppointments([]);
+    } finally {
+      setAppointmentLoading(false);
+    }
+  };
+
+  const fetchAppointmentServices = async () => {
+    try {
+      const response = await servicesAPI.getServices();
+      if (response.success) {
+        setAppointmentServices(response.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch services:', error);
+      setAppointmentServices([]);
+    }
+  };
+
+  const handleViewAppointmentDetails = async (appointment) => {
+    console.log('Viewing appointment details:', appointment);
+    // Could open a modal to show appointment details
+  };
+
+  const handleCheckInAppointment = async (appointment) => {
+    setSelectedAppointmentPatient(appointment);
+    setShowCheckInModal(true);
+  };
+
+  const handleCheckOutAppointment = async (appointment) => {
+    setSelectedAppointmentPatient(appointment);
+    setShowCheckOutModal(true);
+  };
+
+  const processCheckIn = async () => {
+    try {
+      const response = await appointmentAPI.checkInPatient(selectedAppointmentPatient._id);
+      
+      if (response.success) {
+        setAppointments(prev => 
+          prev.map(apt => 
+            apt._id === selectedAppointmentPatient._id 
+              ? { ...response.data }
+              : apt
+          )
+        );
+        
+        setShowCheckInModal(false);
+        setSelectedAppointmentPatient(null);
+        alert(`Patient ${selectedAppointmentPatient.patientName} checked in successfully!`);
+      } else {
+        throw new Error(response.message || 'Failed to check in patient');
+      }
+    } catch (error) {
+      console.error('Check-in error:', error);
+      setAppointmentError('Failed to check in patient: ' + error.message);
+      alert('Failed to check in patient: ' + error.message);
+    }
+  };
+
+  const processCheckOut = async () => {
+    try {
+      const response = await appointmentAPI.checkOutPatient(selectedAppointmentPatient._id, 'completed');
+      
+      if (response.success) {
+        setAppointments(prev => 
+          prev.map(apt => 
+            apt._id === selectedAppointmentPatient._id 
+              ? { ...response.data }
+              : apt
+          )
+        );
+        
+        setShowCheckOutModal(false);
+        setSelectedAppointmentPatient(null);
+        alert(`Patient ${selectedAppointmentPatient.patientName} checked out successfully!`);
+      } else {
+        throw new Error(response.message || 'Failed to check out patient');
+      }
+    } catch (error) {
+      console.error('Check-out error:', error);
+      setAppointmentError('Failed to check out patient: ' + error.message);
+      alert('Failed to check out patient: ' + error.message);
+    }
+  };
+
+  const handleEditAppointment = (appointment) => {
+    setEditingAppointment(appointment);
+    setScheduleData({
+      patientName: appointment.patientName,
+      contactNumber: appointment.contactNumber || '',
+      email: appointment.email || '',
+      serviceId: appointment.serviceId,
+      serviceName: appointment.serviceName,
+      appointmentDate: appointment.appointmentDate,
+      appointmentTime: appointment.appointmentTime,
+      notes: appointment.notes || '',
+      reasonForVisit: appointment.reasonForVisit || '',
+      followUpFor: appointment.followUpFor || '',
+      groupSize: appointment.groupSize || 1,
+      groupMembers: appointment.groupMembers || []
+    });
+    setShowScheduleModal(true);
+  };
+
+  const handleCancelAppointment = async (appointment) => {
+    if (confirm(`Are you sure you want to cancel the appointment for ${appointment.patientName}?`)) {
+      try {
+        const response = await appointmentAPI.cancelAppointment(appointment._id, 'Cancelled by admin');
+        
+        if (response.success) {
+          setAppointments(prev => 
+            prev.map(apt => 
+              apt._id === appointment._id 
+                ? { ...apt, status: 'cancelled' }
+                : apt
+            )
+          );
+          alert('Appointment cancelled successfully!');
+        } else {
+          throw new Error(response.message || 'Failed to cancel appointment');
+        }
+      } catch (error) {
+        console.error('Cancel appointment error:', error);
+        alert('Failed to cancel appointment: ' + error.message);
+      }
+    }
+  };
+
+  const handleScheduleSubmit = async () => {
+    try {
+      const validationErrors = validateAppointmentForm();
+      if (validationErrors.length > 0) {
+        alert('Please fix the following errors:\\n\\n' + validationErrors.join('\\n'));
+        return;
+      }
+
+      const appointmentData = {
+        patientId: null,
+        patientName: scheduleData.patientName,
+        contactNumber: scheduleData.contactNumber,
+        email: scheduleData.email,
+        serviceId: scheduleData.serviceId,
+        serviceName: scheduleData.serviceName,
+        appointmentDate: scheduleData.appointmentDate,
+        appointmentTime: scheduleData.appointmentTime,
+        type: appointmentType,
+        priority: 'regular',
+        notes: scheduleData.notes,
+        reasonForVisit: scheduleData.reasonForVisit,
+        adminNotes: `Scheduled via admin portal by ${currentUser.firstName || currentUser.username || 'Admin'}`
+      };
+
+      let response;
+      if (editingAppointment) {
+        response = await appointmentAPI.updateAppointment(editingAppointment._id, appointmentData);
+      } else {
+        response = await appointmentAPI.createAppointment(appointmentData);
+      }
+      
+      if (response.success) {
+        if (editingAppointment) {
+          setAppointments(prev => 
+            prev.map(apt => 
+              apt._id === editingAppointment._id 
+                ? response.data 
+                : apt
+            )
+          );
+        } else {
+          setAppointments(prev => [response.data, ...prev]);
+        }
+        
+        setShowScheduleModal(false);
+        setEditingAppointment(null);
+        setScheduleData({
+          patientName: '',
+          contactNumber: '',
+          email: '',
+          serviceId: '',
+          serviceName: '',
+          appointmentDate: '',
+          appointmentTime: '',
+          notes: '',
+          reasonForVisit: '',
+          followUpFor: '',
+          groupSize: 1,
+          groupMembers: []
+        });
+        setAppointmentError('');
+        
+        alert(`Appointment ${editingAppointment ? 'updated' : 'scheduled'} successfully for ${response.data.patientName}!`);
+      } else {
+        throw new Error(response.message || `Failed to ${editingAppointment ? 'update' : 'schedule'} appointment`);
+      }
+    } catch (error) {
+      console.error('Schedule appointment error:', error);
+      setAppointmentError(`Failed to ${editingAppointment ? 'update' : 'schedule'} appointment: ` + error.message);
+      alert(`Failed to ${editingAppointment ? 'update' : 'schedule'} appointment:\\n` + error.message);
+    }
+  };
+
+  const validateAppointmentForm = () => {
+    const errors = [];
+
+    if (!scheduleData.patientName.trim()) {
+      errors.push('Patient name is required');
+    }
+    
+    if (!scheduleData.contactNumber.trim()) {
+      errors.push('Contact number is required');
+    } else if (!/^\\+?[0-9\\s\\-\\(\\)]{10,}$/.test(scheduleData.contactNumber)) {
+      errors.push('Please enter a valid contact number');
+    }
+    
+    if (!scheduleData.email.trim()) {
+      errors.push('Email is required');
+    } else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(scheduleData.email)) {
+      errors.push('Please enter a valid email address');
+    }
+    
+    if (!scheduleData.serviceId) {
+      errors.push('Please select a service');
+    }
+    
+    if (!scheduleData.appointmentDate) {
+      errors.push('Appointment date is required');
+    } else {
+      const selectedDate = new Date(scheduleData.appointmentDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (selectedDate < today) {
+        errors.push('Appointment date cannot be in the past');
+      }
+    }
+    
+    if (!scheduleData.appointmentTime) {
+      errors.push('Please select an appointment time slot');
+    }
+    
+    if (!scheduleData.reasonForVisit.trim()) {
+      errors.push('Reason for visit is required');
+    }
+
+    return errors;
+  };
+
+  const processWalkInRegistration = async () => {
+    try {
+      const mockServiceId = appointmentServices.length > 0 ? appointmentServices[0]._id : '507f1f77bcf86cd799439011';
+      
+      const walkInAppointmentData = {
+        patientName: walkInData.patientName,
+        contactNumber: walkInData.contactNumber,
+        email: walkInData.email,
+        serviceId: mockServiceId,
+        serviceName: walkInData.services.join(', ') || 'Walk-in Service',
+        appointmentDate: new Date().toISOString().split('T')[0],
+        appointmentTime: 'Walk-in',
+        type: 'walk-in',
+        priority: walkInData.urgency,
+        notes: walkInData.notes,
+        reasonForVisit: 'Walk-in patient registration'
+      };
+
+      const response = await appointmentAPI.createAppointment(walkInAppointmentData);
+      
+      if (response.success) {
+        setAppointments(prev => [response.data, ...prev]);
+        
+        setShowWalkInModal(false);
+        setWalkInData({
+          patientName: '',
+          contactNumber: '',
+          email: '',
+          services: [],
+          notes: '',
+          urgency: 'regular'
+        });
+        
+        alert(`Walk-in patient ${response.data.patientName} registered successfully!`);
+      } else {
+        throw new Error(response.message || 'Failed to register walk-in patient');
+      }
+    } catch (error) {
+      console.error('Walk-in registration error:', error);
+      setAppointmentError('Failed to register walk-in patient: ' + error.message);
+      alert('Failed to register walk-in patient: ' + error.message);
+    }
+  };
+
+  // Effect to fetch appointments when section changes
+  useEffect(() => {
+    if (activeSection === 'appointments') {
+      fetchAppointments();
+      fetchAppointmentServices();
+    }
+  }, [activeSection, appointmentSearchTerm, appointmentFilterStatus, appointmentFilterDate]);
 
   const handleLogout = async () => {
     try {
@@ -2638,6 +3009,7 @@ function Dashboard({ currentUser, onLogout }) {
       case 'reports': return 'Financial Reports';
       case 'logs': return 'System Logs';
       case 'services': return 'Lab Services';
+      case 'appointments': return 'Appointment Management';
       default: return 'Dashboard';
     }
   };
@@ -2656,6 +3028,7 @@ function Dashboard({ currentUser, onLogout }) {
       case 'reports': return renderFinancialReports();
       case 'logs': return renderSystemLogs();
       case 'services': return renderServices();
+      case 'appointments': return renderAppointmentManagement();
       case 'mobile-lab': return renderMobileLabManagement();
       default: return renderDashboardHome();
     }
@@ -5405,6 +5778,189 @@ function Dashboard({ currentUser, onLogout }) {
                     </td>
                   </tr>
                 ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Appointment Management Component
+  const renderAppointmentManagement = () => (
+    <div className="management-container">
+      <div className="management-header">
+        <div className="management-title">
+          <h2>Appointment Management</h2>
+          <p>View and manage patient appointments</p>
+        </div>
+        <button className="add-btn" onClick={() => setShowScheduleModal(true)}>
+          + Schedule Appointment
+        </button>
+      </div>
+
+      <div className="management-stats">
+        <div className="stat-card">
+          <div className="stat-icon"></div>
+          <div className="stat-info">
+            <div className="stat-label">Today's Appointments</div>
+            <div className="stat-value">{appointments.filter(apt => {
+              const today = new Date().toISOString().split('T')[0];
+              return apt.appointmentDate === today;
+            }).length}</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon"></div>
+          <div className="stat-info">
+            <div className="stat-label">Pending Appointments</div>
+            <div className="stat-value">{appointments.filter(apt => apt.status === 'pending' || apt.status === 'confirmed').length}</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon"></div>
+          <div className="stat-info">
+            <div className="stat-label">Completed Today</div>
+            <div className="stat-value">{appointments.filter(apt => {
+              const today = new Date().toISOString().split('T')[0];
+              return apt.appointmentDate === today && apt.status === 'completed';
+            }).length}</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon"></div>
+          <div className="stat-info">
+            <div className="stat-label">Walk-in Patients</div>
+            <div className="stat-value">{appointments.filter(apt => apt.type === 'walk-in').length}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="search-filter">
+        <input
+          type="text"
+          placeholder="Search appointments..."
+          className="search-input"
+          value={appointmentSearchTerm}
+          onChange={(e) => setAppointmentSearchTerm(e.target.value)}
+        />
+        <select
+          className="filter-select"
+          value={appointmentFilterStatus}
+          onChange={(e) => setAppointmentFilterStatus(e.target.value)}
+        >
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="checked-in">Checked In</option>
+          <option value="in-progress">In Progress</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <input
+          type="date"
+          className="date-filter"
+          value={appointmentFilterDate}
+          onChange={(e) => setAppointmentFilterDate(e.target.value)}
+        />
+        <button className="filter-btn" onClick={() => setShowWalkInModal(true)}>
+          + Walk-in Registration
+        </button>
+      </div>
+
+      <div className="management-content">
+        <div className="data-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Appointment ID</th>
+                <th>Patient Name</th>
+                <th>Service</th>
+                <th>Date & Time</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {appointmentLoading ? (
+                <tr>
+                  <td colSpan="7">Loading appointments...</td>
+                </tr>
+              ) : appointments.length === 0 ? (
+                <tr>
+                  <td colSpan="7">No appointments found</td>
+                </tr>
+              ) : (
+                appointments
+                  .filter(appointment => {
+                    const matchesSearch = appointmentSearchTerm === '' || 
+                      appointment.patientName?.toLowerCase().includes(appointmentSearchTerm.toLowerCase()) ||
+                      appointment.appointmentId?.toLowerCase().includes(appointmentSearchTerm.toLowerCase());
+                    const matchesStatus = appointmentFilterStatus === '' || appointment.status === appointmentFilterStatus;
+                    const matchesDate = appointmentFilterDate === '' || appointment.appointmentDate === appointmentFilterDate;
+                    return matchesSearch && matchesStatus && matchesDate;
+                  })
+                  .map((appointment) => (
+                    <tr key={appointment._id}>
+                      <td>{appointment.appointmentId}</td>
+                      <td>{appointment.patientName}</td>
+                      <td>{appointment.serviceName}</td>
+                      <td>
+                        {new Date(appointment.appointmentDate).toLocaleDateString()} - {appointment.appointmentTime}
+                      </td>
+                      <td>
+                        <span className={`appointment-type ${appointment.type}`}>
+                          {appointment.type}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`status ${appointment.status}`}>
+                          {appointment.status}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          <button 
+                            className="action-btn view" 
+                            onClick={() => handleViewAppointmentDetails(appointment)}
+                          >
+                            View
+                          </button>
+                          {(appointment.status === 'confirmed' || appointment.status === 'pending') && (
+                            <button 
+                              className="action-btn checkin" 
+                              onClick={() => handleCheckInAppointment(appointment)}
+                            >
+                              Check In
+                            </button>
+                          )}
+                          {appointment.status === 'checked-in' && (
+                            <button 
+                              className="action-btn checkout" 
+                              onClick={() => handleCheckOutAppointment(appointment)}
+                            >
+                              Check Out
+                            </button>
+                          )}
+                          <button 
+                            className="action-btn edit" 
+                            onClick={() => handleEditAppointment(appointment)}
+                          >
+                            Edit
+                          </button>
+                          {appointment.status !== 'completed' && appointment.status !== 'cancelled' && (
+                            <button 
+                              className="action-btn cancel" 
+                              onClick={() => handleCancelAppointment(appointment)}
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
               )}
             </tbody>
           </table>
@@ -9196,6 +9752,12 @@ function Dashboard({ currentUser, onLogout }) {
                 >
                   Services
                 </div>
+                <div 
+                  className={`dashboard-nav-subitem ${activeSection === 'appointments' ? 'active' : ''}`}
+                  onClick={() => handleSectionClick('appointments')}
+                >
+                  Appointments
+                </div>
               </div>
             )}
           </div>
@@ -9274,6 +9836,281 @@ function Dashboard({ currentUser, onLogout }) {
       
       {/* Service Modal */}
       {ServiceModal()}
+
+      {/* Appointment Management Modals */}
+      {/* Schedule Appointment Modal */}
+      {showScheduleModal && (
+        <div className="modal-overlay" onClick={() => setShowScheduleModal(false)}>
+          <div className="modal-content large-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{editingAppointment ? 'Edit Appointment' : 'Schedule New Appointment'}</h3>
+              <button className="modal-close" onClick={() => setShowScheduleModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Patient Name *</label>
+                  <input
+                    type="text"
+                    value={scheduleData.patientName}
+                    onChange={(e) => setScheduleData({...scheduleData, patientName: e.target.value})}
+                    placeholder="Enter patient name"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Contact Number *</label>
+                  <input
+                    type="text"
+                    value={scheduleData.contactNumber}
+                    onChange={(e) => setScheduleData({...scheduleData, contactNumber: e.target.value})}
+                    placeholder="+639XXXXXXXXX"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Email *</label>
+                <input
+                  type="email"
+                  value={scheduleData.email}
+                  onChange={(e) => setScheduleData({...scheduleData, email: e.target.value})}
+                  placeholder="patient@email.com"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Service *</label>
+                <select
+                  value={scheduleData.serviceId}
+                  onChange={(e) => {
+                    const selectedService = appointmentServices.find(s => s._id === e.target.value);
+                    setScheduleData({
+                      ...scheduleData,
+                      serviceId: e.target.value,
+                      serviceName: selectedService ? selectedService.serviceName : ''
+                    });
+                  }}
+                  required
+                >
+                  <option value="">Select a service...</option>
+                  {appointmentServices.map(service => (
+                    <option key={service._id} value={service._id}>
+                      {service.serviceName} - ₱{service.price}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Appointment Date *</label>
+                  <input
+                    type="date"
+                    value={scheduleData.appointmentDate}
+                    onChange={(e) => setScheduleData({...scheduleData, appointmentDate: e.target.value})}
+                    min={new Date().toISOString().split('T')[0]}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Appointment Time *</label>
+                  <select
+                    value={scheduleData.appointmentTime}
+                    onChange={(e) => setScheduleData({...scheduleData, appointmentTime: e.target.value})}
+                    required
+                  >
+                    <option value="">Select time slot...</option>
+                    <option value="8:00 AM">8:00 AM</option>
+                    <option value="9:00 AM">9:00 AM</option>
+                    <option value="10:00 AM">10:00 AM</option>
+                    <option value="11:00 AM">11:00 AM</option>
+                    <option value="1:00 PM">1:00 PM</option>
+                    <option value="2:00 PM">2:00 PM</option>
+                    <option value="3:00 PM">3:00 PM</option>
+                    <option value="4:00 PM">4:00 PM</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Reason for Visit *</label>
+                <textarea
+                  value={scheduleData.reasonForVisit}
+                  onChange={(e) => setScheduleData({...scheduleData, reasonForVisit: e.target.value})}
+                  placeholder="Describe the reason for this appointment"
+                  rows="3"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Additional Notes</label>
+                <textarea
+                  value={scheduleData.notes}
+                  onChange={(e) => setScheduleData({...scheduleData, notes: e.target.value})}
+                  placeholder="Any additional information or special instructions"
+                  rows="2"
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="btn-secondary" 
+                onClick={() => setShowScheduleModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-primary"
+                onClick={handleScheduleSubmit}
+              >
+                {editingAppointment ? 'Update Appointment' : 'Schedule Appointment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Walk-in Registration Modal */}
+      {showWalkInModal && (
+        <div className="modal-overlay" onClick={() => setShowWalkInModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Walk-in Patient Registration</h3>
+              <button className="modal-close" onClick={() => setShowWalkInModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Patient Name *</label>
+                <input
+                  type="text"
+                  value={walkInData.patientName}
+                  onChange={(e) => setWalkInData({...walkInData, patientName: e.target.value})}
+                  placeholder="Enter patient name"
+                />
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Contact Number *</label>
+                  <input
+                    type="text"
+                    value={walkInData.contactNumber}
+                    onChange={(e) => setWalkInData({...walkInData, contactNumber: e.target.value})}
+                    placeholder="+639XXXXXXXXX"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email *</label>
+                  <input
+                    type="email"
+                    value={walkInData.email}
+                    onChange={(e) => setWalkInData({...walkInData, email: e.target.value})}
+                    placeholder="patient@email.com"
+                  />
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Services Required</label>
+                <textarea
+                  value={walkInData.services.join(', ')}
+                  onChange={(e) => setWalkInData({...walkInData, services: e.target.value.split(', ').filter(s => s)})}
+                  placeholder="List services needed (comma separated)"
+                  rows="2"
+                />
+              </div>
+              <div className="form-group">
+                <label>Urgency</label>
+                <select
+                  value={walkInData.urgency}
+                  onChange={(e) => setWalkInData({...walkInData, urgency: e.target.value})}
+                >
+                  <option value="regular">Regular</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Notes</label>
+                <textarea
+                  value={walkInData.notes}
+                  onChange={(e) => setWalkInData({...walkInData, notes: e.target.value})}
+                  placeholder="Additional notes (optional)"
+                  rows="3"
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowWalkInModal(false)}>
+                Cancel
+              </button>
+              <button className="btn-primary" onClick={processWalkInRegistration}>
+                Register Walk-in Patient
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Check-in Confirmation Modal */}
+      {showCheckInModal && selectedAppointmentPatient && (
+        <div className="modal-overlay" onClick={() => setShowCheckInModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Check-in Patient</h3>
+              <button className="modal-close" onClick={() => setShowCheckInModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to check in the following patient?</p>
+              <div className="patient-details">
+                <p><strong>Patient:</strong> {selectedAppointmentPatient.patientName}</p>
+                <p><strong>Service:</strong> {selectedAppointmentPatient.serviceName}</p>
+                <p><strong>Time:</strong> {selectedAppointmentPatient.appointmentTime}</p>
+                <p><strong>Appointment ID:</strong> {selectedAppointmentPatient.appointmentId}</p>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowCheckInModal(false)}>
+                Cancel
+              </button>
+              <button className="btn-primary" onClick={processCheckIn}>
+                Confirm Check-in
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Check-out Confirmation Modal */}
+      {showCheckOutModal && selectedAppointmentPatient && (
+        <div className="modal-overlay" onClick={() => setShowCheckOutModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Check-out Patient</h3>
+              <button className="modal-close" onClick={() => setShowCheckOutModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to check out the following patient?</p>
+              <div className="patient-details">
+                <p><strong>Patient:</strong> {selectedAppointmentPatient.patientName}</p>
+                <p><strong>Service:</strong> {selectedAppointmentPatient.serviceName}</p>
+                <p><strong>Time:</strong> {selectedAppointmentPatient.appointmentTime}</p>
+                <p><strong>Appointment ID:</strong> {selectedAppointmentPatient.appointmentId}</p>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowCheckOutModal(false)}>
+                Cancel
+              </button>
+              <button className="btn-primary" onClick={processCheckOut}>
+                Confirm Check-out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
