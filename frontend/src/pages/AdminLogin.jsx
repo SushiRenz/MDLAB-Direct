@@ -80,8 +80,8 @@ function AdminLogin({ onNavigateToLogin, onNavigateToDashboard }) {
         
         if (userRole === 'admin' || userRole === 'pathologist' || userRole === 'medtech' || userRole === 'receptionist') {
           // Valid admin/staff user
-          localStorage.setItem('token', data.token);
-          localStorage.setItem('user', JSON.stringify(data.user));
+          sessionStorage.setItem('token', data.token);
+          sessionStorage.setItem('user', JSON.stringify(data.user));
           
           console.log('Staff login successful:', data.user);
           
@@ -89,9 +89,13 @@ function AdminLogin({ onNavigateToLogin, onNavigateToDashboard }) {
             setLoading(false);
             onNavigateToDashboard();
           }, 500);
-        } else {
+        } else if (userRole === 'patient') {
           // Patient trying to access staff login
-          setError('Access denied. This portal is for staff only.');
+          setError('This is the Staff Portal. Patients should use the main login page - click "Back to Patient Login" below.');
+          setLoading(false);
+        } else {
+          // Unknown role
+          setError('Account role not recognized. Please contact administrator.');
           setLoading(false);
         }
       } else {

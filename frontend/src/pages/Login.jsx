@@ -95,26 +95,28 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
 
       // Success - store user data and redirect based on role
       if (data.success && data.token) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        console.log('Login successful for user:', data.user.firstName, data.user.lastName, '- Role:', data.user.role);
         
-        console.log('Login successful:', data.user);
-        
-        // Check user role and redirect accordingly
+        // Check user role - ONLY PATIENTS can login through this page
         const userRole = data.user.role;
         
-        if (userRole === 'admin' || userRole === 'pathologist' || userRole === 'medtech' || userRole === 'patient') {
-          // All roles can now access their respective dashboards
+        if (userRole === 'patient') {
+          // Only patients allowed on this login page
+          sessionStorage.setItem('token', data.token);
+          sessionStorage.setItem('user', JSON.stringify(data.user));
+          
           setTimeout(() => {
             setLoading(false);
             onNavigateToDashboard();
           }, 500);
+        } else if (userRole === 'admin' || userRole === 'pathologist' || userRole === 'medtech' || userRole === 'receptionist') {
+          // Staff/admin accounts should use staff portal
+          setLoading(false);
+          setError('Staff accounts must use the Staff Portal. Please click the arrow in the top-right corner.');
         } else {
           // Unknown role
           setLoading(false);
           setError('Account role not recognized. Please contact administrator.');
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
         }
       } else {
         console.log('Login response missing token or success flag');

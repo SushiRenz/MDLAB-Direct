@@ -48,7 +48,7 @@ const register = asyncHandler(async (req, res, next) => {
   });
 
   // Send token response
-  sendTokenResponse(user, 201, res, 'User registered successfully');
+  await sendTokenResponse(user, 201, res, 'User registered successfully');
 });
 
 // @desc    Login user
@@ -118,14 +118,23 @@ const login = asyncHandler(async (req, res, next) => {
     await user.resetLoginAttempts();
   }
 
-  // Send token response
-  sendTokenResponse(user, 200, res, 'Login successful');
+  // Send token response (this will invalidate any previous session)
+  await sendTokenResponse(user, 200, res, 'Login successful');
 });
 
 // @desc    Logout user / clear cookie
 // @route   POST /api/auth/logout
 // @access  Private
 const logout = asyncHandler(async (req, res, next) => {
+  try {
+    // Clear the user's active session
+    await req.user.clearSession();
+    console.log(`Session cleared for user: ${req.user.username}`);
+  } catch (error) {
+    console.error('Error clearing session:', error);
+    // Continue with logout even if session clearing fails
+  }
+
   res.cookie('token', 'none', {
     expires: new Date(Date.now() + 10 * 1000),
     httpOnly: true
@@ -157,6 +166,7 @@ const getMe = asyncHandler(async (req, res, next) => {
       address: user.address,
       dateOfBirth: user.dateOfBirth,
       gender: user.gender,
+      profilePic: user.profilePic,
       isActive: user.isActive,
       isEmailVerified: user.isEmailVerified,
       lastLogin: user.lastLogin,
@@ -221,6 +231,7 @@ const updateProfile = asyncHandler(async (req, res, next) => {
       address: user.address,
       dateOfBirth: user.dateOfBirth,
       gender: user.gender,
+      profilePic: user.profilePic,
       isActive: user.isActive,
       isEmailVerified: user.isEmailVerified,
       lastLogin: user.lastLogin,

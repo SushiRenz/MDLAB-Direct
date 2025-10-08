@@ -12,7 +12,7 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -31,8 +31,8 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Token expired or invalid
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
       window.location.href = '/login';
     }
     return Promise.reject(error);
@@ -48,8 +48,8 @@ export const authAPI = {
       
       // Store token and user data
       if (response.data.success && response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        sessionStorage.setItem('token', response.data.token);
+        sessionStorage.setItem('user', JSON.stringify(response.data.user));
       }
       
       return response.data;
@@ -69,8 +69,8 @@ export const authAPI = {
       // Store token and user data
       if (response.data.success && response.data.token) {
         console.log('API: storing token and user data');
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        sessionStorage.setItem('token', response.data.token);
+        sessionStorage.setItem('user', JSON.stringify(response.data.user));
       }
       
       return response.data;
@@ -89,9 +89,9 @@ export const authAPI = {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Always clear local storage
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      // Always clear session storage
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
     }
   },
 
@@ -112,7 +112,7 @@ export const authAPI = {
       
       // Update stored user data
       if (response.data.success && response.data.user) {
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        sessionStorage.setItem('user', JSON.stringify(response.data.user));
       }
       
       return response.data;
@@ -607,15 +607,15 @@ export const servicesAPI = {
 export const authUtils = {
   // Check if user is logged in
   isAuthenticated: () => {
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
+    const token = sessionStorage.getItem('token');
+    const user = sessionStorage.getItem('user');
     return !!(token && user);
   },
 
   // Get stored user data
   getStoredUser: () => {
     try {
-      const user = localStorage.getItem('user');
+      const user = sessionStorage.getItem('user');
       return user ? JSON.parse(user) : null;
     } catch (error) {
       console.error('Error parsing stored user data:', error);
@@ -625,7 +625,7 @@ export const authUtils = {
 
   // Get stored token
   getStoredToken: () => {
-    return localStorage.getItem('token');
+    return sessionStorage.getItem('token');
   },
 
   // Check if user has specific role
@@ -647,8 +647,8 @@ export const authUtils = {
 
   // Clear all stored auth data
   clearAuthData: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
   },
 };
 

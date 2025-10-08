@@ -84,6 +84,14 @@ const userSchema = new mongoose.Schema({
   lastLogin: {
     type: Date
   },
+  currentSessionToken: {
+    type: String,
+    default: null
+  },
+  sessionExpiry: {
+    type: Date,
+    default: null
+  },
   loginAttempts: {
     type: Number,
     default: 0
@@ -190,6 +198,34 @@ userSchema.methods.resetLoginAttempts = function() {
   });
 };
 
+// Method to set active session
+userSchema.methods.setActiveSession = function(token, expiryDate) {
+  return this.updateOne({
+    $set: {
+      currentSessionToken: token,
+      sessionExpiry: expiryDate,
+      lastLogin: new Date()
+    }
+  });
+};
+
+// Method to clear active session
+userSchema.methods.clearSession = function() {
+  return this.updateOne({
+    $unset: {
+      currentSessionToken: 1,
+      sessionExpiry: 1
+    }
+  });
+};
+
+// Method to check if session is valid
+userSchema.methods.isSessionValid = function(token) {
+  return this.currentSessionToken === token && 
+         this.sessionExpiry && 
+         this.sessionExpiry > new Date();
+};
+
 // Static method to find user by email or username
 userSchema.statics.findByEmailOrUsername = function(identifier) {
   return this.findOne({
@@ -215,6 +251,22 @@ userSchema.statics.getUserStats = function() {
       }
     }
   ]);
+};
+
+// Static method to clean up expired sessions
+userSchema.statics.cleanupExpiredSessions = function() {
+  console.log('Cleaning up expired sessions...');
+  return this.updateMany(
+    {
+      sessionExpiry: { $lt: new Date() }
+    },
+    {
+      $unset: {
+        currentSessionToken: 1,
+        sessionExpiry: 1
+      }
+    }
+  );
 };
 
 module.exports = mongoose.model('User', userSchema);

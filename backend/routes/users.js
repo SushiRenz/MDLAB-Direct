@@ -63,26 +63,7 @@ const validateUserUpdate = [
   body('role').optional().isIn(['patient', 'medtech', 'pathologist', 'admin']).withMessage('Invalid role'),
 ];
 
-// Admin-only routes for user management
-router.route('/stats')
-  .get(protect, authorize('admin'), getUserStats);
-
-router.route('/')
-  .get(protect, authorize('admin'), getUsers)
-  .post(protect, authorize('admin'), validateUser, createUser);
-
-router.route('/:id')
-  .get(protect, authorize('admin'), getUser)
-  .put(protect, authorize('admin'), validateUserUpdate, updateUser)
-  .delete(protect, authorize('admin'), deleteUser);
-
-router.route('/:id/activate')
-  .put(protect, authorize('admin'), activateUser);
-
-router.route('/:id/deactivate')
-  .put(protect, authorize('admin'), deactivateUser);
-
-// Update profile route for current user
+// Update profile route for current user - MUST come before /:id routes
 router.put('/me', protect, upload.single('profilePic'), async (req, res) => {
   try {
     const updates = {};
@@ -120,5 +101,24 @@ router.put('/me', protect, upload.single('profilePic'), async (req, res) => {
     res.status(500).json({ message: 'Error updating profile' });
   }
 });
+
+// Admin-only routes for user management
+router.route('/stats')
+  .get(protect, authorize('admin'), getUserStats);
+
+router.route('/')
+  .get(protect, authorize('admin'), getUsers)
+  .post(protect, authorize('admin'), validateUser, createUser);
+
+router.route('/:id')
+  .get(protect, authorize('admin'), getUser)
+  .put(protect, authorize('admin'), validateUserUpdate, updateUser)
+  .delete(protect, authorize('admin'), deleteUser);
+
+router.route('/:id/activate')
+  .put(protect, authorize('admin'), activateUser);
+
+router.route('/:id/deactivate')
+  .put(protect, authorize('admin'), deactivateUser);
 
 module.exports = router;

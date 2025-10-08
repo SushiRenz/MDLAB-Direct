@@ -15,33 +15,40 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Handle authentication persistence with session detection
+  // Handle authentication persistence with proper role-based routing
   useEffect(() => {
-    const handleSessionAndAuthentication = async () => {
-      // Check if this is a new browser session or just a page refresh
-      const sessionActive = sessionStorage.getItem('sessionActive');
-      const token = localStorage.getItem('token');
-      const user = localStorage.getItem('user');
+    const handleAuthenticationAndRouting = async () => {
+      const token = sessionStorage.getItem('token');
+      const user = sessionStorage.getItem('user');
       
-      if (!sessionActive) {
-        // This is a new browser session (browser was closed and reopened)
-        console.log('New browser session detected - clearing auth and going to login');
+      // Check if there's a saved view for this tab
+      const savedView = sessionStorage.getItem('currentView');
+      
+      // Better detection for fresh tab vs reload:
+      // - Fresh tab: no savedView AND navigation type is 'navigate' (not 'reload')
+      // - Reload: savedView exists OR navigation type is 'reload'
+      const navigationType = performance.getEntriesByType('navigation')[0]?.type;
+      const isFreshTab = !savedView && navigationType === 'navigate';
+      const isReload = navigationType === 'reload' || navigationType === 'back_forward';
+      
+      console.log('Navigation detection:', { 
+        savedView, 
+        navigationType, 
+        isFreshTab, 
+        isReload,
+        hasToken: !!token 
+      });
+      
+      if (token && user) {
+        console.log('Found stored credentials - validating session');
         
-        // Clear stored credentials for new session
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        
-        // Reset authentication state
-        setCurrentUser(null);
-        setIsAuthenticated(false);
-        setCurrentView('login');
-        
-        // Mark session as active for future page refreshes
-        sessionStorage.setItem('sessionActive', 'true');
-        
-      } else if (token && user) {
-        // This is a page refresh within the same browser session
-        console.log('Page refresh detected - validating stored session');
+        // If it's a fresh tab (new tab/window), go to login for multi-account support
+        if (isFreshTab) {
+          console.log('Fresh tab detected - going to login for multi-account support');
+          setCurrentView('login');
+          sessionStorage.setItem('currentView', 'login');
+          return;
+        }
         
         try {
           const userData = JSON.parse(user);
@@ -56,58 +63,101 @@ function App() {
           });
           
           if (response.ok) {
-            // Token is valid - restore user session
-            setCurrentUser(userData);
+            const currentUserData = await response.json();
+            
+            // Use the fresh user data from the server
+            const validUser = currentUserData.user || currentUserData;
+            
+            // Update sessionStorage with fresh user data
+            sessionStorage.setItem('user', JSON.stringify(validUser));
+            
+            // Set authentication state
+            setCurrentUser(validUser);
             setIsAuthenticated(true);
             
-            // Route to appropriate dashboard based on role
-            switch (userData.role) {
-              case 'admin':
-                setCurrentView('dashboard');
-                break;
-              case 'receptionist':
-                setCurrentView('receptionist-dashboard');
-                break;
-              case 'medtech':
-                setCurrentView('medtech-dashboard');
-                break;
-              case 'pathologist':
-                setCurrentView('pathologist-dashboard');
-                break;
-              case 'patient':
-                setCurrentView('patient-portal');
-                break;
-              default:
-                setCurrentView('dashboard');
+            // If we have a saved view that matches the user's role, restore it
+            // Otherwise, route based on role
+            if (savedView) {
+              const roleViewMap = {
+                'admin': 'dashboard',
+                'receptionist': 'receptionist-dashboard',
+                'medtech': 'medtech-dashboard',
+                'pathologist': 'pathologist-dashboard',
+                'patient': 'patient-portal'
+              };
+              
+              const expectedView = roleViewMap[validUser.role];
+              
+              // If saved view matches user's role, use it; otherwise use role-based default
+              if (savedView === expectedView) {
+                console.log('Restoring saved view for authenticated user:', savedView);
+                setCurrentView(savedView);
+              } else {
+                console.log('Saved view does not match user role, using role-based routing');
+                setCurrentView(expectedView || 'dashboard');
+                sessionStorage.setItem('currentView', expectedView || 'dashboard');
+              }
+            } else {
+              // No saved view, route based on role
+              console.log('No saved view, routing user based on role:', validUser.role);
+              switch (validUser.role) {
+                case 'admin':
+                  setCurrentView('dashboard');
+                  sessionStorage.setItem('currentView', 'dashboard');
+                  break;
+                case 'receptionist':
+                  setCurrentView('receptionist-dashboard');
+                  sessionStorage.setItem('currentView', 'receptionist-dashboard');
+                  break;
+                case 'medtech':
+                  setCurrentView('medtech-dashboard');
+                  sessionStorage.setItem('currentView', 'medtech-dashboard');
+                  break;
+                case 'pathologist':
+                  setCurrentView('pathologist-dashboard');
+                  sessionStorage.setItem('currentView', 'pathologist-dashboard');
+                  break;
+                case 'patient':
+                  setCurrentView('patient-portal');
+                  sessionStorage.setItem('currentView', 'patient-portal');
+                  break;
+                default:
+                  console.warn('Unknown role, defaulting to admin dashboard:', validUser.role);
+                  setCurrentView('dashboard');
+                  sessionStorage.setItem('currentView', 'dashboard');
+              }
             }
             
-            console.log('Session restored for user:', userData.role);
+            console.log('Session restored successfully for:', validUser.role, validUser.firstName);
           } else {
-            // Token is invalid - clear and go to login
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
+            // Token is invalid or expired
+            console.log('Invalid token - clearing session');
+            sessionStorage.removeItem('token');
+            sessionStorage.removeItem('user');
+            sessionStorage.removeItem('currentView');
             setCurrentUser(null);
             setIsAuthenticated(false);
             setCurrentView('login');
-            console.log('Invalid token - redirected to login');
           }
         } catch (error) {
-          // Error validating token or parsing user data - go to login
+          // Error validating token or parsing user data
           console.error('Error validating session:', error);
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('user');
+          sessionStorage.removeItem('currentView');
           setCurrentUser(null);
           setIsAuthenticated(false);
           setCurrentView('login');
         }
       } else {
-        // No stored credentials but session is active (shouldn't happen, but handle it)
+        // No stored credentials - always go to login
+        console.log('No stored credentials - going to login');
         setCurrentView('login');
-        console.log('Session active but no credentials - redirected to login');
+        sessionStorage.setItem('currentView', 'login');
       }
     };
     
-    handleSessionAndAuthentication();
+    handleAuthenticationAndRouting();
   }, []);
 
   // Update document title based on current view
@@ -146,13 +196,102 @@ function App() {
     updateTitle();
   }, [currentView]);
 
+  // Cross-tab session detection using storage events
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      // Only handle sessionStorage changes (though storage events typically fire for localStorage)
+      // We'll use a custom approach since sessionStorage doesn't trigger storage events across tabs
+      
+      // If another tab clears the session, detect it and redirect to login
+      if (e.key === 'sessionCleared' && e.newValue === 'true') {
+        console.log('Session cleared in another tab - logging out');
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+        setCurrentView('login');
+        
+        // Clear this tab's session as well
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        sessionStorage.removeItem('currentView');
+        
+        // Remove the signal
+        localStorage.removeItem('sessionCleared');
+      }
+    };
+
+    // Listen for storage events (works for localStorage only)
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  // Handle user data updates (e.g., from profile updates)
+  const handleUserUpdate = (updatedUser) => {
+    console.log('App.jsx - User data updated:', updatedUser);
+    setCurrentUser(updatedUser);
+    sessionStorage.setItem('user', JSON.stringify(updatedUser));
+  };
+
+  const handleLogin = (user) => {
+    console.log('handleLogin called with user:', user);
+    
+    // Store user data in sessionStorage (tab-specific)
+    sessionStorage.setItem('user', JSON.stringify(user));
+    sessionStorage.setItem('token', user.token);
+    
+    // Update authentication state
+    setIsAuthenticated(true);
+    setCurrentUser(user);
+    
+    // Navigate to appropriate dashboard
+    navigateBasedOnRole(user.role);
+    
+    // Force a re-render
+    window.location.reload();
+  };
+
+  const navigateBasedOnRole = (role) => {
+    switch (role) {
+      case 'admin':
+        setCurrentView('dashboard');
+        sessionStorage.setItem('currentView', 'dashboard');
+        break;
+      case 'receptionist':
+        setCurrentView('receptionist-dashboard');
+        sessionStorage.setItem('currentView', 'receptionist-dashboard');
+        break;
+      case 'medtech':
+        setCurrentView('medtech-dashboard');
+        sessionStorage.setItem('currentView', 'medtech-dashboard');
+        break;
+      case 'pathologist':
+        setCurrentView('pathologist-dashboard');
+        sessionStorage.setItem('currentView', 'pathologist-dashboard');
+        break;
+      case 'patient':
+        setCurrentView('patient-portal');
+        sessionStorage.setItem('currentView', 'patient-portal');
+        break;
+      default:
+        setCurrentView('login');
+        sessionStorage.setItem('currentView', 'login');
+    }
+  };
+
   const handleLogout = () => {
-    // Clear localStorage
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    // Get token before clearing (for backend logout call)
+    const token = sessionStorage.getItem('token');
     
     // Clear sessionStorage
-    sessionStorage.removeItem('sessionActive');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('currentView');
+    
+    // Signal other tabs to log out too (using localStorage for cross-tab communication)
+    localStorage.setItem('sessionCleared', 'true');
+    setTimeout(() => localStorage.removeItem('sessionCleared'), 100);
     
     // Clear session state
     setIsAuthenticated(false);
@@ -161,19 +300,22 @@ function App() {
     // Force navigation to login page
     setCurrentView('login');
     
-    console.log('User logged out and session cleared');
+    console.log('User logged out successfully');
     
     // Optional: Call backend logout endpoint
-    fetch(API_ENDPOINTS.LOGOUT, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    }).catch(err => console.log('Backend logout call failed:', err));
+    if (token) {
+      fetch(API_ENDPOINTS.LOGOUT, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }).catch(err => console.log('Backend logout call failed:', err));
+    }
   };
 
   const handleNavigateToSignUp = () => {
     setCurrentView('signup');
+    sessionStorage.setItem('currentView', 'signup');
   };
 
   const handleNavigateToLogin = () => {
@@ -181,16 +323,18 @@ function App() {
     setIsAuthenticated(false);
     setCurrentUser(null);
     setCurrentView('login');
+    sessionStorage.setItem('currentView', 'login');
   };
 
   const handleNavigateToAdminLogin = () => {
     setCurrentView('admin-login');
+    sessionStorage.setItem('currentView', 'admin-login');
   };
 
   const handleNavigateToDashboard = () => {
     // This will be called after successful login
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
+    const token = sessionStorage.getItem('token');
+    const user = sessionStorage.getItem('user');
     
     if (token && user) {
       try {
@@ -198,45 +342,55 @@ function App() {
         setCurrentUser(userData);
         setIsAuthenticated(true);
         
-        // Mark session as active for refresh detection
-        sessionStorage.setItem('sessionActive', 'true');
-        
-        // Role-based routing
+        // Role-based routing - ALWAYS route based on the current user's role
+        console.log('Post-login routing for user role:', userData.role);
+        let targetView;
         switch (userData.role) {
           case 'admin':
             console.log('Routing to admin dashboard');
-            setCurrentView('dashboard'); // Admin Dashboard
+            targetView = 'dashboard';
+            setCurrentView('dashboard');
             break;
           case 'receptionist':
             console.log('Routing to receptionist dashboard');
-            setCurrentView('receptionist-dashboard'); // Receptionist Dashboard
+            targetView = 'receptionist-dashboard';
+            setCurrentView('receptionist-dashboard');
             break;
           case 'medtech':
             console.log('Routing to medtech dashboard');
-            setCurrentView('medtech-dashboard'); // MedTech Dashboard
+            targetView = 'medtech-dashboard';
+            setCurrentView('medtech-dashboard');
             break;
           case 'pathologist':
             console.log('Routing to pathologist dashboard');
-            setCurrentView('pathologist-dashboard'); // Pathologist Dashboard
+            targetView = 'pathologist-dashboard';
+            setCurrentView('pathologist-dashboard');
             break;
           case 'patient':
             console.log('Routing to patient portal');
-            setCurrentView('patient-portal'); // Patient Portal (for future)
+            targetView = 'patient-portal';
+            setCurrentView('patient-portal');
             break;
           default:
             console.log('Unknown role, routing to default dashboard:', userData.role);
-            setCurrentView('dashboard'); // Fallback to admin dashboard
+            targetView = 'dashboard';
+            setCurrentView('dashboard');
         }
         
-        console.log('Navigating to dashboard for user:', userData, 'Role:', userData.role);
+        // Save the view to sessionStorage for this tab
+        sessionStorage.setItem('currentView', targetView);
+        
+        console.log('Navigation completed for:', userData.firstName, userData.lastName, '(Role:', userData.role + ')');
       } catch (error) {
         console.error('Error parsing user data during navigation:', error);
         // Stay on login if data is invalid
         setCurrentView('login');
+        sessionStorage.setItem('currentView', 'login');
       }
     } else {
       console.error('No token or user data found, staying on login');
       setCurrentView('login');
+      sessionStorage.setItem('currentView', 'login');
     }
   };
 
@@ -297,6 +451,7 @@ function App() {
           <PatientDashboard
             currentUser={currentUser}
             onLogout={handleLogout}
+            onUserUpdate={handleUserUpdate}
           />
         );
       default:

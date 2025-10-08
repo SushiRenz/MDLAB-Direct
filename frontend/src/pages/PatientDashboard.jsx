@@ -51,9 +51,12 @@ function PatientDashboard(props) {
     return appointmentDate < today;
   });
 
-  // Sync currentUser state with props
+  // Sync currentUser state with props - CRITICAL for profile data visibility
   useEffect(() => {
-    setCurrentUser(props.currentUser);
+    console.log('PatientDashboard - props.currentUser changed:', props.currentUser);
+    if (props.currentUser) {
+      setCurrentUser(props.currentUser);
+    }
   }, [props.currentUser]);
 
   // Load test results from localStorage
@@ -318,8 +321,8 @@ function PatientDashboard(props) {
   const confirmLogout = async () => {
     try {
       // Clear local storage
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
       
       // Call the parent logout function
       props.onLogout();
@@ -335,7 +338,18 @@ function PatientDashboard(props) {
   };
 
   const handleProfileUpdate = (updatedUser) => {
-    setCurrentUser({ ...updatedUser }); // Create a new object to force re-render
+    console.log('PatientDashboard - Profile updated:', updatedUser);
+    
+    // Update local state
+    setCurrentUser({ ...updatedUser });
+    
+    // Update sessionStorage so other components can access the updated data
+    sessionStorage.setItem('user', JSON.stringify(updatedUser));
+    
+    // If the parent component (App.jsx) has an onUserUpdate callback, call it
+    if (props.onUserUpdate) {
+      props.onUserUpdate(updatedUser);
+    }
   };
 
   const handleAppointmentSubmit = async (appointmentData) => {

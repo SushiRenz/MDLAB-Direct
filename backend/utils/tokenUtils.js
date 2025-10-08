@@ -8,7 +8,7 @@ const generateToken = (id) => {
 };
 
 // Send token response
-const sendTokenResponse = (user, statusCode, res, message = 'Success') => {
+const sendTokenResponse = async (user, statusCode, res, message = 'Success') => {
   // Create token
   const token = generateToken(user._id);
 
@@ -21,9 +21,24 @@ const sendTokenResponse = (user, statusCode, res, message = 'Success') => {
     sameSite: 'strict'
   };
 
-  // Update last login
-  user.lastLogin = new Date();
-  user.save({ validateBeforeSave: false });
+  const expiryDate = new Date(
+    Date.now() + (parseInt(process.env.JWT_EXPIRE?.replace('d', '')) || 7) * 24 * 60 * 60 * 1000
+  );
+
+  try {
+    // Clear any existing session for this user (single session per user)
+    if (user.currentSessionToken) {
+      console.log(`Invalidating previous session for user: ${user.username}`);
+    }
+    
+    // Set new active session
+    await user.setActiveSession(token, expiryDate);
+    
+    console.log(`New session created for user: ${user.username}, expires: ${expiryDate}`);
+  } catch (error) {
+    console.error('Error setting active session:', error);
+    // Continue with login even if session tracking fails
+  }
 
   res
     .status(statusCode)
@@ -41,6 +56,10 @@ const sendTokenResponse = (user, statusCode, res, message = 'Success') => {
         fullName: user.fullName,
         role: user.role,
         phone: user.phone,
+        gender: user.gender,
+        dateOfBirth: user.dateOfBirth,
+        address: user.address,
+        profilePic: user.profilePic,
         isActive: user.isActive,
         isEmailVerified: user.isEmailVerified,
         lastLogin: user.lastLogin,

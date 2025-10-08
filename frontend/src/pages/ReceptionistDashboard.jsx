@@ -196,8 +196,8 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
   const handleLogout = async () => {
     try {
       // Clear local storage
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
       
       // Call the parent logout function
       onLogout();

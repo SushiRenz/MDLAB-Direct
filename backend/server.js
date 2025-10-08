@@ -20,6 +20,9 @@ const mobileLabRoutes = require('./routes/mobileLab');
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
 
+// Import models for session management
+const User = require('./models/User');
+
 const app = express();
 
 // Security middleware
@@ -184,6 +187,30 @@ mongoose.connect(mongoURI, mongoOptions)
 // MongoDB connection event handlers
 mongoose.connection.on('connected', () => {
   console.log('📡 Mongoose connected to MongoDB');
+  
+  // Start session cleanup task (runs every hour)
+  setInterval(async () => {
+    try {
+      const result = await User.cleanupExpiredSessions();
+      if (result.modifiedCount > 0) {
+        console.log(`🧹 Cleaned up ${result.modifiedCount} expired sessions`);
+      }
+    } catch (error) {
+      console.error('❌ Error cleaning up expired sessions:', error);
+    }
+  }, 60 * 60 * 1000); // Run every hour
+  
+  // Run cleanup immediately on startup
+  setTimeout(async () => {
+    try {
+      const result = await User.cleanupExpiredSessions();
+      if (result.modifiedCount > 0) {
+        console.log(`🧹 Initial cleanup: removed ${result.modifiedCount} expired sessions`);
+      }
+    } catch (error) {
+      console.error('❌ Error in initial session cleanup:', error);
+    }
+  }, 5000); // Run after 5 seconds to ensure database is ready
 });
 
 mongoose.connection.on('error', (err) => {

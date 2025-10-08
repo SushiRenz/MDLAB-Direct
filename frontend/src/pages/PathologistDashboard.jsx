@@ -22,8 +22,8 @@ function PathologistDashboard({ currentUser, onLogout }) {
 
   const handleLogout = async () => {
     try {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
       onLogout();
     } catch (error) {
       console.error('Logout error:', error);

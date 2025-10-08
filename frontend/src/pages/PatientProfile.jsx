@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import '../design/PatientDashboard.css';
 
@@ -7,18 +7,82 @@ function PatientProfile({ user, onProfileUpdate }) {
   const [profileData, setProfileData] = useState({
     gender: user?.gender || '',
     dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).split('T')[0] : '',
-    address: typeof user?.address === 'object' && user?.address ? JSON.stringify(user.address) : user?.address || '',
+    address: typeof user?.address === 'object' && user?.address ? 
+      JSON.stringify(user.address) : 
+      user?.address || '',
     profilePic: user?.profilePic || null,
   });
   const [previewPic, setPreviewPic] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Update profileData when user prop changes
+  useEffect(() => {
+    console.log('PatientProfile - useEffect triggered, user changed:', user);
+    console.log('PatientProfile - user data available:', !!user);
+    console.log('PatientProfile - user details:', {
+      firstName: user?.firstName,
+      lastName: user?.lastName,
+      email: user?.email,
+      gender: user?.gender,
+      dateOfBirth: user?.dateOfBirth,
+      address: user?.address
+    });
+    
+    if (user) {
+      const newProfileData = {
+        gender: user?.gender || '',
+        dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).split('T')[0] : '',
+        address: typeof user?.address === 'object' && user?.address ? 
+          JSON.stringify(user.address) : 
+          user?.address || '',
+        profilePic: user?.profilePic || null,
+      };
+      
+      console.log('PatientProfile - Setting profile data:', newProfileData);
+      setProfileData(newProfileData);
+    }
+  }, [user]);
+
+  // Fetch fresh user data when component mounts to ensure we have latest profile info
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const token = sessionStorage.getItem('token');
+        if (token && user?.id) {
+          console.log('PatientProfile - Fetching fresh user data');
+          const response = await axios.get('/api/auth/me', {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
+          
+          if (response.data.success && response.data.user) {
+            console.log('PatientProfile - Fresh user data received:', response.data.user);
+            // Update parent component with fresh data
+            if (onProfileUpdate) {
+              onProfileUpdate(response.data.user);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('PatientProfile - Error fetching user data:', error);
+      }
+    };
+
+    // Only fetch if we have a user but missing profile data
+    if (user?.id && (!user.gender && !user.dateOfBirth && !user.address)) {
+      fetchUserData();
+    }
+  }, [user?.id, onProfileUpdate]);
 
   const handleEditClick = () => {
     // Update profile data when entering edit mode
     setProfileData({
       gender: user?.gender || '',
       dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).split('T')[0] : '',
-      address: typeof user?.address === 'object' && user?.address ? JSON.stringify(user.address) : user?.address || '',
+      address: typeof user?.address === 'object' && user?.address ? 
+        JSON.stringify(user.address) : 
+        user?.address || '',
       profilePic: user?.profilePic || null,
     });
     setEditMode(true);
@@ -31,7 +95,9 @@ function PatientProfile({ user, onProfileUpdate }) {
     setProfileData({
       gender: user?.gender || '',
       dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).split('T')[0] : '',
-      address: typeof user?.address === 'object' && user?.address ? JSON.stringify(user.address) : user?.address || '',
+      address: typeof user?.address === 'object' && user?.address ? 
+        JSON.stringify(user.address) : 
+        user?.address || '',
       profilePic: user?.profilePic || null,
     });
   };
@@ -60,7 +126,7 @@ function PatientProfile({ user, onProfileUpdate }) {
   const handleSave = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const { gender, dateOfBirth, address, profilePic } = profileData;
 
       const formData = new FormData();
@@ -87,21 +153,31 @@ function PatientProfile({ user, onProfileUpdate }) {
         updatedUser.profilePic = `${updatedUser.profilePic}?t=${Date.now()}`;
       }
 
-      // Update parent state
+      console.log('PatientProfile - Profile update successful:', updatedUser);
+
+      // Update parent state FIRST
       if (onProfileUpdate) {
+        console.log('PatientProfile - Calling onProfileUpdate with:', updatedUser);
         onProfileUpdate(updatedUser);
       }
 
       // Update local state with new data
-      setProfileData({
+      const newProfileData = {
         gender: updatedUser.gender || '',
-        dateOfBirth: updatedUser.dateOfBirth || '',
-        address: updatedUser.address || '',
+        dateOfBirth: updatedUser.dateOfBirth ? String(updatedUser.dateOfBirth).split('T')[0] : '',
+        address: typeof updatedUser.address === 'object' && updatedUser.address ? 
+          JSON.stringify(updatedUser.address) : 
+          updatedUser.address || '',
         profilePic: updatedUser.profilePic || null
-      });
+      };
+      
+      console.log('PatientProfile - Updating local profileData:', newProfileData);
+      setProfileData(newProfileData);
 
       setPreviewPic(null);
       setEditMode(false);
+
+      console.log('PatientProfile - Profile update completed successfully!');
 
     } catch (err) {
       console.error('Update error:', err);
@@ -230,7 +306,7 @@ function PatientProfile({ user, onProfileUpdate }) {
                   <option value="Other">Other</option>
                 </select>
               ) : (
-                <div className="field-value">{user?.gender || 'Not provided'}</div>
+                <div className="field-value">{profileData.gender || 'Not provided'}</div>
               )}
             </div>
             <div className="field-item">
@@ -244,7 +320,7 @@ function PatientProfile({ user, onProfileUpdate }) {
                 />
               ) : (
                 <div className="field-value">
-                  {user?.dateOfBirth ? String(user.dateOfBirth).split('T')[0] : 'Not provided'}
+                  {profileData.dateOfBirth || 'Not provided'}
                 </div>
               )}
             </div>
@@ -262,10 +338,7 @@ function PatientProfile({ user, onProfileUpdate }) {
                 />
               ) : (
                 <div className="field-value">
-                  {typeof user?.address === 'object' && user?.address ? 
-                    JSON.stringify(user.address) : 
-                    user?.address || 'Not provided'
-                  }
+                  {profileData.address || 'Not provided'}
                 </div>
               )}
             </div>
