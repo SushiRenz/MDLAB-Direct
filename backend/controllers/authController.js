@@ -1,5 +1,6 @@
 const { validationResult } = require('express-validator');
 const User = require('../models/User');
+const Log = require('../models/Log');
 const asyncHandler = require('../utils/asyncHandler');
 const { sendTokenResponse } = require('../utils/tokenUtils');
 
@@ -46,6 +47,16 @@ const register = asyncHandler(async (req, res, next) => {
     phone,
     role
   });
+
+  // Log user registration
+  await Log.logUserAction(
+    'User Registration',
+    `New user registered: ${firstName} ${lastName} (${email}) with role: ${role}`,
+    email,
+    req.ip || req.connection.remoteAddress || '127.0.0.1',
+    'success',
+    { userId: user._id, role, registrationTime: new Date() }
+  );
 
   // Send token response
   await sendTokenResponse(user, 201, res, 'User registered successfully');
@@ -105,6 +116,16 @@ const login = asyncHandler(async (req, res, next) => {
     // Increment login attempts
     await user.incLoginAttempts();
     
+    // Log failed login attempt
+    await Log.logAuthentication(
+      'Failed Login Attempt',
+      `Invalid password for user: ${identifier}`,
+      user.email,
+      req.ip || req.connection.remoteAddress || '127.0.0.1',
+      'failed',
+      { loginAttempts: user.loginAttempts + 1, identifier }
+    );
+    
     return res.status(401).json({
       success: false,
       message: 'Invalid credentials'
@@ -118,6 +139,16 @@ const login = asyncHandler(async (req, res, next) => {
     await user.resetLoginAttempts();
   }
 
+  // Log successful login
+  await Log.logAuthentication(
+    'User Login',
+    `Successful login: ${user.firstName} ${user.lastName} (${user.email}) - Role: ${user.role}`,
+    user.email,
+    req.ip || req.connection.remoteAddress || '127.0.0.1',
+    'success',
+    { userId: user._id, role: user.role, loginTime: new Date() }
+  );
+
   // Send token response (this will invalidate any previous session)
   await sendTokenResponse(user, 200, res, 'Login successful');
 });
@@ -127,6 +158,16 @@ const login = asyncHandler(async (req, res, next) => {
 // @access  Private
 const logout = asyncHandler(async (req, res, next) => {
   try {
+    // Log logout activity
+    await Log.logAuthentication(
+      'User Logout',
+      `User logged out: ${req.user.firstName} ${req.user.lastName} (${req.user.email})`,
+      req.user.email,
+      req.ip || req.connection.remoteAddress || '127.0.0.1',
+      'success',
+      { userId: req.user._id, logoutTime: new Date() }
+    );
+
     // Clear the user's active session
     await req.user.clearSession();
     console.log(`Session cleared for user: ${req.user.username}`);

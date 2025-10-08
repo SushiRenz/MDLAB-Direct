@@ -241,17 +241,21 @@ function Dashboard({ currentUser, onLogout }) {
     try {
       // Fetch user statistics
       const userStatsResponse = await userAPI.getUserStats();
+      console.log('User stats response:', userStatsResponse);
       
       // Fetch finance statistics  
       const financeStatsResponse = await financeAPI.getFinanceStats();
+      console.log('Finance stats response:', financeStatsResponse);
       
       // Fetch recent transactions
       const recentTransactionsResponse = await financeAPI.getTransactions({ limit: 5 });
+      console.log('Recent transactions response:', recentTransactionsResponse);
       
       // Fetch services and calculate stats locally
       let serviceStats = { totalServices: 0, activeServices: 0, topServices: [] };
       try {
         const servicesResponse = await servicesAPI.getServices();
+        console.log('Services response:', servicesResponse);
         if (servicesResponse.success && servicesResponse.data) {
           const services = servicesResponse.data;
           serviceStats = {
@@ -264,20 +268,52 @@ function Dashboard({ currentUser, onLogout }) {
         console.error('Error fetching services for stats:', error);
       }
 
+      // Fetch appointments stats
+      let appointmentStats = { totalAppointments: 0, todayAppointments: 0, pendingAppointments: 0 };
+      try {
+        const appointmentsResponse = await appointmentAPI.getAppointmentStats();
+        console.log('Appointments stats response:', appointmentsResponse);
+        if (appointmentsResponse.success && appointmentsResponse.data) {
+          appointmentStats = appointmentsResponse.data;
+        }
+      } catch (error) {
+        console.error('Error fetching appointment stats:', error);
+      }
+
       if (userStatsResponse.success && financeStatsResponse.success) {
+        // Map the backend response to frontend state
+        const userStats = userStatsResponse.stats || {};
+        const roleStats = userStats.byRole || [];
+        
+        // Calculate role counts
+        const patientCount = roleStats.find(r => r._id === 'patient')?.count || 0;
+        const medtechCount = roleStats.find(r => r._id === 'medtech')?.count || 0;
+        const pathologistCount = roleStats.find(r => r._id === 'pathologist')?.count || 0;
+        const receptionistCount = roleStats.find(r => r._id === 'receptionist')?.count || 0;
+        const adminCount = roleStats.find(r => r._id === 'admin')?.count || 0;
+        
         setDashboardStats({
-          totalUsers: userStatsResponse.stats?.totalUsers || 0,
-          totalPatients: userStatsResponse.stats?.totalPatients || 0,
-          totalMedTech: userStatsResponse.stats?.totalMedTech || 0,
-          activeUsers: userStatsResponse.stats?.activeUsers || 0,
+          totalUsers: userStats.total || 0,
+          totalPatients: patientCount,
+          totalMedTech: medtechCount,
+          totalPathologists: pathologistCount,
+          totalReceptionists: receptionistCount,
+          totalAdmins: adminCount,
+          activeUsers: userStats.active || 0,
           totalRevenue: financeStatsResponse.data?.totalRevenue || 0,
           pendingBills: financeStatsResponse.data?.pendingBills || 0,
           monthlyRevenue: financeStatsResponse.data?.monthlyRevenue || 0,
           completedPayments: financeStatsResponse.data?.completedPayments || 0,
+          totalBills: financeStatsResponse.data?.totalBills || 0,
+          totalPayments: financeStatsResponse.data?.totalPayments || 0,
+          totalTransactions: financeStatsResponse.data?.totalTransactions || 0,
           recentTransactions: recentTransactionsResponse.success ? (recentTransactionsResponse.data || []) : [],
           topServices: serviceStats.topServices || [],
           totalServices: serviceStats.totalServices || 0,
-          activeServices: serviceStats.activeServices || 0
+          activeServices: serviceStats.activeServices || 0,
+          totalAppointments: appointmentStats.totalAppointments || 0,
+          todayAppointments: appointmentStats.todayAppointments || 0,
+          pendingAppointments: appointmentStats.pendingAppointments || 0
         });
       } else {
         throw new Error('Failed to fetch dashboard data');
@@ -286,39 +322,29 @@ function Dashboard({ currentUser, onLogout }) {
       console.error('Dashboard data fetch error:', err);
       setDashboardError(err.message || 'Failed to load dashboard data');
       
-      // Set fallback data for demo purposes
+      // Set empty data instead of mock data
       setDashboardStats({
-        totalUsers: 156,
-        totalPatients: 89,
-        totalMedTech: 23,
-        activeUsers: 142,
-        totalRevenue: 1250000,
-        pendingBills: 45,
-        monthlyRevenue: 850000,
-        completedPayments: 128,
-        recentTransactions: [
-          {
-            transactionId: 'TXN-2025-001',
-            patientName: 'Maria Santos',
-            amount: 2500,
-            type: 'payment',
-            status: 'completed',
-            transactionDate: new Date().toISOString()
-          },
-          {
-            transactionId: 'TXN-2025-002', 
-            patientName: 'Carlos Rodriguez',
-            amount: 1800,
-            type: 'payment',
-            status: 'pending',
-            transactionDate: new Date(Date.now() - 86400000).toISOString()
-          }
-        ],
-        topServices: [
-          { serviceName: 'Complete Blood Count', count: 45, revenue: 36000 },
-          { serviceName: 'Lipid Profile', count: 32, revenue: 48000 },
-          { serviceName: 'X-Ray Chest', count: 28, revenue: 33600 }
-        ]
+        totalUsers: 0,
+        totalPatients: 0,
+        totalMedTech: 0,
+        totalPathologists: 0,
+        totalReceptionists: 0,
+        totalAdmins: 0,
+        activeUsers: 0,
+        totalRevenue: 0,
+        pendingBills: 0,
+        monthlyRevenue: 0,
+        completedPayments: 0,
+        totalBills: 0,
+        totalPayments: 0,
+        totalTransactions: 0,
+        recentTransactions: [],
+        topServices: [],
+        totalServices: 0,
+        activeServices: 0,
+        totalAppointments: 0,
+        todayAppointments: 0,
+        pendingAppointments: 0
       });
     } finally {
       setDashboardLoading(false);
@@ -858,16 +884,25 @@ function Dashboard({ currentUser, onLogout }) {
         }
       }
 
+      console.log('🔄 Fetching logs with params:', params);
       const data = await logsAPI.getLogs(params);
+      console.log('📊 Logs API response:', data);
+      
       if (data.success) {
+        console.log('✅ Setting logs:', data.data?.length || 0, 'entries');
         setLogs(data.data || []);
         setLogPagination(data.pagination || logPagination);
       } else {
+        console.error('❌ Logs fetch failed:', data.message);
         setLogsError(data.message || 'Failed to fetch logs');
+        // Set empty array instead of mock data
+        setLogs([]);
       }
     } catch (err) {
-      console.error('Failed to fetch logs:', err);
+      console.error('💥 Failed to fetch logs:', err);
       setLogsError(err.message || 'Failed to fetch logs');
+      // Set empty array instead of mock data
+      setLogs([]);
     } finally {
       setLogsLoading(false);
     }
@@ -875,12 +910,26 @@ function Dashboard({ currentUser, onLogout }) {
 
   const fetchLogStats = async () => {
     try {
+      console.log('🔄 Fetching log stats...');
       const data = await logsAPI.getLogStats();
+      console.log('📊 Log stats API response:', data);
+      
       if (data.success) {
+        console.log('✅ Setting log stats:', data.data);
         setLogStats(data.data);
+      } else {
+        console.error('❌ Log stats fetch failed:', data.message);
+        // Set empty stats instead of mock data
+        setLogStats({
+          today: { totalEvents: 0, activeUsers: 0, securityAlerts: 0, systemUptime: '0%' }
+        });
       }
     } catch (err) {
-      console.error('Failed to fetch log stats:', err);
+      console.error('💥 Failed to fetch log stats:', err);
+      // Set empty stats instead of mock data
+      setLogStats({
+        today: { totalEvents: 0, activeUsers: 0, securityAlerts: 0, systemUptime: '0%' }
+      });
     }
   };
 
@@ -3122,168 +3171,297 @@ function Dashboard({ currentUser, onLogout }) {
       );
     }
 
+    if (dashboardError) {
+      return (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '400px',
+          color: '#e74c3c'
+        }}>
+          <div style={{ fontSize: '18px', marginBottom: '10px' }}>Error loading dashboard data</div>
+          <div style={{ fontSize: '14px', color: '#666' }}>{dashboardError}</div>
+          <button 
+            onClick={fetchDashboardData}
+            style={{
+              marginTop: '20px',
+              padding: '10px 20px',
+              backgroundColor: '#3498db',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer'
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+
     return (
     <>
-      {/* Top Row Stats */}
+      {/* Welcome Section */}
+      <div className="dashboard-welcome">
+        <h1>MDLAB Direct - Admin Dashboard</h1>
+        <p>Welcome back, {currentUser?.firstName} {currentUser?.lastName}! Here's your laboratory overview.</p>
+      </div>
+
+      {/* Top Row Stats - Users & System */}
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Total Users</div>
             <div className="stat-value">{dashboardStats.totalUsers}</div>
+            <div className="stat-description">All registered users</div>
           </div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon"></div>
           <div className="stat-info">
-            <div className="stat-label">Active Patients</div>
-            <div className="stat-value">{dashboardStats.activePatients}</div>
+            <div className="stat-label">Active Users</div>
+            <div className="stat-value">{dashboardStats.activeUsers}</div>
+            <div className="stat-description">Currently active accounts</div>
           </div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon"></div>
           <div className="stat-info">
-            <div className="stat-label">Total Revenue</div>
-            <div className="stat-value">₱{dashboardStats.totalRevenue?.toLocaleString() || '0'}</div>
+            <div className="stat-label">Total Patients</div>
+            <div className="stat-value">{dashboardStats.totalPatients}</div>
+            <div className="stat-description">Registered patients</div>
           </div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon"></div>
           <div className="stat-info">
             <div className="stat-label">Total Services</div>
             <div className="stat-value">{dashboardStats.totalServices}</div>
+            <div className="stat-description">Available lab services</div>
           </div>
         </div>
       </div>
 
-      {/* Middle Row */}
-      <div className="middle-grid">
-        <div className="chart-card large">
-          <div className="card-header">
-            <h3>Monthly Revenue</h3>
-          </div>
-          <div className="chart-placeholder">
-            <div className="chart-content">
-              <div className="chart-title">Revenue Trends</div>
-              <div className="chart-mock">
-                <div className="chart-bar" style={{height: '60%'}}></div>
-                <div className="chart-bar" style={{height: '80%'}}></div>
-                <div className="chart-bar" style={{height: '45%'}}></div>
-                <div className="chart-bar" style={{height: '90%'}}></div>
-                <div className="chart-bar" style={{height: '70%'}}></div>
-                <div className="chart-bar" style={{height: '85%'}}></div>
-              </div>
-            </div>
+      {/* Staff Overview Row */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Medical Technologists</div>
+            <div className="stat-value">{dashboardStats.totalMedTech}</div>
+            <div className="stat-description">Lab technicians</div>
           </div>
         </div>
 
-        <div className="info-card">
-          <div className="card-header">
-            <h3>Financial Overview</h3>
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Pathologists</div>
+            <div className="stat-value">{dashboardStats.totalPathologists}</div>
+            <div className="stat-description">Medical pathologists</div>
           </div>
-          <div className="card-content">
-            <div className="overview-item">
-              <span className="overview-label">Total Bills</span>
-              <span className="overview-value">{dashboardStats.totalBills}</span>
-            </div>
-            <div className="overview-item">
-              <span className="overview-label">Total Payments</span>
-              <span className="overview-value">{dashboardStats.totalPayments}</span>
-            </div>
-            <div className="overview-item">
-              <span className="overview-label">Total Transactions</span>
-              <span className="overview-value">{dashboardStats.totalTransactions}</span>
-            </div>
-            <div className="overview-item">
-              <span className="overview-label">Total Revenue</span>
-              <span className="overview-value">₱{dashboardStats.totalRevenue?.toLocaleString() || '0'}</span>
-            </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Receptionists</div>
+            <div className="stat-value">{dashboardStats.totalReceptionists}</div>
+            <div className="stat-description">Front desk staff</div>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Administrators</div>
+            <div className="stat-value">{dashboardStats.totalAdmins}</div>
+            <div className="stat-description">System admins</div>
           </div>
         </div>
       </div>
 
-      {/* Bottom Row */}
-      <div className="bottom-grid">
-        <div className="quick-access-card">
-          <div className="card-header">
-            <h3>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '8px'}}>
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-              Patients
-            </h3>
-          </div>
-          <div className="quick-access-content">
-            <div className="access-item">
-              <span>Total Patients</span>
-              <span className="access-count">{dashboardStats.totalPatients}</span>
-            </div>
-            <div className="access-item">
-              <span>Active Patients</span>
-              <span className="access-count">{dashboardStats.activePatients}</span>
-            </div>
+      {/* Financial Overview Row */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Total Revenue</div>
+            <div className="stat-value">₱{(dashboardStats.totalRevenue || 0).toLocaleString()}</div>
+            <div className="stat-description">All-time revenue</div>
           </div>
         </div>
 
-        <div className="quick-access-card">
-          <div className="card-header">
-            <h3>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '8px'}}>
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-              MedTech
-            </h3>
-          </div>
-          <div className="quick-access-content">
-            <div className="access-item">
-              <span>Total MedTech</span>
-              <span className="access-count">{dashboardStats.totalMedTech}</span>
-            </div>
-            <div className="access-item">
-              <span>Active MedTech</span>
-              <span className="access-count">{dashboardStats.totalMedTech}</span>
-            </div>
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Monthly Revenue</div>
+            <div className="stat-value">₱{(dashboardStats.monthlyRevenue || 0).toLocaleString()}</div>
+            <div className="stat-description">Current month</div>
           </div>
         </div>
 
-        <div className="activity-card">
-          <div className="card-header">
-            <h3>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '8px'}}>
-                <path d="M18 20V10"></path>
-                <path d="M12 20V4"></path>
-                <path d="M6 20v-6"></path>
-              </svg>
-              System Analytics
-            </h3>
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Total Bills</div>
+            <div className="stat-value">{dashboardStats.totalBills || 0}</div>
+            <div className="stat-description">Generated bills</div>
           </div>
-          <div className="activity-content">
-            <div className="activity-chart">
-              <div className="analytics-title">System Overview</div>
-              <div className="activity-stats">
-                <div className="activity-stat">
-                  <span>Total Logs</span>
-                  <span className="stat-number">{dashboardStats.totalLogs}</span>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Pending Bills</div>
+            <div className="stat-value">{dashboardStats.pendingBills || 0}</div>
+            <div className="stat-description">Awaiting payment</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Services & Appointments Row */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Active Services</div>
+            <div className="stat-value">{dashboardStats.activeServices}</div>
+            <div className="stat-description">Currently available</div>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Total Appointments</div>
+            <div className="stat-value">{dashboardStats.totalAppointments || 0}</div>
+            <div className="stat-description">All-time bookings</div>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Today's Appointments</div>
+            <div className="stat-value">{dashboardStats.todayAppointments || 0}</div>
+            <div className="stat-description">Scheduled for today</div>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Pending Appointments</div>
+            <div className="stat-value">{dashboardStats.pendingAppointments || 0}</div>
+            <div className="stat-description">Awaiting confirmation</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Transactions */}
+      {dashboardStats.recentTransactions && dashboardStats.recentTransactions.length > 0 && (
+        <div className="dashboard-section">
+          <div className="section-header">
+            <h2>Recent Transactions</h2>
+            <p>Latest financial activities</p>
+          </div>
+          <div className="transactions-table">
+            <div className="table-header">
+              <div className="table-cell">Transaction ID</div>
+              <div className="table-cell">Patient</div>
+              <div className="table-cell">Amount</div>
+              <div className="table-cell">Type</div>
+              <div className="table-cell">Status</div>
+              <div className="table-cell">Date</div>
+            </div>
+            {dashboardStats.recentTransactions.slice(0, 5).map((transaction, index) => (
+              <div key={index} className="table-row">
+                <div className="table-cell">{transaction.transactionId || transaction._id}</div>
+                <div className="table-cell">{transaction.patientName || 'N/A'}</div>
+                <div className="table-cell">₱{(transaction.amount || 0).toLocaleString()}</div>
+                <div className="table-cell">{transaction.type || 'N/A'}</div>
+                <div className="table-cell">
+                  <span className={`status-badge ${transaction.status}`}>
+                    {transaction.status || 'pending'}
+                  </span>
                 </div>
-                <div className="activity-stat">
-                  <span>Services</span>
-                  <span className="stat-number">{dashboardStats.totalServices}</span>
+                <div className="table-cell">
+                  {transaction.transactionDate ? 
+                    new Date(transaction.transactionDate).toLocaleDateString() : 
+                    'N/A'
+                  }
                 </div>
               </div>
-            </div>
+            ))}
           </div>
+        </div>
+      )}
+
+      {/* Top Services */}
+      {dashboardStats.topServices && dashboardStats.topServices.length > 0 && (
+        <div className="dashboard-section">
+          <div className="section-header">
+            <h2>Popular Services</h2>
+            <p>Most requested laboratory services</p>
+          </div>
+          <div className="services-grid">
+            {dashboardStats.topServices.slice(0, 6).map((service, index) => (
+              <div key={index} className="service-card">
+                <div className="service-name">{service.serviceName || service.name}</div>
+                <div className="service-stats">
+                  <div className="service-stat">
+                    <span className="stat-label">Price</span>
+                    <span className="stat-value">₱{(service.price || 0).toLocaleString()}</span>
+                  </div>
+                  {service.count && (
+                    <div className="service-stat">
+                      <span className="stat-label">Bookings</span>
+                      <span className="stat-value">{service.count}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div className="dashboard-section">
+        <div className="section-header">
+          <h2>Quick Actions</h2>
+          <p>Common administrative tasks</p>
+        </div>
+        <div className="quick-actions-grid">
+          <button 
+            className="action-button"
+            onClick={() => setActiveSection('user-management')}
+          >
+            <div className="action-title">Manage Users</div>
+            <div className="action-description">Add, edit, or deactivate users</div>
+          </button>
+          
+          <button 
+            className="action-button"
+            onClick={() => setActiveSection('finance')}
+          >
+            <div className="action-title">Financial Management</div>
+            <div className="action-description">View bills, payments, transactions</div>
+          </button>
+          
+          <button 
+            className="action-button"
+            onClick={() => setActiveSection('services')}
+          >
+            <div className="action-title">Service Management</div>
+            <div className="action-description">Manage laboratory services</div>
+          </button>
+          
+          <button 
+            className="action-button"
+            onClick={() => setActiveSection('appointments')}
+          >
+            <div className="action-title">Appointments</div>
+            <div className="action-description">View and manage bookings</div>
+          </button>
         </div>
       </div>
     </>
     );
   };
+
+
 
   const renderPatientManagement = () => {
     const patients = users.filter(user => user.role === 'patient');
@@ -4776,31 +4954,31 @@ function Dashboard({ currentUser, onLogout }) {
       <div className="logs-overview">
         <div className="log-stats">
           <div className="stat-card">
-            <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">Total Events Today</div>
               <div className="stat-value">{logStats?.today?.totalEvents || 0}</div>
+              <div className="stat-description">System activities logged</div>
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">Active Users</div>
               <div className="stat-value">{logStats?.today?.activeUsers || 0}</div>
+              <div className="stat-description">Users with activity today</div>
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon"></div>
             <div className="stat-info">
               <div className="stat-label">Security Alerts</div>
               <div className="stat-value">{logStats?.today?.securityAlerts || 0}</div>
+              <div className="stat-description">Security events detected</div>
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon"></div>
             <div className="stat-info">
-              <div className="stat-label">System Uptime</div>
-              <div className="stat-value">{logStats?.today?.systemUptime || '0%'}</div>
+              <div className="stat-label">Total Logs</div>
+              <div className="stat-value">{logPagination.totalLogs || logs.length || 0}</div>
+              <div className="stat-description">All recorded events</div>
             </div>
           </div>
         </div>
@@ -4899,8 +5077,30 @@ function Dashboard({ currentUser, onLogout }) {
                 <tbody>
                   {logs.length === 0 ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '20px' }}>
-                        No logs found
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '40px 20px' }}>
+                        <div style={{ color: '#6c757d', fontSize: '16px', marginBottom: '10px' }}>
+                          No logs found
+                        </div>
+                        <div style={{ color: '#95a5a6', fontSize: '14px' }}>
+                          {logsError ? 'Failed to load logs from server' : 'No log entries match the current filters'}
+                        </div>
+                        {logsError && (
+                          <button 
+                            onClick={() => fetchLogs(1)}
+                            style={{
+                              marginTop: '15px',
+                              padding: '8px 16px',
+                              backgroundColor: '#21AEA8',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '14px'
+                            }}
+                          >
+                            Retry
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ) : (
@@ -4909,16 +5109,67 @@ function Dashboard({ currentUser, onLogout }) {
                         key={log._id} 
                         className={log.level === 'critical' ? 'security-alert' : ''}
                       >
-                        <td>{new Date(log.timestamp).toLocaleString()}</td>
+                        <td>
+                          <div style={{ fontSize: '13px', lineHeight: '1.4' }}>
+                            <div style={{ fontWeight: '600', color: '#2c3e50' }}>
+                              {new Date(log.timestamp).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </div>
+                            <div style={{ color: '#6c757d', fontSize: '12px' }}>
+                              {new Date(log.timestamp).toLocaleTimeString('en-US', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit'
+                              })}
+                            </div>
+                          </div>
+                        </td>
                         <td>
                           <span className={`log-level ${log.level}`}>
                             {log.level.toUpperCase()}
                           </span>
                         </td>
-                        <td>{log.userEmail}</td>
-                        <td>{log.action}</td>
-                        <td>{log.details}</td>
-                        <td>{log.ipAddress}</td>
+                        <td>
+                          <div style={{ fontSize: '13px', lineHeight: '1.4' }}>
+                            <div style={{ fontWeight: '500', color: '#2c3e50' }}>
+                              {log.userEmail || 'System'}
+                            </div>
+                            {log.userEmail && log.userEmail !== 'system' && (
+                              <div style={{ color: '#6c757d', fontSize: '11px' }}>
+                                User Account
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ fontSize: '13px', fontWeight: '500', color: '#2c3e50' }}>
+                            {log.action}
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ 
+                            fontSize: '12px', 
+                            color: '#495057',
+                            maxWidth: '200px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }} title={log.details}>
+                            {log.details}
+                          </div>
+                        </td>
+                        <td>
+                          <span style={{ 
+                            fontSize: '12px', 
+                            fontFamily: 'monospace',
+                            color: '#6c757d'
+                          }}>
+                            {log.ipAddress || 'N/A'}
+                          </span>
+                        </td>
                         <td>
                           <span className={`status ${log.status}`}>
                             {log.status.charAt(0).toUpperCase() + log.status.slice(1)}

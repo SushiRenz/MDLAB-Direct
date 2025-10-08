@@ -100,6 +100,43 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
+// API Access Logging Middleware
+const Log = require('./models/Log');
+app.use(async (req, res, next) => {
+  // Only log certain API endpoints to avoid spam
+  if (req.path.startsWith('/api/') && 
+      !req.path.includes('/health') && 
+      !req.path.includes('/ping') &&
+      !req.path.includes('/logs')) { // Don't log the logs endpoint to avoid recursion
+    
+    try {
+      // Get user email from request if authenticated
+      const userEmail = req.user?.email || 'anonymous';
+      const action = `${req.method} ${req.path}`;
+      const details = `API Access: ${req.method} ${req.path}${req.query ? ' - Query: ' + JSON.stringify(req.query) : ''}`;
+      
+      // Log the API access asynchronously (don't wait for it)
+      Log.logInfo(
+        action,
+        details,
+        userEmail,
+        req.ip || req.connection.remoteAddress || '127.0.0.1',
+        { 
+          method: req.method, 
+          path: req.path, 
+          query: req.query,
+          userAgent: req.get('User-Agent')
+        }
+      ).catch(err => {
+        console.error('Failed to log API access:', err);
+      });
+    } catch (error) {
+      console.error('Error in API logging middleware:', error);
+    }
+  }
+  next();
+});
+
 // Serve static files for profile pictures
 app.use('/profile-pics', express.static(path.join(__dirname, 'public/profile-pics')));
 

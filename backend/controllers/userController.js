@@ -1,5 +1,6 @@
 const { validationResult } = require('express-validator');
 const User = require('../models/User');
+const Log = require('../models/Log');
 const asyncHandler = require('../utils/asyncHandler');
 
 // @desc    Get all users
@@ -139,6 +140,21 @@ const createUser = asyncHandler(async (req, res, next) => {
     gender
   });
 
+  // Log user creation by admin
+  await Log.logUserAction(
+    'User Creation',
+    `Admin created new user: ${firstName} ${lastName} (${email}) with role: ${role}`,
+    req.user?.email || 'admin',
+    req.ip || req.connection.remoteAddress || '127.0.0.1',
+    'success',
+    { 
+      createdUserId: user._id, 
+      createdUserRole: role, 
+      adminId: req.user?._id,
+      creationTime: new Date() 
+    }
+  );
+
   res.status(201).json({
     success: true,
     message: 'User created successfully',
@@ -197,6 +213,21 @@ const updateUser = asyncHandler(async (req, res, next) => {
     }
   ).select('-passwordHash');
 
+  // Log user update by admin
+  await Log.logUserAction(
+    'User Update',
+    `Admin updated user: ${user.firstName} ${user.lastName} (${user.email}) - Fields: ${Object.keys(fieldsToUpdate).join(', ')}`,
+    req.user?.email || 'admin',
+    req.ip || req.connection.remoteAddress || '127.0.0.1',
+    'success',
+    { 
+      updatedUserId: user._id, 
+      updatedFields: Object.keys(fieldsToUpdate),
+      adminId: req.user?._id,
+      updateTime: new Date() 
+    }
+  );
+
   res.status(200).json({
     success: true,
     message: 'User updated successfully',
@@ -229,6 +260,21 @@ const deleteUser = asyncHandler(async (req, res, next) => {
   }
 
   await User.findByIdAndDelete(req.params.id);
+
+  // Log user deletion by admin
+  await Log.logUserAction(
+    'User Deletion',
+    `Admin deleted user: ${user.firstName} ${user.lastName} (${user.email}) - Role: ${user.role}`,
+    req.user?.email || 'admin',
+    req.ip || req.connection.remoteAddress || '127.0.0.1',
+    'success',
+    { 
+      deletedUserId: user._id, 
+      deletedUserRole: user.role,
+      adminId: req.user?._id,
+      deletionTime: new Date() 
+    }
+  );
 
   res.status(200).json({
     success: true,
@@ -269,6 +315,20 @@ const deactivateUser = asyncHandler(async (req, res, next) => {
     }
   ).select('-passwordHash');
 
+  // Log user deactivation by admin
+  await Log.logUserAction(
+    'User Deactivation',
+    `Admin deactivated user: ${user.firstName} ${user.lastName} (${user.email})`,
+    req.user?.email || 'admin',
+    req.ip || req.connection.remoteAddress || '127.0.0.1',
+    'success',
+    { 
+      deactivatedUserId: user._id, 
+      adminId: req.user?._id,
+      deactivationTime: new Date() 
+    }
+  );
+
   res.status(200).json({
     success: true,
     message: 'User deactivated successfully',
@@ -295,6 +355,20 @@ const activateUser = asyncHandler(async (req, res, next) => {
       message: 'User not found'
     });
   }
+
+  // Log user activation by admin
+  await Log.logUserAction(
+    'User Activation',
+    `Admin activated user: ${user.firstName} ${user.lastName} (${user.email})`,
+    req.user?.email || 'admin',
+    req.ip || req.connection.remoteAddress || '127.0.0.1',
+    'success',
+    { 
+      activatedUserId: user._id, 
+      adminId: req.user?._id,
+      activationTime: new Date() 
+    }
+  );
 
   res.status(200).json({
     success: true,

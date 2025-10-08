@@ -4,6 +4,7 @@ const Transaction = require('../models/Transaction');
 const Payment = require('../models/Payment');
 const BillingRate = require('../models/BillingRate');
 const User = require('../models/User');
+const Log = require('../models/Log');
 const asyncHandler = require('../utils/asyncHandler');
 
 // @desc    Get finance dashboard stats
