@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import '../design/MedTechDashboard.css';
+import '../design/Dashboard.css';
 
 function MedTechDashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('dashboard');
-  const [samplesOpen, setSamplesOpen] = useState(false);
-  const [resultsOpen, setResultsOpen] = useState(false);
-
+  const [sampleManagementOpen, setSampleManagementOpen] = useState(false);
+  const [testingOpen, setTestingOpen] = useState(false);
+  
   // Loading and error states
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -19,13 +19,10 @@ function MedTechDashboard({ currentUser, onLogout }) {
     urgent: 8
   });
   const [selectedSample, setSelectedSample] = useState(null);
-  const [showSampleModal, setShowSampleModal] = useState(false);
 
   // Test Results State
   const [testResults, setTestResults] = useState([]);
   const [selectedResult, setSelectedResult] = useState(null);
-  const [showResultModal, setShowResultModal] = useState(false);
-  const [editingResult, setEditingResult] = useState(null);
 
   // Form States
   const [sampleForm, setSampleForm] = useState({
@@ -166,7 +163,6 @@ function MedTechDashboard({ currentUser, onLogout }) {
       };
       
       setSamples(prev => [newSample, ...prev]);
-      setShowSampleModal(false);
       setSampleForm({
         patientId: '',
         patientName: '',
@@ -222,10 +218,10 @@ function MedTechDashboard({ currentUser, onLogout }) {
 
   // Effect to fetch data when section changes
   useEffect(() => {
-    if (['sample-collection', 'sample-processing', 'sample-tracking'].includes(activeSection)) {
+    if (['sample-collection', 'sample-tracking'].includes(activeSection)) {
       fetchSamples();
     }
-    if (['result-entry', 'result-validation'].includes(activeSection)) {
+    if (activeSection === 'result-entry') {
       fetchTestResults();
     }
   }, [activeSection]);
@@ -234,12 +230,12 @@ function MedTechDashboard({ currentUser, onLogout }) {
     setActiveSection(section);
   };
 
-  const toggleSamples = () => {
-    setSamplesOpen(!samplesOpen);
+  const toggleSampleManagement = () => {
+    setSampleManagementOpen(!sampleManagementOpen);
   };
 
-  const toggleResults = () => {
-    setResultsOpen(!resultsOpen);
+  const toggleTesting = () => {
+    setTestingOpen(!testingOpen);
   };
 
   const handleLogout = async () => {
@@ -256,12 +252,9 @@ function MedTechDashboard({ currentUser, onLogout }) {
   const renderPageTitle = () => {
     switch (activeSection) {
       case 'sample-collection': return 'Sample Collection';
-      case 'sample-processing': return 'Sample Processing';
       case 'sample-tracking': return 'Sample Tracking';
       case 'result-entry': return 'Result Entry';
-      case 'result-validation': return 'Result Validation';
-      case 'analyzer-integration': return 'Analyzer Integration';
-      case 'reports': return 'Lab Reports';
+      case 'quality-control': return 'Quality Control';
       default: return 'MedTech Dashboard';
     }
   };
@@ -269,148 +262,144 @@ function MedTechDashboard({ currentUser, onLogout }) {
   const renderContent = () => {
     switch (activeSection) {
       case 'sample-collection': return renderSampleCollection();
-      case 'sample-processing': return renderSampleProcessing();
       case 'sample-tracking': return renderSampleTracking();
       case 'result-entry': return renderResultEntry();
-      case 'result-validation': return renderResultValidation();
-      case 'analyzer-integration': return renderAnalyzerIntegration();
-      case 'reports': return renderReports();
+      case 'quality-control': return renderQualityControl();
       default: return renderDashboardHome();
     }
   };
 
   const renderDashboardHome = () => (
     <>
-      {/* Top Row Stats */}
-      <div className="medtech-stats-grid">
-        <div className="medtech-stat-card urgent">
+      {/* Stats Grid */}
+      <div className="stats-grid">
+        <div className="stat-card">
           <div className="stat-info">
-            <div className="stat-label">Urgent Samples</div>
-            <div className="stat-value">8</div>
-          </div>
-        </div>
-
-        <div className="medtech-stat-card">
-          <div className="stat-info">
-            <div className="stat-label">Samples Today</div>
+            <div className="stat-label">Total Samples</div>
             <div className="stat-value">45</div>
           </div>
         </div>
 
-        <div className="medtech-stat-card">
+        <div className="stat-card">
           <div className="stat-info">
             <div className="stat-label">In Progress</div>
             <div className="stat-value">23</div>
           </div>
         </div>
 
-        <div className="medtech-stat-card">
+        <div className="stat-card">
           <div className="stat-info">
             <div className="stat-label">Completed</div>
             <div className="stat-value">67</div>
           </div>
         </div>
-      </div>
 
-      {/* Quick Actions */}
-      <div className="quick-actions-grid">
-        <div className="quick-action-card" onClick={() => handleSectionClick('sample-collection')}>
-          <div className="action-title">Collect Sample</div>
-          <div className="action-description">Register and collect new samples</div>
-        </div>
-
-        <div className="quick-action-card" onClick={() => handleSectionClick('result-entry')}>
-          <div className="action-title">Enter Results</div>
-          <div className="action-description">Input test results manually</div>
-        </div>
-
-        <div className="quick-action-card" onClick={() => handleSectionClick('analyzer-integration')}>
-          <div className="action-title">Analyzer Data</div>
-          <div className="action-description">Import from analyzers</div>
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">Urgent</div>
+            <div className="stat-value">8</div>
+          </div>
         </div>
       </div>
 
-      {/* Work Lists */}
-      <div className="worklist-section">
-        <div className="worklist-header">
-          <h3>Today's Work List</h3>
-          <button className="refresh-btn" onClick={() => window.location.reload()}>Refresh</button>
-        </div>
-
-        <div className="worklist-grid">
-          <div className="worklist-card">
-            <div className="worklist-title">Pending Tests</div>
-            <div className="worklist-content">
-              <div className="test-item priority-high">
-                <span className="test-code">CBC-001</span>
-                <span className="patient-name">Maria Santos</span>
-                <span className="test-type">Complete Blood Count</span>
-                <span className="priority">HIGH</span>
-              </div>
-              <div className="test-item priority-normal">
-                <span className="test-code">BG-002</span>
-                <span className="patient-name">Juan Cruz</span>
-                <span className="test-type">Blood Glucose</span>
-                <span className="priority">NORMAL</span>
-              </div>
-              <div className="test-item priority-urgent">
-                <span className="test-code">LFT-003</span>
-                <span className="patient-name">Pedro Garcia</span>
-                <span className="test-type">Liver Function</span>
-                <span className="priority">URGENT</span>
+      {/* Middle Grid */}
+      <div className="middle-grid">
+        <div className="chart-card">
+          <div className="card-header">
+            <h3>Sample Processing Overview</h3>
+          </div>
+          <div className="chart-placeholder">
+            <div className="chart-content">
+              <div className="chart-mock">
+                <div className="chart-bar" style={{height: '60%'}}></div>
+                <div className="chart-bar" style={{height: '80%'}}></div>
+                <div className="chart-bar" style={{height: '45%'}}></div>
+                <div className="chart-bar" style={{height: '90%'}}></div>
+                <div className="chart-bar" style={{height: '70%'}}></div>
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="worklist-card">
-            <div className="worklist-title">Quality Control</div>
-            <div className="worklist-content">
-              <div className="qc-item qc-passed">
-                <span className="qc-test">Chemistry QC Level 1</span>
-                <span className="qc-status">PASSED</span>
-                <span className="qc-time">08:30 AM</span>
-              </div>
-              <div className="qc-item qc-pending">
-                <span className="qc-test">Hematology QC Level 2</span>
-                <span className="qc-status">PENDING</span>
-                <span className="qc-time">-</span>
-              </div>
-              <div className="qc-item qc-failed">
-                <span className="qc-test">Immunology QC</span>
-                <span className="qc-status">FAILED</span>
-                <span className="qc-time">09:15 AM</span>
-              </div>
+        <div className="info-card">
+          <div className="card-header">
+            <h3>Quick Actions</h3>
+          </div>
+          <div className="card-content">
+            <div className="overview-item" style={{cursor: 'pointer'}} onClick={() => handleSectionClick('sample-collection')}>
+              <span className="overview-label">Collect Sample</span>
+              <span className="overview-value">→</span>
+            </div>
+            <div className="overview-item" style={{cursor: 'pointer'}} onClick={() => handleSectionClick('result-entry')}>
+              <span className="overview-label">Enter Results</span>
+              <span className="overview-value">→</span>
+            </div>
+            <div className="overview-item" style={{cursor: 'pointer'}} onClick={() => handleSectionClick('sample-tracking')}>
+              <span className="overview-label">Track Samples</span>
+              <span className="overview-value">→</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Equipment Status */}
-      <div className="equipment-status">
-        <h3>Equipment Status</h3>
-        <div className="equipment-grid">
-          <div className="equipment-card status-online">
-            <div className="equipment-info">
-              <div className="equipment-name">Hematology Analyzer</div>
-              <div className="equipment-status">Online</div>
+      {/* Bottom Grid */}
+      <div className="bottom-grid">
+        <div className="quick-access-card">
+          <div className="card-header">
+            <h3>Recent Samples</h3>
+          </div>
+          <div className="quick-access-content">
+            <div className="access-item">
+              <span>S001-2024 - Maria Santos</span>
+              <span style={{color: '#21AEA8', fontWeight: '600'}}>Processing</span>
+            </div>
+            <div className="access-item">
+              <span>S002-2024 - Juan Cruz</span>
+              <span style={{color: '#28a745', fontWeight: '600'}}>Completed</span>
+            </div>
+            <div className="access-item">
+              <span>S003-2024 - Pedro Garcia</span>
+              <span style={{color: '#dc3545', fontWeight: '600'}}>Urgent</span>
             </div>
           </div>
-          <div className="equipment-card status-online">
-            <div className="equipment-info">
-              <div className="equipment-name">Chemistry Analyzer</div>
-              <div className="equipment-status">Online</div>
+        </div>
+
+        <div className="activity-card">
+          <div className="card-header">
+            <h3>Today's Tasks</h3>
+          </div>
+          <div className="activity-content">
+            <div className="access-item">
+              <span>Blood samples to process</span>
+              <span style={{color: '#21AEA8', fontWeight: '600'}}>12</span>
+            </div>
+            <div className="access-item">
+              <span>Results pending entry</span>
+              <span style={{color: '#ffc107', fontWeight: '600'}}>8</span>
+            </div>
+            <div className="access-item">
+              <span>Urgent samples</span>
+              <span style={{color: '#dc3545', fontWeight: '600'}}>3</span>
             </div>
           </div>
-          <div className="equipment-card status-maintenance">
-            <div className="equipment-info">
-              <div className="equipment-name">PCR Machine</div>
-              <div className="equipment-status">Maintenance</div>
-            </div>
+        </div>
+
+        <div className="activity-card">
+          <div className="card-header">
+            <h3>System Status</h3>
           </div>
-          <div className="equipment-card status-offline">
-            <div className="equipment-info">
-              <div className="equipment-name">Microscope 3</div>
-              <div className="equipment-status">Offline</div>
+          <div className="activity-content">
+            <div className="access-item">
+              <span>Analyzer Status</span>
+              <span style={{color: '#28a745', fontWeight: '600'}}>Online</span>
+            </div>
+            <div className="access-item">
+              <span>Quality Control</span>
+              <span style={{color: '#28a745', fontWeight: '600'}}>Passed</span>
+            </div>
+            <div className="access-item">
+              <span>Equipment Check</span>
+              <span style={{color: '#21AEA8', fontWeight: '600'}}>OK</span>
             </div>
           </div>
         </div>
@@ -471,44 +460,40 @@ function MedTechDashboard({ currentUser, onLogout }) {
     };
 
     return (
-      <div className="sample-collection-container">
-        <div className="collection-header">
-          <h2>Sample Collection</h2>
-          <div className="collection-actions">
-            <button className="btn-scan">Scan Barcode</button>
-            <button className="btn-manual">Manual Entry</button>
-          </div>
+      <div style={{background: 'white', padding: '25px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'}}>
+        <div style={{marginBottom: '25px'}}>
+          <h2 style={{color: '#2c3e50', marginBottom: '10px'}}>Sample Collection</h2>
+          <p style={{color: '#6c757d', margin: '0'}}>Register and collect new laboratory samples</p>
         </div>
 
         {loading && (
-          <div className="loading-container">
-            <div className="loading-spinner"></div>
+          <div style={{textAlign: 'center', padding: '20px', color: '#6c757d'}}>
             <p>Processing sample...</p>
           </div>
         )}
 
         {error && (
-          <div className="error-container">
-            <p className="error-message">{error}</p>
-            <button onClick={() => setError('')}>Dismiss</button>
+          <div style={{background: '#f8d7da', color: '#721c24', padding: '12px', borderRadius: '4px', marginBottom: '20px'}}>
+            <p style={{margin: '0'}}>{error}</p>
+            <button onClick={() => setError('')} style={{background: 'none', border: 'none', color: '#721c24', textDecoration: 'underline', cursor: 'pointer'}}>Dismiss</button>
           </div>
         )}
 
-        <form className="collection-form" onSubmit={handleSubmit}>
-          <div className="form-section">
-            <h3>Patient Information</h3>
-            <div className="form-grid">
+        <form onSubmit={handleSubmit} style={{display: 'grid', gap: '20px'}}>
+          <div>
+            <h3 style={{color: '#2c3e50', marginBottom: '15px', fontSize: '1.1rem'}}>Patient Information</h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px'}}>
               <input 
                 type="text" 
                 placeholder="Patient ID" 
-                className="form-input"
+                style={{padding: '12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.9rem'}}
                 value={sampleForm.patientId}
                 onChange={(e) => handleInputChange('patientId', e.target.value)}
               />
               <input 
                 type="text" 
                 placeholder="Patient Name *" 
-                className="form-input"
+                style={{padding: '12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.9rem'}}
                 value={sampleForm.patientName}
                 onChange={(e) => handleInputChange('patientName', e.target.value)}
                 required
@@ -516,12 +501,12 @@ function MedTechDashboard({ currentUser, onLogout }) {
               <input 
                 type="date" 
                 placeholder="Date of Birth" 
-                className="form-input"
+                style={{padding: '12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.9rem'}}
                 value={sampleForm.dateOfBirth}
                 onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
               />
               <select 
-                className="form-select"
+                style={{padding: '12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.9rem'}}
                 value={sampleForm.gender}
                 onChange={(e) => handleInputChange('gender', e.target.value)}
               >
@@ -532,18 +517,18 @@ function MedTechDashboard({ currentUser, onLogout }) {
             </div>
           </div>
 
-          <div className="form-section">
-            <h3>Sample Details</h3>
-            <div className="form-grid">
+          <div>
+            <h3 style={{color: '#2c3e50', marginBottom: '15px', fontSize: '1.1rem'}}>Sample Details</h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px'}}>
               <input 
                 type="text" 
                 placeholder="Sample ID (Auto-generated)" 
-                className="form-input"
+                style={{padding: '12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.9rem'}}
                 value={sampleForm.sampleId}
                 onChange={(e) => handleInputChange('sampleId', e.target.value)}
               />
               <select 
-                className="form-select"
+                style={{padding: '12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.9rem'}}
                 value={sampleForm.sampleType}
                 onChange={(e) => handleInputChange('sampleType', e.target.value)}
                 required
@@ -558,12 +543,12 @@ function MedTechDashboard({ currentUser, onLogout }) {
               <input 
                 type="datetime-local" 
                 placeholder="Collection Time" 
-                className="form-input"
+                style={{padding: '12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.9rem'}}
                 value={sampleForm.collectionTime}
                 onChange={(e) => handleInputChange('collectionTime', e.target.value)}
               />
               <select 
-                className="form-select"
+                style={{padding: '12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.9rem'}}
                 value={sampleForm.priority}
                 onChange={(e) => handleInputChange('priority', e.target.value)}
               >
@@ -574,9 +559,9 @@ function MedTechDashboard({ currentUser, onLogout }) {
             </div>
           </div>
 
-          <div className="form-section">
-            <h3>Tests Requested *</h3>
-            <div className="tests-grid">
+          <div>
+            <h3 style={{color: '#2c3e50', marginBottom: '15px', fontSize: '1.1rem'}}>Tests Requested *</h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '10px'}}>
               {[
                 'Complete Blood Count (CBC)',
                 'Blood Glucose',
@@ -585,42 +570,53 @@ function MedTechDashboard({ currentUser, onLogout }) {
                 'Lipid Profile',
                 'Thyroid Function'
               ].map(test => (
-                <label key={test} className="test-checkbox">
+                <label key={test} style={{display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', cursor: 'pointer'}}>
                   <input 
                     type="checkbox"
                     checked={sampleForm.testRequests.includes(test)}
                     onChange={() => handleTestToggle(test)}
+                    style={{margin: '0'}}
                   />
-                  <span>{test}</span>
+                  <span style={{fontSize: '0.9rem'}}>{test}</span>
                 </label>
               ))}
             </div>
           </div>
 
-          <div className="form-actions">
+          <div style={{display: 'flex', gap: '10px', paddingTop: '10px'}}>
             <button 
               type="submit" 
-              className="btn-save"
+              style={{background: '#21AEA8', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'}}
               disabled={loading}
             >
               {loading ? 'Saving...' : 'Save Sample'}
             </button>
-            <button type="button" className="btn-print">Print Labels</button>
-            <button type="button" className="btn-clear" onClick={handleClearForm}>Clear Form</button>
+            <button 
+              type="button" 
+              style={{background: '#6c757d', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '4px', cursor: 'pointer'}}
+            >
+              Print Labels
+            </button>
+            <button 
+              type="button" 
+              style={{background: '#dc3545', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '4px', cursor: 'pointer'}}
+              onClick={handleClearForm}
+            >
+              Clear Form
+            </button>
           </div>
         </form>
 
-        {/* Recent Samples */}
         {samples.length > 0 && (
-          <div className="recent-samples">
-            <h3>Recent Collections ({samples.length})</h3>
-            <div className="samples-list">
+          <div style={{marginTop: '30px', padding: '20px', background: '#f8f9fa', borderRadius: '4px'}}>
+            <h3 style={{color: '#2c3e50', marginBottom: '15px'}}>Recent Collections ({samples.length})</h3>
+            <div style={{display: 'grid', gap: '8px'}}>
               {samples.slice(0, 5).map(sample => (
-                <div key={sample.id} className="sample-item">
-                  <span className="sample-id">{sample.id}</span>
-                  <span className="patient-name">{sample.patientName}</span>
-                  <span className="sample-type">{sample.sampleType}</span>
-                  <span className={`status-${sample.status}`}>{sample.status}</span>
+                <div key={sample.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: 'white', borderRadius: '4px'}}>
+                  <span style={{fontWeight: '600'}}>{sample.id}</span>
+                  <span>{sample.patientName}</span>
+                  <span style={{color: '#6c757d'}}>{sample.sampleType}</span>
+                  <span style={{color: sample.status === 'completed' ? '#28a745' : '#21AEA8', fontWeight: '600'}}>{sample.status}</span>
                 </div>
               ))}
             </div>
@@ -630,329 +626,132 @@ function MedTechDashboard({ currentUser, onLogout }) {
     );
   };
 
-  const renderSampleProcessing = () => (
-    <div className="processing-container">
-      <div className="processing-header">
-        <h2>Sample Processing</h2>
-        <div className="processing-filter">
-          <select className="filter-select">
-            <option>All Samples</option>
-            <option>Blood</option>
-            <option>Urine</option>
-            <option>Serum</option>
-          </select>
-          <select className="filter-select">
-            <option>All Status</option>
-            <option>Received</option>
-            <option>Processing</option>
-            <option>Ready for Testing</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="processing-workflow">
-        <div className="workflow-step">
-          <div className="step-header">1. Sample Reception</div>
-          <div className="step-content">
-            <div className="sample-item">
-              <span className="sample-id">S001-2024</span>
-              <span className="patient-name">Maria Santos</span>
-              <span className="sample-type">Blood</span>
-              <button className="btn-receive">Receive</button>
-            </div>
-            <div className="sample-item">
-              <span className="sample-id">S002-2024</span>
-              <span className="patient-name">Juan Cruz</span>
-              <span className="sample-type">Urine</span>
-              <button className="btn-receive">Receive</button>
-            </div>
-          </div>
-        </div>
-
-        <div className="workflow-step">
-          <div className="step-header">2. Sample Preparation</div>
-          <div className="step-content">
-            <div className="sample-item processing">
-              <span className="sample-id">S003-2024</span>
-              <span className="patient-name">Pedro Garcia</span>
-              <span className="sample-type">Serum</span>
-              <button className="btn-process">Process</button>
-            </div>
-          </div>
-        </div>
-
-        <div className="workflow-step">
-          <div className="step-header">3. Ready for Testing</div>
-          <div className="step-content">
-            <div className="sample-item ready">
-              <span className="sample-id">S004-2024</span>
-              <span className="patient-name">Ana Lopez</span>
-              <span className="sample-type">Plasma</span>
-              <button className="btn-test">Send to Testing</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   const renderSampleTracking = () => (
-    <div className="tracking-container">
-      <div className="tracking-header">
-        <h2>Sample Tracking</h2>
-        <div className="tracking-search">
-          <input type="text" placeholder="Search by Sample ID or Patient Name" className="search-input" />
-          <button className="search-btn">Search</button>
+    <div style={{background: 'white', padding: '25px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'}}>
+      <div style={{marginBottom: '25px'}}>
+        <h2 style={{color: '#2c3e50', marginBottom: '10px'}}>Sample Tracking</h2>
+        <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
+          <input 
+            type="text" 
+            placeholder="Search by Sample ID or Patient Name" 
+            style={{flex: '1', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.9rem'}}
+          />
+          <button style={{background: '#21AEA8', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer'}}>
+            Search
+          </button>
         </div>
       </div>
 
-      <div className="tracking-stats">
+      <div className="stats-grid" style={{marginBottom: '25px'}}>
         <div className="stat-card">
-          <div className="stat-value">45</div>
-          <div className="stat-label">Total Samples</div>
+          <div className="stat-info">
+            <div className="stat-label">Total Samples</div>
+            <div className="stat-value">45</div>
+          </div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">23</div>
-          <div className="stat-label">In Progress</div>
+          <div className="stat-info">
+            <div className="stat-label">In Progress</div>
+            <div className="stat-value">23</div>
+          </div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">15</div>
-          <div className="stat-label">Completed</div>
+          <div className="stat-info">
+            <div className="stat-label">Completed</div>
+            <div className="stat-value">15</div>
+          </div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">7</div>
-          <div className="stat-label">Pending</div>
+          <div className="stat-info">
+            <div className="stat-label">Pending</div>
+            <div className="stat-value">7</div>
+          </div>
         </div>
       </div>
 
-      <div className="tracking-table">
-        <table>
-          <thead>
-            <tr>
-              <th>Sample ID</th>
-              <th>Patient</th>
-              <th>Test Type</th>
-              <th>Collection Date</th>
-              <th>Current Status</th>
-              <th>Location</th>
-              <th>Priority</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>S001-2024</td>
-              <td>Maria Santos</td>
-              <td>Complete Blood Count</td>
-              <td>Oct 9, 2025 08:30</td>
-              <td><span className="status-processing">Processing</span></td>
-              <td>Hematology Lab</td>
-              <td><span className="priority-normal">Normal</span></td>
-              <td>
-                <button className="btn-track">Track</button>
-                <button className="btn-update">Update</button>
-              </td>
-            </tr>
-            <tr>
-              <td>S002-2024</td>
-              <td>Juan Cruz</td>
-              <td>Blood Glucose</td>
-              <td>Oct 9, 2025 09:15</td>
-              <td><span className="status-completed">Completed</span></td>
-              <td>Chemistry Lab</td>
-              <td><span className="priority-urgent">Urgent</span></td>
-              <td>
-                <button className="btn-track">Track</button>
-                <button className="btn-view">View</button>
-              </td>
-            </tr>
-            <tr>
-              <td>S003-2024</td>
-              <td>Pedro Garcia</td>
-              <td>Liver Function Tests</td>
-              <td>Oct 9, 2025 10:00</td>
-              <td><span className="status-pending">Pending</span></td>
-              <td>Reception</td>
-              <td><span className="priority-high">High</span></td>
-              <td>
-                <button className="btn-track">Track</button>
-                <button className="btn-start">Start</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div className="tracking-timeline">
-        <h3>Sample History Timeline</h3>
-        <div className="timeline">
-          <div className="timeline-item completed">
-            <div className="timeline-marker"></div>
-            <div className="timeline-content">
-              <div className="timeline-time">08:30 AM</div>
-              <div className="timeline-title">Sample Collected</div>
-              <div className="timeline-desc">Sample collected from patient</div>
+      <div style={{background: '#f8f9fa', padding: '20px', borderRadius: '4px', marginBottom: '25px'}}>
+        <h3 style={{color: '#2c3e50', marginBottom: '15px'}}>Sample List</h3>
+        <div style={{display: 'grid', gap: '10px'}}>
+          <div style={{display: 'grid', gridTemplateColumns: '120px 150px 180px 140px 120px 100px 1fr', gap: '15px', padding: '10px', background: '#21AEA8', color: 'white', borderRadius: '4px', fontWeight: '600', fontSize: '0.9rem'}}>
+            <span>Sample ID</span>
+            <span>Patient</span>
+            <span>Test Type</span>
+            <span>Collection Date</span>
+            <span>Status</span>
+            <span>Priority</span>
+            <span>Actions</span>
+          </div>
+          
+          <div style={{display: 'grid', gridTemplateColumns: '120px 150px 180px 140px 120px 100px 1fr', gap: '15px', padding: '12px', background: 'white', borderRadius: '4px', alignItems: 'center', fontSize: '0.9rem'}}>
+            <span style={{fontWeight: '600'}}>S001-2024</span>
+            <span>Maria Santos</span>
+            <span>Complete Blood Count</span>
+            <span style={{color: '#6c757d'}}>Oct 9, 2025</span>
+            <span style={{color: '#21AEA8', fontWeight: '600'}}>Processing</span>
+            <span style={{color: '#ffc107', fontWeight: '600'}}>Normal</span>
+            <div style={{display: 'flex', gap: '5px'}}>
+              <button style={{background: '#21AEA8', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', fontSize: '0.8rem', cursor: 'pointer'}}>Track</button>
+              <button style={{background: '#6c757d', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', fontSize: '0.8rem', cursor: 'pointer'}}>Update</button>
             </div>
           </div>
-          <div className="timeline-item completed">
-            <div className="timeline-marker"></div>
-            <div className="timeline-content">
-              <div className="timeline-time">08:45 AM</div>
-              <div className="timeline-title">Sample Received</div>
-              <div className="timeline-desc">Sample received at laboratory</div>
+          
+          <div style={{display: 'grid', gridTemplateColumns: '120px 150px 180px 140px 120px 100px 1fr', gap: '15px', padding: '12px', background: 'white', borderRadius: '4px', alignItems: 'center', fontSize: '0.9rem'}}>
+            <span style={{fontWeight: '600'}}>S002-2024</span>
+            <span>Juan Cruz</span>
+            <span>Blood Glucose</span>
+            <span style={{color: '#6c757d'}}>Oct 9, 2025</span>
+            <span style={{color: '#28a745', fontWeight: '600'}}>Completed</span>
+            <span style={{color: '#dc3545', fontWeight: '600'}}>Urgent</span>
+            <div style={{display: 'flex', gap: '5px'}}>
+              <button style={{background: '#21AEA8', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', fontSize: '0.8rem', cursor: 'pointer'}}>Track</button>
+              <button style={{background: '#28a745', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', fontSize: '0.8rem', cursor: 'pointer'}}>View</button>
             </div>
           </div>
-          <div className="timeline-item active">
-            <div className="timeline-marker"></div>
-            <div className="timeline-content">
-              <div className="timeline-time">09:00 AM</div>
-              <div className="timeline-title">Processing Started</div>
-              <div className="timeline-desc">Sample processing initiated</div>
-            </div>
-          </div>
-          <div className="timeline-item pending">
-            <div className="timeline-marker"></div>
-            <div className="timeline-content">
-              <div className="timeline-time">Pending</div>
-              <div className="timeline-title">Testing</div>
-              <div className="timeline-desc">Awaiting test completion</div>
+          
+          <div style={{display: 'grid', gridTemplateColumns: '120px 150px 180px 140px 120px 100px 1fr', gap: '15px', padding: '12px', background: 'white', borderRadius: '4px', alignItems: 'center', fontSize: '0.9rem'}}>
+            <span style={{fontWeight: '600'}}>S003-2024</span>
+            <span>Pedro Garcia</span>
+            <span>Liver Function Tests</span>
+            <span style={{color: '#6c757d'}}>Oct 9, 2025</span>
+            <span style={{color: '#ffc107', fontWeight: '600'}}>Pending</span>
+            <span style={{color: '#fd7e14', fontWeight: '600'}}>High</span>
+            <div style={{display: 'flex', gap: '5px'}}>
+              <button style={{background: '#21AEA8', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', fontSize: '0.8rem', cursor: 'pointer'}}>Track</button>
+              <button style={{background: '#007bff', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', fontSize: '0.8rem', cursor: 'pointer'}}>Start</button>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
 
-  const renderResultValidation = () => (
-    <div className="validation-container">
-      <div className="validation-header">
-        <h2>Result Validation</h2>
-        <div className="validation-filters">
-          <select className="filter-select">
-            <option>All Results</option>
-            <option>Pending Validation</option>
-            <option>Validated</option>
-            <option>Rejected</option>
-          </select>
-          <select className="filter-select">
-            <option>All Departments</option>
-            <option>Hematology</option>
-            <option>Chemistry</option>
-            <option>Microbiology</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="validation-stats">
-        <div className="stat-card">
-          <div className="stat-value">12</div>
-          <div className="stat-label">Pending Validation</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">45</div>
-          <div className="stat-label">Validated Today</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">3</div>
-          <div className="stat-label">Flagged for Review</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">2</div>
-          <div className="stat-label">Critical Values</div>
-        </div>
-      </div>
-
-      <div className="validation-queue">
-        <h3>Validation Queue</h3>
-        <div className="queue-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Sample ID</th>
-                <th>Patient</th>
-                <th>Test</th>
-                <th>Result Date</th>
-                <th>Status</th>
-                <th>Critical Values</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="priority-critical">
-                <td>S001-2024</td>
-                <td>Emergency Patient</td>
-                <td>Troponin</td>
-                <td>Oct 9, 2025 11:30</td>
-                <td><span className="status-critical">Critical</span></td>
-                <td><span className="critical-flag">High Troponin</span></td>
-                <td>
-                  <button className="btn-validate-critical">Validate Critical</button>
-                  <button className="btn-view">View</button>
-                </td>
-              </tr>
-              <tr>
-                <td>S002-2024</td>
-                <td>Maria Santos</td>
-                <td>Complete Blood Count</td>
-                <td>Oct 9, 2025 10:45</td>
-                <td><span className="status-pending">Pending</span></td>
-                <td>None</td>
-                <td>
-                  <button className="btn-validate">Validate</button>
-                  <button className="btn-review">Review</button>
-                </td>
-              </tr>
-              <tr>
-                <td>S003-2024</td>
-                <td>Juan Cruz</td>
-                <td>Blood Glucose</td>
-                <td>Oct 9, 2025 10:15</td>
-                <td><span className="status-flagged">Flagged</span></td>
-                <td><span className="abnormal-flag">Low Glucose</span></td>
-                <td>
-                  <button className="btn-validate">Validate</button>
-                  <button className="btn-reject">Reject</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="validation-details">
-        <h3>Validation Guidelines</h3>
-        <div className="guidelines-grid">
-          <div className="guideline-card">
-            <div className="guideline-title">Critical Value Protocol</div>
-            <div className="guideline-content">
-              <ul>
-                <li>Immediately notify ordering physician</li>
-                <li>Document notification time and recipient</li>
-                <li>Verify result accuracy before release</li>
-                <li>Follow up confirmation if required</li>
-              </ul>
+      <div style={{background: '#f8f9fa', padding: '20px', borderRadius: '4px'}}>
+        <h3 style={{color: '#2c3e50', marginBottom: '15px'}}>Sample Timeline</h3>
+        <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
+          <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+            <div style={{width: '12px', height: '12px', background: '#28a745', borderRadius: '50%'}}></div>
+            <div>
+              <div style={{fontWeight: '600', color: '#2c3e50'}}>08:30 AM - Sample Collected</div>
+              <div style={{color: '#6c757d', fontSize: '0.9rem'}}>Sample collected from patient</div>
             </div>
           </div>
-          <div className="guideline-card">
-            <div className="guideline-title">Standard Validation</div>
-            <div className="guideline-content">
-              <ul>
-                <li>Check results against reference ranges</li>
-                <li>Review for transcription errors</li>
-                <li>Verify patient demographics</li>
-                <li>Confirm test methodology</li>
-              </ul>
+          <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+            <div style={{width: '12px', height: '12px', background: '#28a745', borderRadius: '50%'}}></div>
+            <div>
+              <div style={{fontWeight: '600', color: '#2c3e50'}}>08:45 AM - Sample Received</div>
+              <div style={{color: '#6c757d', fontSize: '0.9rem'}}>Sample received at laboratory</div>
             </div>
           </div>
-          <div className="guideline-card">
-            <div className="guideline-title">Quality Control</div>
-            <div className="guideline-content">
-              <ul>
-                <li>Ensure QC passed before validation</li>
-                <li>Check instrument calibration status</li>
-                <li>Review precision and accuracy</li>
-                <li>Document any deviations</li>
-              </ul>
+          <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+            <div style={{width: '12px', height: '12px', background: '#21AEA8', borderRadius: '50%'}}></div>
+            <div>
+              <div style={{fontWeight: '600', color: '#2c3e50'}}>09:00 AM - Processing Started</div>
+              <div style={{color: '#6c757d', fontSize: '0.9rem'}}>Sample processing initiated</div>
+            </div>
+          </div>
+          <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+            <div style={{width: '12px', height: '12px', background: '#e9ecef', borderRadius: '50%'}}></div>
+            <div>
+              <div style={{fontWeight: '600', color: '#6c757d'}}>Pending - Testing</div>
+              <div style={{color: '#6c757d', fontSize: '0.9rem'}}>Awaiting test completion</div>
             </div>
           </div>
         </div>
@@ -1007,54 +806,65 @@ function MedTechDashboard({ currentUser, onLogout }) {
     );
 
     return (
-      <div className="result-entry-container">
-        <div className="entry-header">
-          <h2>Manual Result Entry</h2>
-          <div className="entry-search">
+      <div style={{background: 'white', padding: '25px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'}}>
+        <div style={{marginBottom: '25px'}}>
+          <h2 style={{color: '#2c3e50', marginBottom: '10px'}}>Manual Result Entry</h2>
+          <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
             <input 
               type="text" 
               placeholder="Search by Sample ID or Patient Name" 
-              className="search-input"
+              style={{flex: '1', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.9rem'}}
               value={resultFilters.search}
               onChange={(e) => setResultFilters(prev => ({...prev, search: e.target.value}))}
             />
-            <button className="search-btn">Search</button>
+            <button style={{background: '#21AEA8', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer'}}>
+              Search
+            </button>
           </div>
         </div>
 
         {loading && (
-          <div className="loading-container">
-            <div className="loading-spinner"></div>
+          <div style={{textAlign: 'center', padding: '20px', color: '#6c757d'}}>
             <p>Loading samples...</p>
           </div>
         )}
 
         {error && (
-          <div className="error-container">
-            <p className="error-message">{error}</p>
-            <button onClick={() => setError('')}>Dismiss</button>
+          <div style={{background: '#f8d7da', color: '#721c24', padding: '12px', borderRadius: '4px', marginBottom: '20px'}}>
+            <p style={{margin: '0'}}>{error}</p>
+            <button onClick={() => setError('')} style={{background: 'none', border: 'none', color: '#721c24', textDecoration: 'underline', cursor: 'pointer'}}>Dismiss</button>
           </div>
         )}
 
-        {/* Pending Samples List */}
-        <div className="pending-samples">
-          <h3>Pending Samples ({pendingSamples.length})</h3>
+        <div style={{background: '#f8f9fa', padding: '20px', borderRadius: '4px', marginBottom: '25px'}}>
+          <h3 style={{color: '#2c3e50', marginBottom: '15px'}}>Pending Samples ({pendingSamples.length})</h3>
           {pendingSamples.length === 0 ? (
-            <div className="empty-state">
+            <div style={{textAlign: 'center', color: '#6c757d', padding: '20px'}}>
               <p>No pending samples found</p>
             </div>
           ) : (
-            <div className="samples-list">
+            <div style={{display: 'grid', gap: '8px'}}>
               {pendingSamples.map(sample => (
                 <div 
                   key={sample.id} 
-                  className={`sample-item ${selectedSample?.id === sample.id ? 'selected' : ''}`}
+                  style={{
+                    display: 'grid', 
+                    gridTemplateColumns: '120px 150px 180px 100px', 
+                    gap: '15px', 
+                    padding: '12px', 
+                    background: selectedSample?.id === sample.id ? '#e8f5e8' : 'white', 
+                    borderRadius: '4px', 
+                    cursor: 'pointer',
+                    border: selectedSample?.id === sample.id ? '2px solid #21AEA8' : '1px solid #e9ecef',
+                    alignItems: 'center',
+                    fontSize: '0.9rem'
+                  }}
                   onClick={() => handleSampleSelect(sample)}
                 >
-                  <span className="sample-id">{sample.id}</span>
-                  <span className="patient-name">{sample.patientName}</span>
-                  <span className="test-type">{sample.testType}</span>
-                  <span className={`priority priority-${sample.priority}`}>{sample.priority}</span>
+                  <span style={{fontWeight: '600'}}>{sample.id}</span>
+                  <span>{sample.patientName}</span>
+                  <span style={{color: '#6c757d'}}>{sample.testType}</span>
+                  <span style={{color: sample.priority === 'urgent' ? '#dc3545' : '#21AEA8', fontWeight: '600'}}>{sample.priority}</span>
                 </div>
               ))}
             </div>
@@ -1062,120 +872,119 @@ function MedTechDashboard({ currentUser, onLogout }) {
         </div>
 
         {selectedSample && (
-          <div className="result-form">
-            <div className="sample-info">
-              <h3>Sample Information</h3>
-              <div className="info-grid">
-                <div className="info-item">
-                  <label>Sample ID:</label>
-                  <span>{selectedSample.id}</span>
-                </div>
-                <div className="info-item">
-                  <label>Patient:</label>
-                  <span>{selectedSample.patientName}</span>
-                </div>
-                <div className="info-item">
-                  <label>Test Type:</label>
-                  <span>{selectedSample.testType}</span>
-                </div>
-                <div className="info-item">
-                  <label>Priority:</label>
-                  <span className={`priority-${selectedSample.priority}`}>{selectedSample.priority}</span>
-                </div>
+          <div style={{background: '#f8f9fa', padding: '20px', borderRadius: '4px', marginBottom: '25px'}}>
+            <h3 style={{color: '#2c3e50', marginBottom: '15px'}}>Sample Information</h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '20px'}}>
+              <div>
+                <label style={{fontWeight: '600', color: '#2c3e50'}}>Sample ID:</label>
+                <span style={{marginLeft: '10px'}}>{selectedSample.id}</span>
+              </div>
+              <div>
+                <label style={{fontWeight: '600', color: '#2c3e50'}}>Patient:</label>
+                <span style={{marginLeft: '10px'}}>{selectedSample.patientName}</span>
+              </div>
+              <div>
+                <label style={{fontWeight: '600', color: '#2c3e50'}}>Test Type:</label>
+                <span style={{marginLeft: '10px'}}>{selectedSample.testType}</span>
+              </div>
+              <div>
+                <label style={{fontWeight: '600', color: '#2c3e50'}}>Priority:</label>
+                <span style={{marginLeft: '10px', color: selectedSample.priority === 'urgent' ? '#dc3545' : '#21AEA8', fontWeight: '600'}}>{selectedSample.priority}</span>
               </div>
             </div>
 
-            <div className="test-results">
-              <h3>Test Results</h3>
-              <div className="results-grid">
-                <div className="result-field">
-                  <label>Hemoglobin (g/dL)</label>
-                  <input 
-                    type="number" 
-                    step="0.1" 
-                    placeholder="12.0-15.5" 
-                    className="result-input"
-                    value={resultForm.hemoglobin}
-                    onChange={(e) => handleResultChange('hemoglobin', e.target.value)}
-                  />
-                  <span className="reference-range">12.0-15.5</span>
-                </div>
-                <div className="result-field">
-                  <label>Hematocrit (%)</label>
-                  <input 
-                    type="number" 
-                    step="0.1" 
-                    placeholder="36-46" 
-                    className="result-input"
-                    value={resultForm.hematocrit}
-                    onChange={(e) => handleResultChange('hematocrit', e.target.value)}
-                  />
-                  <span className="reference-range">36-46</span>
-                </div>
-                <div className="result-field">
-                  <label>WBC Count (×10³/μL)</label>
-                  <input 
-                    type="number" 
-                    step="0.1" 
-                    placeholder="4.5-11.0" 
-                    className="result-input"
-                    value={resultForm.wbc}
-                    onChange={(e) => handleResultChange('wbc', e.target.value)}
-                  />
-                  <span className="reference-range">4.5-11.0</span>
-                </div>
-                <div className="result-field">
-                  <label>RBC Count (×10⁶/μL)</label>
-                  <input 
-                    type="number" 
-                    step="0.1" 
-                    placeholder="4.2-5.4" 
-                    className="result-input"
-                    value={resultForm.rbc}
-                    onChange={(e) => handleResultChange('rbc', e.target.value)}
-                  />
-                  <span className="reference-range">4.2-5.4</span>
-                </div>
-                <div className="result-field">
-                  <label>Platelet Count (×10³/μL)</label>
-                  <input 
-                    type="number" 
-                    step="1" 
-                    placeholder="150-400" 
-                    className="result-input"
-                    value={resultForm.platelets}
-                    onChange={(e) => handleResultChange('platelets', e.target.value)}
-                  />
-                  <span className="reference-range">150-400</span>
-                </div>
+            <h3 style={{color: '#2c3e50', marginBottom: '15px'}}>Test Results</h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px', marginBottom: '20px'}}>
+              <div>
+                <label style={{display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50'}}>Hemoglobin (g/dL)</label>
+                <input 
+                  type="number" 
+                  step="0.1" 
+                  placeholder="12.0-15.5" 
+                  style={{width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.9rem'}}
+                  value={resultForm.hemoglobin}
+                  onChange={(e) => handleResultChange('hemoglobin', e.target.value)}
+                />
+                <span style={{fontSize: '0.8rem', color: '#6c757d'}}>Reference: 12.0-15.5</span>
               </div>
+              <div>
+                <label style={{display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50'}}>Hematocrit (%)</label>
+                <input 
+                  type="number" 
+                  step="0.1" 
+                  placeholder="36-46" 
+                  style={{width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.9rem'}}
+                  value={resultForm.hematocrit}
+                  onChange={(e) => handleResultChange('hematocrit', e.target.value)}
+                />
+                <span style={{fontSize: '0.8rem', color: '#6c757d'}}>Reference: 36-46</span>
+              </div>
+              <div>
+                <label style={{display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50'}}>WBC Count (×10³/μL)</label>
+                <input 
+                  type="number" 
+                  step="0.1" 
+                  placeholder="4.5-11.0" 
+                  style={{width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.9rem'}}
+                  value={resultForm.wbc}
+                  onChange={(e) => handleResultChange('wbc', e.target.value)}
+                />
+                <span style={{fontSize: '0.8rem', color: '#6c757d'}}>Reference: 4.5-11.0</span>
+              </div>
+              <div>
+                <label style={{display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50'}}>RBC Count (×10⁶/μL)</label>
+                <input 
+                  type="number" 
+                  step="0.1" 
+                  placeholder="4.2-5.4" 
+                  style={{width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.9rem'}}
+                  value={resultForm.rbc}
+                  onChange={(e) => handleResultChange('rbc', e.target.value)}
+                />
+                <span style={{fontSize: '0.8rem', color: '#6c757d'}}>Reference: 4.2-5.4</span>
+              </div>
+              <div>
+                <label style={{display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50'}}>Platelet Count (×10³/μL)</label>
+                <input 
+                  type="number" 
+                  step="1" 
+                  placeholder="150-400" 
+                  style={{width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.9rem'}}
+                  value={resultForm.platelets}
+                  onChange={(e) => handleResultChange('platelets', e.target.value)}
+                />
+                <span style={{fontSize: '0.8rem', color: '#6c757d'}}>Reference: 150-400</span>
+              </div>
+            </div>
 
-              <div className="result-actions">
-                <button 
-                  className="btn-save-results" 
-                  onClick={handleSaveResults}
-                  disabled={loading}
-                >
-                  {loading ? 'Saving...' : 'Save Results'}
-                </button>
-                <button className="btn-validate">Validate & Submit</button>
-                <button className="btn-flag">Flag for Review</button>
-              </div>
+            <div style={{display: 'flex', gap: '10px'}}>
+              <button 
+                style={{background: '#21AEA8', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'}}
+                onClick={handleSaveResults}
+                disabled={loading}
+              >
+                {loading ? 'Saving...' : 'Save Results'}
+              </button>
+              <button style={{background: '#28a745', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '4px', cursor: 'pointer'}}>
+                Validate & Submit
+              </button>
+              <button style={{background: '#ffc107', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '4px', cursor: 'pointer'}}>
+                Flag for Review
+              </button>
             </div>
           </div>
         )}
 
-        {/* Recently Saved Results */}
         {testResults.length > 0 && (
-          <div className="saved-results">
-            <h3>Recent Results ({testResults.length})</h3>
-            <div className="saved-list">
+          <div style={{background: '#f8f9fa', padding: '20px', borderRadius: '4px'}}>
+            <h3 style={{color: '#2c3e50', marginBottom: '15px'}}>Recent Results ({testResults.length})</h3>
+            <div style={{display: 'grid', gap: '8px'}}>
               {testResults.slice(0, 5).map((result, index) => (
-                <div key={index} className="saved-item">
-                  <span>{result.sampleId}</span>
+                <div key={index} style={{display: 'grid', gridTemplateColumns: '120px 150px 180px 120px', gap: '15px', padding: '8px', background: 'white', borderRadius: '4px', alignItems: 'center', fontSize: '0.9rem'}}>
+                  <span style={{fontWeight: '600'}}>{result.sampleId}</span>
                   <span>{result.patientName || 'Unknown Patient'}</span>
-                  <span>{result.testType || 'Lab Test'}</span>
-                  <span className="saved-time">{new Date(result.resultDate).toLocaleTimeString()}</span>
+                  <span style={{color: '#6c757d'}}>{result.testType || 'Lab Test'}</span>
+                  <span style={{color: '#6c757d'}}>{new Date(result.resultDate).toLocaleTimeString()}</span>
                 </div>
               ))}
             </div>
@@ -1185,285 +994,189 @@ function MedTechDashboard({ currentUser, onLogout }) {
     );
   };
 
-  const renderAnalyzerIntegration = () => (
-    <div className="analyzer-container">
-      <div className="analyzer-header">
-        <h2>Analyzer Integration</h2>
-        <button className="btn-sync">Sync All</button>
+  const renderQualityControl = () => (
+    <div style={{background: 'white', padding: '25px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'}}>
+      <div style={{marginBottom: '25px'}}>
+        <h2 style={{color: '#2c3e50', marginBottom: '10px'}}>Quality Control</h2>
+        <p style={{color: '#6c757d', margin: '0'}}>Monitor and manage quality control procedures</p>
       </div>
 
-      <div className="analyzer-grid">
-        <div className="analyzer-card connected">
-          <div className="analyzer-info">
-            <div className="analyzer-name">Hematology Analyzer</div>
-            <div className="analyzer-model">XN-1000</div>
-            <div className="analyzer-status">Connected</div>
-          </div>
-          <div className="analyzer-actions">
-            <button className="btn-import">Import Results</button>
-            <button className="btn-calibrate">Calibrate</button>
-          </div>
-          <div className="analyzer-data">
-            <div className="data-item">
-              <span>Pending Results:</span>
-              <span className="data-value">5</span>
-            </div>
-            <div className="data-item">
-              <span>Last Import:</span>
-              <span className="data-value">10:30 AM</span>
-            </div>
+      {/* QC Status Grid */}
+      <div className="stats-grid" style={{marginBottom: '25px'}}>
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">QC Tests Today</div>
+            <div className="stat-value">12</div>
           </div>
         </div>
-
-        <div className="analyzer-card connected">
-          <div className="analyzer-info">
-            <div className="analyzer-name">Chemistry Analyzer</div>
-            <div className="analyzer-model">AU-480</div>
-            <div className="analyzer-status">Connected</div>
-          </div>
-          <div className="analyzer-actions">
-            <button className="btn-import">Import Results</button>
-            <button className="btn-calibrate">Calibrate</button>
-          </div>
-          <div className="analyzer-data">
-            <div className="data-item">
-              <span>Pending Results:</span>
-              <span className="data-value">12</span>
-            </div>
-            <div className="data-item">
-              <span>Last Import:</span>
-              <span className="data-value">11:15 AM</span>
-            </div>
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">QC Passed</div>
+            <div className="stat-value">11</div>
           </div>
         </div>
-
-        <div className="analyzer-card maintenance">
-          <div className="analyzer-info">
-            <div className="analyzer-name">PCR Machine</div>
-            <div className="analyzer-model">Applied Biosystems</div>
-            <div className="analyzer-status">Maintenance</div>
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">QC Failed</div>
+            <div className="stat-value">1</div>
           </div>
-          <div className="analyzer-actions">
-            <button className="btn-import" disabled>Import Results</button>
-            <button className="btn-maintenance">Maintenance</button>
-          </div>
-          <div className="analyzer-data">
-            <div className="data-item">
-              <span>Next Service:</span>
-              <span className="data-value">Sept 15</span>
-            </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-info">
+            <div className="stat-label">QC Pending</div>
+            <div className="stat-value">3</div>
           </div>
         </div>
       </div>
 
-      <div className="import-history">
-        <h3>Recent Data Imports</h3>
-        <div className="import-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Analyzer</th>
-                <th>Samples</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>11:30 AM</td>
-                <td>Hematology Analyzer</td>
-                <td>8 samples</td>
-                <td><span className="status-success">Success</span></td>
-                <td><button className="btn-view">View</button></td>
-              </tr>
-              <tr>
-                <td>11:15 AM</td>
-                <td>Chemistry Analyzer</td>
-                <td>15 samples</td>
-                <td><span className="status-success">Success</span></td>
-                <td><button className="btn-view">View</button></td>
-              </tr>
-              <tr>
-                <td>10:45 AM</td>
-                <td>PCR Machine</td>
-                <td>3 samples</td>
-                <td><span className="status-error">Error</span></td>
-                <td><button className="btn-retry">Retry</button></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderReports = () => (
-    <div className="reports-container">
-      <div className="reports-header">
-        <h2>Laboratory Reports</h2>
-        <div className="report-filters">
-          <input type="date" className="date-input" />
-          <select className="filter-select">
-            <option>All Tests</option>
-            <option>Hematology</option>
-            <option>Chemistry</option>
-            <option>Microbiology</option>
-          </select>
-          <button className="btn-generate">Generate Report</button>
+      {/* QC Results Table */}
+      <div style={{background: '#f8f9fa', padding: '20px', borderRadius: '4px', marginBottom: '25px'}}>
+        <h3 style={{color: '#2c3e50', marginBottom: '15px'}}>Recent QC Results</h3>
+        <div style={{display: 'grid', gap: '10px'}}>
+          <div style={{display: 'grid', gridTemplateColumns: '120px 180px 120px 120px 150px 1fr', gap: '15px', padding: '10px', background: '#21AEA8', color: 'white', borderRadius: '4px', fontWeight: '600', fontSize: '0.9rem'}}>
+            <span>QC ID</span>
+            <span>Test Type</span>
+            <span>Level</span>
+            <span>Status</span>
+            <span>Run Date</span>
+            <span>Actions</span>
+          </div>
+          
+          <div style={{display: 'grid', gridTemplateColumns: '120px 180px 120px 120px 150px 1fr', gap: '15px', padding: '12px', background: 'white', borderRadius: '4px', alignItems: 'center', fontSize: '0.9rem'}}>
+            <span style={{fontWeight: '600'}}>QC001</span>
+            <span>Complete Blood Count</span>
+            <span style={{color: '#21AEA8'}}>Level 1</span>
+            <span style={{color: '#28a745', fontWeight: '600'}}>Passed</span>
+            <span style={{color: '#6c757d'}}>Oct 10, 2025</span>
+            <button style={{background: '#21AEA8', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', fontSize: '0.8rem', cursor: 'pointer'}}>View</button>
+          </div>
+          
+          <div style={{display: 'grid', gridTemplateColumns: '120px 180px 120px 120px 150px 1fr', gap: '15px', padding: '12px', background: 'white', borderRadius: '4px', alignItems: 'center', fontSize: '0.9rem'}}>
+            <span style={{fontWeight: '600'}}>QC002</span>
+            <span>Blood Glucose</span>
+            <span style={{color: '#ffc107'}}>Level 2</span>
+            <span style={{color: '#dc3545', fontWeight: '600'}}>Failed</span>
+            <span style={{color: '#6c757d'}}>Oct 10, 2025</span>
+            <button style={{background: '#dc3545', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', fontSize: '0.8rem', cursor: 'pointer'}}>Review</button>
+          </div>
+          
+          <div style={{display: 'grid', gridTemplateColumns: '120px 180px 120px 120px 150px 1fr', gap: '15px', padding: '12px', background: 'white', borderRadius: '4px', alignItems: 'center', fontSize: '0.9rem'}}>
+            <span style={{fontWeight: '600'}}>QC003</span>
+            <span>Liver Function Tests</span>
+            <span style={{color: '#fd7e14'}}>Level 3</span>
+            <span style={{color: '#ffc107', fontWeight: '600'}}>Pending</span>
+            <span style={{color: '#6c757d'}}>Oct 10, 2025</span>
+            <button style={{background: '#007bff', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', fontSize: '0.8rem', cursor: 'pointer'}}>Run</button>
+          </div>
         </div>
       </div>
 
-      <div className="reports-summary">
-        <div className="summary-card">
-          <div className="summary-title">Daily Summary</div>
-          <div className="summary-stats">
-            <div className="summary-item">
-              <span>Tests Completed:</span>
-              <span>67</span>
-            </div>
-            <div className="summary-item">
-              <span>Tests Pending:</span>
-              <span>23</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="reports-chart">
-          <div className="chart-title">Tests by Department</div>
-          <div className="chart-placeholder">
-            <div className="chart-bar">
-              <div className="bar hematology" style={{height: '80%'}}></div>
-              <span>Hematology</span>
-            </div>
-            <div className="chart-bar">
-              <div className="bar chemistry" style={{height: '60%'}}></div>
-              <span>Chemistry</span>
-            </div>
-            <div className="chart-bar">
-              <div className="bar microbiology" style={{height: '40%'}}></div>
-              <span>Microbiology</span>
-            </div>
-          </div>
-        </div>
+      {/* Quick Actions */}
+      <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px'}}>
+        <button style={{background: '#21AEA8', color: 'white', border: 'none', padding: '15px', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'}}>
+          Run QC Test
+        </button>
+        <button style={{background: '#28a745', color: 'white', border: 'none', padding: '15px', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'}}>
+          View QC Reports
+        </button>
+        <button style={{background: '#6c757d', color: 'white', border: 'none', padding: '15px', borderRadius: '4px', cursor: 'pointer', fontWeight: '600'}}>
+          QC Settings
+        </button>
       </div>
     </div>
   );
 
   return (
-    <div className="medtech-dashboard-container">
+    <div className="dashboard-container">
       {/* Sidebar */}
-      <div className="medtech-dashboard-sidebar">
-        <div className="medtech-sidebar-header">
-          <h2 className="medtech-sidebar-title">MDLAB DIRECT</h2>
-          <div className="medtech-sidebar-subtitle">MedTech Portal</div>
+      <div className="dashboard-sidebar">
+        <div className="dashboard-sidebar-header">
+          <h2 className="dashboard-sidebar-title">MDLAB DIRECT</h2>
+          <div className="dashboard-sidebar-subtitle">MedTech Portal</div>
         </div>
         
-        <nav className="medtech-sidebar-nav">
+        <nav className="dashboard-sidebar-nav">
           <div 
-            className={`medtech-nav-item ${activeSection === 'dashboard' ? 'active' : ''}`}
+            className={`dashboard-nav-item ${activeSection === 'dashboard' ? 'active' : ''}`}
             onClick={() => handleSectionClick('dashboard')}
           >
-            <span className="medtech-nav-text">Dashboard</span>
+            <span className="dashboard-nav-text">Dashboard</span>
           </div>
 
-          <div className="medtech-dropdown">
-            <div className="medtech-nav-item-header" onClick={toggleSamples}>
-              <div className="medtech-nav-item-main">
-                <span className="medtech-nav-text">Sample Management</span>
+          <div className="dashboard-dropdown">
+            <div className="dashboard-nav-item-header" onClick={toggleSampleManagement}>
+              <div className="dashboard-nav-item-main">
+                <span className="dashboard-nav-text">Sample Management</span>
               </div>
-              <span className={`medtech-dropdown-arrow ${samplesOpen ? 'open' : ''}`}>▼</span>
+              <span className={`dashboard-dropdown-arrow ${sampleManagementOpen ? 'open' : ''}`}>▼</span>
             </div>
-            {samplesOpen && (
-              <div className="medtech-nav-submenu">
+            {sampleManagementOpen && (
+              <div className="dashboard-nav-submenu">
                 <div 
-                  className={`medtech-nav-subitem ${activeSection === 'sample-collection' ? 'active' : ''}`}
+                  className={`dashboard-nav-subitem ${activeSection === 'sample-collection' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('sample-collection')}
                 >
-                  Collection
+                  Sample Collection
                 </div>
                 <div 
-                  className={`medtech-nav-subitem ${activeSection === 'sample-processing' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('sample-processing')}
-                >
-                  Processing
-                </div>
-                <div 
-                  className={`medtech-nav-subitem ${activeSection === 'sample-tracking' ? 'active' : ''}`}
+                  className={`dashboard-nav-subitem ${activeSection === 'sample-tracking' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('sample-tracking')}
                 >
-                  Tracking
+                  Sample Tracking
                 </div>
               </div>
             )}
           </div>
 
-          <div className="medtech-dropdown">
-            <div className="medtech-nav-item-header" onClick={toggleResults}>
-              <div className="medtech-nav-item-main">
-                <span className="medtech-nav-text">Results & Testing</span>
+          <div className="dashboard-dropdown">
+            <div className="dashboard-nav-item-header" onClick={toggleTesting}>
+              <div className="dashboard-nav-item-main">
+                <span className="dashboard-nav-text">Testing & Results</span>
               </div>
-              <span className={`medtech-dropdown-arrow ${resultsOpen ? 'open' : ''}`}>▼</span>
+              <span className={`dashboard-dropdown-arrow ${testingOpen ? 'open' : ''}`}>▼</span>
             </div>
-            {resultsOpen && (
-              <div className="medtech-nav-submenu">
+            {testingOpen && (
+              <div className="dashboard-nav-submenu">
                 <div 
-                  className={`medtech-nav-subitem ${activeSection === 'result-entry' ? 'active' : ''}`}
+                  className={`dashboard-nav-subitem ${activeSection === 'result-entry' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('result-entry')}
                 >
                   Result Entry
                 </div>
                 <div 
-                  className={`medtech-nav-subitem ${activeSection === 'result-validation' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('result-validation')}
+                  className={`dashboard-nav-subitem ${activeSection === 'quality-control' ? 'active' : ''}`}
+                  onClick={() => handleSectionClick('quality-control')}
                 >
-                  Validation
-                </div>
-                <div 
-                  className={`medtech-nav-subitem ${activeSection === 'analyzer-integration' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('analyzer-integration')}
-                >
-                  Analyzer Integration
+                  Quality Control
                 </div>
               </div>
             )}
           </div>
-
-          <div 
-            className={`medtech-nav-item ${activeSection === 'reports' ? 'active' : ''}`}
-            onClick={() => handleSectionClick('reports')}
-          >
-            <span className="medtech-nav-text">Reports</span>
-          </div>
         </nav>
 
-        <div className="medtech-sidebar-footer">
-          <div className="medtech-user-info">
-            <div className="medtech-user-avatar">
+        <div className="dashboard-sidebar-footer">
+          <div className="dashboard-user-info">
+            <div className="dashboard-user-avatar">
               {user?.firstName?.charAt(0) || user?.username?.charAt(0) || 'M'}
             </div>
-            <div className="medtech-user-details">
-              <div className="medtech-user-role">MedTech</div>
-              <div className="medtech-user-email">{user?.email || 'medtech@mdlab.com'}</div>
+            <div className="dashboard-user-details">
+              <div className="dashboard-user-role">MedTech</div>
+              <div className="dashboard-user-email">{user?.email || 'medtech@mdlab.com'}</div>
             </div>
-            <button className="medtech-logout-btn" onClick={handleLogout}>
-              Logout
+            <button className="dashboard-logout-btn" onClick={handleLogout}>
+              ⏻
             </button>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="medtech-dashboard-main">
-        <div className="medtech-dashboard-header">
-          <h1 className="medtech-page-title">{renderPageTitle()}</h1>
-          <div className="medtech-header-actions">
-            <button className="medtech-notification-btn">Notifications</button>
-            <div className="medtech-time-display">{new Date().toLocaleTimeString()}</div>
-          </div>
+      <div className="dashboard-main">
+        <div className="dashboard-header">
+          <h1 className="dashboard-page-title">{renderPageTitle()}</h1>
         </div>
 
-        <div className="medtech-dashboard-content">
+        <div className="dashboard-content">
           {renderContent()}
         </div>
       </div>
