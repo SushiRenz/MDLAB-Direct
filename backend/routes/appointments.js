@@ -64,10 +64,32 @@ router.post('/',
       .normalizeEmail(),
     
     body('serviceId')
-      .notEmpty()
-      .withMessage('Service ID is required')
+      .optional()
       .isMongoId()
       .withMessage('Please provide a valid service ID'),
+    
+    body('serviceIds')
+      .optional()
+      .isArray({ min: 1 })
+      .withMessage('Service IDs must be a non-empty array')
+      .custom((value, { req }) => {
+        // At least one of serviceId or serviceIds must be provided
+        if (!req.body.serviceId && (!value || value.length === 0)) {
+          throw new Error('Either serviceId or serviceIds must be provided');
+        }
+        
+        // If serviceIds is provided, validate each ID
+        if (value && value.length > 0) {
+          const mongoose = require('mongoose');
+          for (const id of value) {
+            if (!mongoose.Types.ObjectId.isValid(id)) {
+              throw new Error('All service IDs must be valid MongoDB ObjectIds');
+            }
+          }
+        }
+        
+        return true;
+      }),
     
     body('appointmentDate')
       .notEmpty()
@@ -75,11 +97,12 @@ router.post('/',
       .isDate()
       .withMessage('Please provide a valid date'),
     
-    body('appointmentTime')
-      .notEmpty()
-      .withMessage('Appointment time is required')
-      .isIn(['7:00 AM - 10:00 AM', '1:00 PM - 4:00 PM'])
-      .withMessage('Please select a valid time slot'),
+    body('totalPrice')
+      .optional()
+      .isNumeric()
+      .withMessage('Total price must be a number')
+      .isFloat({ min: 0 })
+      .withMessage('Total price must be a positive number'),
     
     body('type')
       .optional()
@@ -141,11 +164,6 @@ router.put('/:id',
       .isISO8601()
       .withMessage('Please provide a valid date'),
     
-    body('appointmentTime')
-      .optional()
-      .matches(/^(0?[1-9]|1[012]):[0-5][0-9] [AP]M$/)
-      .withMessage('Please provide time in format HH:MM AM/PM'),
-    
     body('status')
       .optional()
       .isIn(['pending', 'confirmed', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show'])
@@ -159,7 +177,19 @@ router.put('/:id',
     body('notes')
       .optional()
       .isLength({ max: 500 })
-      .withMessage('Notes cannot exceed 500 characters')
+      .withMessage('Notes cannot exceed 500 characters'),
+    
+    body('billGenerated')
+      .optional()
+      .isBoolean()
+      .withMessage('Bill generated must be a boolean value'),
+    
+    body('actualCost')
+      .optional()
+      .isNumeric()
+      .withMessage('Actual cost must be a number')
+      .isFloat({ min: 0 })
+      .withMessage('Actual cost must be a positive number')
   ], 
   updateAppointment
 );

@@ -597,6 +597,67 @@
   margin: 0 0 12px 0;
 }
 
+/* Multiple Tests Display Styles */
+.appointment-title {
+  color: #21AEA8;
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+}
+
+.multiple-tests-info {
+  margin-bottom: 16px;
+}
+
+.tests-summary {
+  margin-bottom: 12px;
+}
+
+.test-count-badge {
+  background: linear-gradient(135deg, #21AEA8, #179e93);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.tests-list {
+  background: #f8fdfd;
+  border: 1px solid #e6f7f7;
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.test-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 6px;
+  padding: 2px 0;
+}
+
+.test-item:last-child {
+  margin-bottom: 0;
+}
+
+.test-bullet {
+  color: #21AEA8;
+  font-weight: bold;
+  margin-right: 8px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.test-name {
+  color: #4a5568;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  flex: 1;
+}
+
 .appointment-time,
 .appointment-location {
   color: #666;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../design/ReceptionistDashboard.css';
 import { userAPI, financeAPI, servicesAPI, appointmentAPI } from '../services/api';
+import BookAppointmentModal from './BookAppointmentModal';
 
 function ReceptionistDashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('receptionist-dashboard');
@@ -12,8 +13,9 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     todayAppointments: 0,
     pendingAppointments: 0,
     completedToday: 0,
-    walkInPatients: 0,
+    cancelledAppointments: 0,
     totalPatientsToday: 0,
+    confirmedAppointments: 0,
     recentAppointments: [],
     upcomingAppointments: [],
     popularServices: []
@@ -31,38 +33,122 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState(null);
 
-  // Patient check-in/out state
-  const [showCheckInModal, setShowCheckInModal] = useState(false);
-  const [showCheckOutModal, setShowCheckOutModal] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState(null);
-
-  // Services state
+  // Services state (needed for appointment booking)
   const [services, setServices] = useState([]);
-  const [showServiceInfoModal, setShowServiceInfoModal] = useState(false);
-  const [selectedService, setSelectedService] = useState(null);
 
-  // Patient information state
-  const [showPatientInfoModal, setShowPatientInfoModal] = useState(false);
-  const [patientInfo, setPatientInfo] = useState(null);
-
-  // Walk-in registration state
-  const [showWalkInModal, setShowWalkInModal] = useState(false);
-  const [walkInData, setWalkInData] = useState({
-    patientName: '',
-    contactNumber: '',
-    email: '',
-    services: [],
-    notes: '',
-    urgency: 'regular'
-  });
+  // Patient details modal state
+  const [showPatientDetailsModal, setShowPatientDetailsModal] = useState(false);
+  const [selectedAppointmentDetails, setSelectedAppointmentDetails] = useState(null);
 
   // Bill generation state
   const [showBillModal, setShowBillModal] = useState(false);
   const [billData, setBillData] = useState(null);
 
+  // Dropdown menu state for appointment actions
+  const [activeDropdown, setActiveDropdown] = useState(null);
+
+  // Edit modals state
+  const [showEditServiceModal, setShowEditServiceModal] = useState(false);
+  const [showEditStatusModal, setShowEditStatusModal] = useState(false);
+  const [editingAppointmentData, setEditingAppointmentData] = useState(null);
+
+  // Helper function to parse and display multiple tests
+  const parseTestNames = (testTypeString) => {
+    if (!testTypeString) return [];
+    
+    // Split by comma and clean up each test name
+    const tests = testTypeString.split(',').map(test => test.trim());
+    
+    return tests;
+  };
+
+  // Helper function to get test count display
+  const getTestDisplayInfo = (testTypeString) => {
+    const tests = parseTestNames(testTypeString);
+    
+    if (tests.length <= 1) {
+      return {
+        mainTitle: tests[0] || 'Lab Test',
+        hasMultiple: false,
+        testCount: tests.length,
+        allTests: tests
+      };
+    }
+    
+    return {
+      mainTitle: `${tests.length} Laboratory Tests`,
+      hasMultiple: true,
+      testCount: tests.length,
+      allTests: tests
+    };
+  };
+
+  // Helper function to format service name for table display
+  const formatServiceNameForTable = (serviceName) => {
+    if (!serviceName) return 'No service';
+    
+    const tests = parseTestNames(serviceName);
+    if (tests.length <= 1) {
+      return serviceName;
+    }
+    
+    return `${tests.length} Tests: ${tests[0]}${tests.length > 1 ? `, +${tests.length - 1} more` : ''}`;
+  };
+
+  // Dropdown action handlers
+  const toggleDropdown = (appointmentId) => {
+    setActiveDropdown(activeDropdown === appointmentId ? null : appointmentId);
+  };
+
+  const handleEditService = (appointment) => {
+    setEditingAppointmentData(appointment);
+    setShowEditServiceModal(true);
+    setActiveDropdown(null);
+  };
+
+  const handleEditStatus = (appointment) => {
+    setEditingAppointmentData(appointment);
+    setShowEditStatusModal(true);
+    setActiveDropdown(null);
+  };
+
+  const handleDeleteAppointment = async (appointment) => {
+    if (window.confirm(`Are you sure you want to delete appointment ${appointment.appointmentId} for ${appointment.patientName}?\n\nThis action cannot be undone.`)) {
+      try {
+        // Call API to delete appointment
+        await appointmentAPI.cancelAppointment(appointment._id, {
+          reason: 'Deleted by receptionist'
+        });
+        
+        // Update local state
+        setAppointments(appointments.filter(apt => apt._id !== appointment._id));
+        alert(`Appointment ${appointment.appointmentId} has been cancelled successfully.`);
+      } catch (error) {
+        console.error('Error deleting appointment:', error);
+        alert('Failed to delete appointment. Please try again.');
+      }
+    }
+    setActiveDropdown(null);
+  };
+
+  // Close dropdown when clicking outside
+  const handleClickOutside = () => {
+    setActiveDropdown(null);
+  };
+
   // Schedule appointment state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [appointmentType, setAppointmentType] = useState('scheduled'); // 'scheduled', 'follow-up', 'walk-in'
+  const [showAppointmentBooking, setShowAppointmentBooking] = useState(false);
+  const [appointmentType, setAppointmentType] = useState('scheduled'); // 'scheduled', 'follow-up'
+  
+  // Patient information for receptionist scheduling
+  const [patientData, setPatientData] = useState({
+    patientName: '',
+    contactNumber: '',
+    email: ''
+  });
+  
+  // Legacy schedule data (keeping for compatibility)
   const [scheduleData, setScheduleData] = useState({
     patientName: '',
     contactNumber: '',
@@ -85,34 +171,41 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     setDashboardLoading(true);
     setDashboardError('');
     try {
-      // Fetch appointment statistics for today
-      const today = new Date().toISOString().split('T')[0];
-      console.log('Fetching appointment stats for:', today);
+      // Fetch appointment statistics for the last week to show real data
+      const today = new Date();
+      console.log('Fetching appointment stats for week period...');
       
-      const appointmentStatsResponse = await appointmentAPI.getAppointmentStats(today, 'day');
-      console.log('Appointment stats response:', appointmentStatsResponse);
+      // Get week data to show real statistics
+      const appointmentStatsResponse = await appointmentAPI.getAppointmentStats(today.toISOString().split('T')[0], 'week');
+      console.log('Week appointment stats response:', appointmentStatsResponse);
 
       if (appointmentStatsResponse.success) {
         const stats = appointmentStatsResponse.data;
         console.log('Processing stats:', stats);
         
+        // Calculate confirmed appointments (confirmed + checked-in + in-progress)
+        const confirmedAppointments = (stats.confirmed || 0) + (stats.checkedIn || 0) + (stats.inProgress || 0);
+        
         setDashboardStats({
           todayAppointments: stats.total || 0,
           pendingAppointments: stats.pending || 0,
           completedToday: stats.completed || 0,
-          walkInPatients: stats.walkIn || 0,
+          cancelledAppointments: stats.cancelled || 0,
           totalPatientsToday: stats.total || 0,
+          confirmedAppointments: confirmedAppointments,
           recentAppointments: stats.recent ? stats.recent.slice(0, 5).map(apt => ({
             appointmentId: apt._id || apt.appointmentId,
             patientName: apt.patientName || apt.patient?.name || 'Unknown Patient',
-            service: apt.serviceName || apt.service?.serviceName || 'Unknown Service',
+            service: formatServiceNameForTable(apt.serviceName || apt.service?.serviceName || 'Unknown Service'),
+            serviceName: apt.serviceName || apt.service?.serviceName || 'Unknown Service',
             time: apt.appointmentTime,
             status: apt.status
           })) : [],
           upcomingAppointments: stats.upcoming ? stats.upcoming.slice(0, 5).map(apt => ({
             appointmentId: apt._id || apt.appointmentId,
             patientName: apt.patientName || apt.patient?.name || 'Unknown Patient', 
-            service: apt.serviceName || apt.service?.serviceName || 'Unknown Service',
+            service: formatServiceNameForTable(apt.serviceName || apt.service?.serviceName || 'Unknown Service'),
+            serviceName: apt.serviceName || apt.service?.serviceName || 'Unknown Service',
             time: apt.appointmentTime,
             status: apt.status
           })) : [],
@@ -132,7 +225,6 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
         todayAppointments: 0,
         pendingAppointments: 0,
         completedToday: 0,
-        walkInPatients: 0,
         totalPatientsToday: 0,
         recentAppointments: [],
         upcomingAppointments: [],
@@ -208,176 +300,14 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     }
   };
 
-  // Patient check-in/out functions
-  const handleCheckIn = (appointment) => {
-    setSelectedPatient(appointment);
-    setShowCheckInModal(true);
+  // Bill generation and appointment management functions
+  
+  // View patient details function
+  const handleViewPatientDetails = (appointment) => {
+    setSelectedAppointmentDetails(appointment);
+    setShowPatientDetailsModal(true);
   };
-
-  const handleCheckOut = (appointment) => {
-    setSelectedPatient(appointment);
-    setShowCheckOutModal(true);
-  };
-
-  const processCheckIn = async () => {
-    try {
-      const response = await appointmentAPI.checkInPatient(selectedPatient._id);
-      
-      if (response.success) {
-        // Update local state with the response data
-        setAppointments(prev => 
-          prev.map(apt => 
-            apt._id === selectedPatient._id 
-              ? { ...response.data }
-              : apt
-          )
-        );
-        
-        setShowCheckInModal(false);
-        setSelectedPatient(null);
-        alert(`Patient ${selectedPatient.patientName} checked in successfully by ${currentUser.name || 'Receptionist'}!`);
-        
-        // Update dashboard stats
-        fetchReceptionistDashboardData();
-      } else {
-        throw new Error(response.message || 'Failed to check in patient');
-      }
-    } catch (error) {
-      console.error('Check-in error:', error);
-      setError('Failed to check in patient: ' + error.message);
-      alert('Failed to check in patient: ' + error.message);
-    }
-  };
-
-  const processCheckOut = async () => {
-    try {
-      const response = await appointmentAPI.checkOutPatient(selectedPatient._id, 'completed');
-      
-      if (response.success) {
-        // Update local state with the response data
-        setAppointments(prev => 
-          prev.map(apt => 
-            apt._id === selectedPatient._id 
-              ? { ...response.data }
-              : apt
-          )
-        );
-        
-        setShowCheckOutModal(false);
-        setSelectedPatient(null);
-        alert(`Patient ${selectedPatient.patientName} checked out successfully by ${currentUser.name || 'Receptionist'}!`);
-        
-        // Update dashboard stats
-        fetchReceptionistDashboardData();
-      } else {
-        throw new Error(response.message || 'Failed to check out patient');
-      }
-    } catch (error) {
-      console.error('Check-out error:', error);
-      setError('Failed to check out patient: ' + error.message);
-      alert('Failed to check out patient: ' + error.message);
-    }
-  };
-
-  // Walk-in registration functions
-  const handleWalkInRegistration = () => {
-    setShowWalkInModal(true);
-  };
-
-  const processWalkInRegistration = async () => {
-    try {
-      // Get the service ID - for demo, we'll use a mock service ID
-      // In real implementation, this would come from a service selection
-      const mockServiceId = '507f1f77bcf86cd799439011'; // Replace with actual service selection
-      
-      const walkInAppointmentData = {
-        patientName: walkInData.patientName,
-        contactNumber: walkInData.contactNumber,
-        email: walkInData.email,
-        serviceId: mockServiceId,
-        serviceName: walkInData.services.join(', ') || 'Walk-in Service',
-        appointmentDate: new Date().toISOString().split('T')[0],
-        appointmentTime: 'Walk-in',
-        type: 'walk-in',
-        priority: walkInData.urgency,
-        notes: walkInData.notes,
-        reasonForVisit: 'Walk-in patient registration'
-      };
-
-      const response = await appointmentAPI.createAppointment(walkInAppointmentData);
-      
-      if (response.success) {
-        // Update local appointments list
-        setAppointments(prev => [response.data, ...prev]);
-        
-        setShowWalkInModal(false);
-        setWalkInData({
-          patientName: '',
-          contactNumber: '',
-          email: '',
-          services: [],
-          notes: '',
-          urgency: 'regular'
-        });
-        
-        alert(`Walk-in patient ${response.data.patientName} registered successfully by ${currentUser.name || 'Receptionist'}!`);
-        
-        // Update dashboard stats
-        fetchReceptionistDashboardData();
-      } else {
-        throw new Error(response.message || 'Failed to register walk-in patient');
-      }
-    } catch (error) {
-      console.error('Walk-in registration error:', error);
-      setError('Failed to register walk-in patient: ' + error.message);
-      alert('Failed to register walk-in patient: ' + error.message);
-    }
-  };
-
-  // Service information functions
-  const handleViewServiceInfo = async (serviceName) => {
-    try {
-      // Fetch service details
-      const serviceInfo = {
-        serviceName: serviceName,
-        description: 'Complete blood count test with differential',
-        price: 800,
-        duration: '30 minutes',
-        preparation: 'No special preparation required',
-        sampleType: 'Blood',
-        turnaroundTime: '2-4 hours'
-      };
-      
-      setSelectedService(serviceInfo);
-      setShowServiceInfoModal(true);
-    } catch (error) {
-      console.error('Failed to fetch service info:', error);
-    }
-  };
-
-  // Patient information functions
-  const handleViewPatientInfo = async (patientName) => {
-    try {
-      // Fetch patient details
-      const patientDetails = {
-        name: patientName,
-        email: 'patient@email.com',
-        phone: '+639123456789',
-        address: '123 Main St, City',
-        dateOfBirth: '1990-01-01',
-        gender: 'Female',
-        emergencyContact: '+639987654321',
-        medicalHistory: ['Hypertension', 'Diabetes'],
-        lastVisit: '2025-01-15'
-      };
-      
-      setPatientInfo(patientDetails);
-      setShowPatientInfoModal(true);
-    } catch (error) {
-      console.error('Failed to fetch patient info:', error);
-    }
-  };
-
+  
   // Validate appointment form data
   const validateAppointmentForm = () => {
     const errors = [];
@@ -442,7 +372,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
 
       // Prepare appointment data based on type
       const appointmentData = {
-        patientId: null, // Explicitly null for walk-in patients
+        patientId: null, // For new patients without existing IDs
         patientName: scheduleData.patientName,
         contactNumber: scheduleData.contactNumber,
         email: scheduleData.email,
@@ -450,7 +380,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
         serviceName: scheduleData.serviceName,
         appointmentDate: scheduleData.appointmentDate,
         appointmentTime: scheduleData.appointmentTime,
-        type: appointmentType, // 'scheduled', 'follow-up', 'walk-in', 'emergency'
+        type: appointmentType, // 'scheduled', 'follow-up', 'emergency'
         priority: 'regular', // Default priority
         notes: scheduleData.notes,
         reasonForVisit: scheduleData.reasonForVisit,
@@ -490,7 +420,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
         });
         setError(''); // Clear any previous errors
         
-        alert(`${appointmentType === 'scheduled' ? 'Scheduled' : appointmentType === 'follow-up' ? 'Follow-up' : appointmentType === 'walk-in' ? 'Walk-in' : 'Emergency'} appointment scheduled successfully for ${response.data.patientName}!`);
+        alert(`${appointmentType === 'scheduled' ? 'Scheduled' : appointmentType === 'follow-up' ? 'Follow-up' : 'Emergency'} appointment scheduled successfully for ${response.data.patientName}!`);
         
         // Update dashboard stats
         fetchReceptionistDashboardData();
@@ -528,28 +458,182 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     }
   };
 
-  // Bill generation functions - limited for receptionist
+  // Bill generation functions - payment confirmation for receptionist
   const handleGenerateBill = (appointment) => {
-    // Receptionists can view and generate basic billing information
-    const bill = {
-      appointmentId: appointment.appointmentId,
-      patientName: appointment.patientName,
-      service: appointment.service,
-      amount: 800, // This would come from service pricing
-      date: new Date().toLocaleDateString(),
-      status: 'pending',
-      generatedBy: currentUser.name || 'Receptionist',
-      notes: 'Bill generated by receptionist for patient convenience'
-    };
+    console.log('Generating bill for specific appointment:', appointment.appointmentId);
+    console.log('Appointment details:', appointment);
     
-    setBillData(bill);
+    // Set appointment data for billing modal
+    setBillData({
+      appointment: appointment,
+      patientName: appointment.patientName,
+      service: appointment.serviceName || appointment.service || 'Service',
+      date: appointment.appointmentDate 
+        ? new Date(appointment.appointmentDate).toLocaleDateString()
+        : 'Date not specified',
+      time: appointment.appointmentTime || 'Any time during clinic hours',
+      price: appointment.totalPrice || appointment.price || '1,500.00',
+      contactNumber: appointment.contactNumber || 'Contact not available',
+      email: appointment.email || 'Email not available'
+    });
     setShowBillModal(true);
-    console.log('Receptionist generated bill for:', appointment.patientName);
+    console.log('Opening payment confirmation for appointment:', appointment.appointmentId, 'patient:', appointment.patientName);
+  };
+
+  const handlePaymentConfirmation = async (isPaid) => {
+    if (!billData) return;
+    
+    try {
+      if (isPaid) {
+        console.log('Processing payment for appointment:', billData.appointment.appointmentId);
+        console.log('Patient:', billData.patientName);
+        
+        // Update appointment status to confirmed in local state - ONLY for this specific appointment
+        const updatedAppointments = appointments.map(apt => {
+          if (apt.appointmentId === billData.appointment.appointmentId) {
+            console.log('Updating appointment:', apt.appointmentId, 'from status:', apt.status, 'to: confirmed');
+            return { ...apt, status: 'confirmed', billGenerated: true };
+          }
+          return apt;
+        });
+        
+        setAppointments(updatedAppointments);
+        setShowBillModal(false);
+        setBillData(null);
+        
+        // Update appointment status in the backend
+        try {
+          if (billData.appointment._id) {
+            await appointmentAPI.updateAppointment(billData.appointment._id, { 
+              status: 'confirmed',
+              billGenerated: true,
+              actualCost: billData.price || billData.appointment.totalPrice || billData.appointment.estimatedCost
+            });
+            console.log('Appointment status updated in backend for:', billData.appointment.appointmentId);
+          }
+        } catch (error) {
+          console.error('Failed to update appointment status in backend:', error);
+          console.error('Error details:', error.response?.data);
+          alert(`Warning: Payment confirmed locally, but failed to sync with server. Error: ${error.response?.data?.message || error.message}`);
+        }
+        
+        alert(`Payment confirmed for ${billData.patientName}! Appointment ${billData.appointment.appointmentId} status updated to confirmed.`);
+        
+        // Refresh appointments list to ensure consistency
+        if (typeof fetchAppointments === 'function') {
+          fetchAppointments();
+        }
+      } else {
+        setShowBillModal(false);
+        setBillData(null);
+      }
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      alert('Failed to process payment. Please try again.');
+    }
   };
 
   // Schedule appointment functions
   const handleScheduleAppointment = () => {
     setShowScheduleModal(true);
+  };
+
+  // New appointment submission handler for BookAppointmentModal
+  const handleReceptionistAppointmentSubmit = async (appointmentData) => {
+    try {
+      if (!patientData.patientName || !patientData.contactNumber || !patientData.email) {
+        alert('Please fill in all patient information before scheduling appointments.');
+        return;
+      }
+
+      const selectedTests = appointmentData.selectedTests || [];
+      
+      if (selectedTests.length === 0) {
+        alert('Please select at least one test.');
+        return;
+      }
+
+      // Fix timezone issue - format date in local timezone
+      const year = appointmentData.date.getFullYear();
+      const month = String(appointmentData.date.getMonth() + 1).padStart(2, '0');
+      const day = String(appointmentData.date.getDate()).padStart(2, '0');
+      const localDateString = `${year}-${month}-${day}`;
+
+      // Create a single appointment for all selected tests
+      const serviceIds = selectedTests.map(test => test._id);
+      const serviceNames = selectedTests.map(test => test.serviceName);
+      const totalPrice = selectedTests.reduce((sum, test) => sum + test.price, 0);
+      
+      console.log(`Creating single appointment for ${selectedTests.length} tests:`, serviceNames);
+      
+      // Create appointment data for API
+      const apiAppointmentData = {
+        patientId: null, // Explicitly null for receptionist-scheduled patients
+        patientName: patientData.patientName,
+        contactNumber: patientData.contactNumber,
+        email: patientData.email,
+        serviceIds: serviceIds, 
+        serviceName: serviceNames.join(', '),
+        appointmentDate: localDateString,
+        appointmentTime: appointmentData.time || 'Any time during clinic hours',
+        type: 'scheduled',
+        priority: 'regular',
+        notes: `Scheduled by receptionist - ${selectedTests.length} tests`,
+        reasonForVisit: `${serviceNames.join(', ')} - Scheduled by receptionist`,
+        receptionistNotes: `Scheduled via receptionist portal by ${currentUser.name || currentUser.email || 'Receptionist'}`,
+        totalPrice: totalPrice
+      };
+
+      console.log('Creating single appointment with data:', apiAppointmentData);
+      
+      const response = await appointmentAPI.createAppointment(apiAppointmentData);
+      console.log('📦 Received response:', response);
+      
+      if (response.success) {
+        // Transform API response to match component format
+        const newAppointment = {
+          id: response.data._id,
+          _id: response.data._id,
+          appointmentId: response.data.appointmentId,
+          patientName: response.data.patientName,
+          contactNumber: response.data.contactNumber,
+          email: response.data.email,
+          serviceName: response.data.serviceName, // Combined service names
+          appointmentDate: response.data.appointmentDate,
+          appointmentTime: response.data.appointmentTime,
+          service: response.data.serviceName, // Keep for compatibility
+          date: new Date(response.data.appointmentDate), // Keep for compatibility
+          time: response.data.appointmentTime, // Keep for compatibility
+          testType: response.data.serviceName,
+          status: response.data.status,
+          notes: response.data.notes || '',
+          totalPrice: response.data.totalPrice || totalPrice
+        };
+
+        console.log('✅ Single appointment created successfully!', newAppointment);
+        
+        // Add the new appointment to the state
+        setAppointments([newAppointment, ...appointments]);
+        setShowScheduleModal(false);
+        setShowAppointmentBooking(false);
+        
+        // Reset patient data for next appointment
+        setPatientData({
+          patientName: '',
+          contactNumber: '',
+          email: ''
+        });
+        
+        alert(`Appointment scheduled successfully!\n\nPatient: ${patientData.patientName}\nTests: ${serviceNames.join(', ')}\nAppointment ID: ${newAppointment.appointmentId}\nTotal: ₱${totalPrice}`);
+      } else {
+        console.error('❌ Appointment creation failed:', response.message);
+        throw new Error(`Failed to create appointment: ${response.message}`);
+      }
+      
+    } catch (error) {
+      console.error('Error scheduling appointments:', error);
+      alert('Failed to schedule appointments: ' + (error.message || 'Please try again'));
+    }
   };
 
   const processScheduleAppointment = async () => {
@@ -631,6 +715,20 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     }
   }, [activeSection, searchTerm, filterStatus, filterDate]);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.receptionist-dropdown-container')) {
+        setActiveDropdown(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
   return (
     <div className="receptionist-dashboard-container">
       {/* Sidebar */}
@@ -662,12 +760,6 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                 >
                   View Appointments
                 </div>
-                <div
-                  className={`receptionist-nav-subitem ${activeSection === 'walk-in-registration' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('walk-in-registration')}
-                >
-                  Walk-in Registration
-                </div>
               </div>
             )}
           </div>
@@ -681,23 +773,8 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
             </div>
             {patientServicesOpen && (
               <div className="receptionist-nav-submenu">
-                <div
-                  className={`receptionist-nav-subitem ${activeSection === 'check-in-out' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('check-in-out')}
-                >
-                  Check-In/Check-Out
-                </div>
-                <div
-                  className={`receptionist-nav-subitem ${activeSection === 'patient-information' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('patient-information')}
-                >
-                  Patient Information
-                </div>
-                <div
-                  className={`receptionist-nav-subitem ${activeSection === 'service-information' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('service-information')}
-                >
-                  Service Information
+                <div className="receptionist-nav-subitem">
+                  <span style={{color: '#999', fontStyle: 'italic'}}>Coming Soon</span>
                 </div>
               </div>
             )}
@@ -733,7 +810,6 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
           <h1 className="receptionist-page-title">
             {activeSection === 'receptionist-dashboard' && 'Dashboard'}
             {activeSection === 'appointments' && 'Appointment Management'}
-            {activeSection === 'walk-in-registration' && 'Walk-in Registration'}
             {activeSection === 'check-in-out' && 'Patient Check-In/Check-Out'}
             {activeSection === 'patient-information' && 'Patient Information'}
             {activeSection === 'service-information' && 'Service Information'}
@@ -753,26 +829,26 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                   <div className="receptionist-stats-grid">
                     <div className="receptionist-stat-card">
                       <div className="receptionist-stat-info">
-                        <div className="receptionist-stat-label">Today's Appointments</div>
+                        <div className="receptionist-stat-label">This Week</div>
                         <div className="receptionist-stat-value">{dashboardStats.todayAppointments}</div>
                       </div>
                     </div>
                     <div className="receptionist-stat-card">
                       <div className="receptionist-stat-info">
-                        <div className="receptionist-stat-label">Pending Appointments</div>
+                        <div className="receptionist-stat-label">Pending</div>
                         <div className="receptionist-stat-value">{dashboardStats.pendingAppointments}</div>
                       </div>
                     </div>
                     <div className="receptionist-stat-card">
                       <div className="receptionist-stat-info">
-                        <div className="receptionist-stat-label">Completed Today</div>
+                        <div className="receptionist-stat-label">Completed</div>
                         <div className="receptionist-stat-value">{dashboardStats.completedToday}</div>
                       </div>
                     </div>
                     <div className="receptionist-stat-card">
                       <div className="receptionist-stat-info">
-                        <div className="receptionist-stat-label">Walk-in Patients</div>
-                        <div className="receptionist-stat-value">{dashboardStats.walkInPatients}</div>
+                        <div className="receptionist-stat-label">Cancelled</div>
+                        <div className="receptionist-stat-value">{dashboardStats.cancelledAppointments || 0}</div>
                       </div>
                     </div>
                   </div>
@@ -809,15 +885,29 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
 
                     <div className="receptionist-info-card">
                       <div className="receptionist-card-header">
-                        <h3>Popular Services Today</h3>
+                        <h3>Recent Activity</h3>
                       </div>
                       <div className="receptionist-card-content">
-                        {dashboardStats.popularServices.map((service, index) => (
-                          <div key={index} className="receptionist-overview-item">
-                            <div className="receptionist-overview-label">{service.serviceName}</div>
-                            <div className="receptionist-overview-value">{service.count} ({service.percentage}%)</div>
+                        {dashboardStats.recentAppointments.length === 0 ? (
+                          <div className="receptionist-empty-state">
+                            <p>No recent activity</p>
                           </div>
-                        ))}
+                        ) : (
+                          <div className="receptionist-activity-list">
+                            {dashboardStats.recentAppointments.map((appointment, index) => (
+                              <div key={index} className="receptionist-activity-item">
+                                <div className="receptionist-activity-details">
+                                  <div className="receptionist-activity-patient">{appointment.patientName}</div>
+                                  <div className="receptionist-activity-service">{appointment.service}</div>
+                                  <div className="receptionist-activity-time">{appointment.time}</div>
+                                </div>
+                                <div className={`receptionist-activity-status ${appointment.status}`}>
+                                  {appointment.status}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -832,30 +922,35 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                         <button className="receptionist-quick-btn" onClick={handleScheduleAppointment}>
                           Schedule Appointment
                         </button>
-                        <button className="receptionist-quick-btn" onClick={handleWalkInRegistration}>
-                          Register Walk-in
+                        <button className="receptionist-quick-btn" onClick={() => handleSectionClick('view-appointments')}>
+                          View Appointments
                         </button>
-                        <button className="receptionist-quick-btn" onClick={() => handleSectionClick('check-in-out')}>
-                          Patient Check-In
-                        </button>
-                        <button className="receptionist-quick-btn" onClick={() => handleSectionClick('service-information')}>
-                          Service Info
+                        <button className="receptionist-quick-btn" onClick={() => handleSectionClick('billing-support')}>
+                          Billing Support
                         </button>
                       </div>
                     </div>
 
                     <div className="receptionist-activity-card">
                       <div className="receptionist-card-header">
-                        <h3>Today's Summary</h3>
+                        <h3>Week Summary</h3>
                       </div>
                       <div className="receptionist-activity-stats">
                         <div className="receptionist-stat-item">
-                          <div className="receptionist-stat-label">Total Patients</div>
-                          <div className="receptionist-stat-value">{dashboardStats.totalPatientsToday}</div>
+                          <div className="receptionist-stat-label">Total Appointments</div>
+                          <div className="receptionist-stat-value">{dashboardStats.todayAppointments}</div>
                         </div>
                         <div className="receptionist-stat-item">
-                          <div className="receptionist-stat-label">Completed</div>
-                          <div className="receptionist-stat-value">{dashboardStats.completedToday}</div>
+                          <div className="receptionist-stat-label">Needs Attention</div>
+                          <div className="receptionist-stat-value">{dashboardStats.pendingAppointments}</div>
+                        </div>
+                        <div className="receptionist-stat-item">
+                          <div className="receptionist-stat-label">Success Rate</div>
+                          <div className="receptionist-stat-value">
+                            {dashboardStats.todayAppointments > 0 
+                              ? Math.round((dashboardStats.completedToday / dashboardStats.todayAppointments) * 100) 
+                              : 0}%
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -933,9 +1028,12 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                           <tr key={appointment._id}>
                             <td>{appointment.appointmentId}</td>
                             <td>{appointment.patientName}</td>
-                            <td>{appointment.serviceName}</td>
+                            <td>{formatServiceNameForTable(appointment.serviceName)}</td>
                             <td>
-                              {new Date(appointment.appointmentDate).toLocaleDateString()} - {appointment.appointmentTime}
+                              {appointment.appointmentDate 
+                                ? `${new Date(appointment.appointmentDate).toLocaleDateString()} - ${appointment.appointmentTime || 'Any time during clinic hours'}`
+                                : 'Invalid Date - Any time during clinic hours'
+                              }
                             </td>
                             <td>
                               <span className={`receptionist-status ${appointment.status}`}>
@@ -946,32 +1044,50 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                               <div className="receptionist-action-buttons">
                                 <button 
                                   className="receptionist-btn-view" 
-                                  onClick={() => handleViewPatientInfo(appointment.patientName)}
+                                  onClick={() => handleViewPatientDetails(appointment)}
                                 >
                                   View
                                 </button>
-                                {appointment.status === 'confirmed' && (
-                                  <button 
-                                    className="receptionist-btn-checkin" 
-                                    onClick={() => handleCheckIn(appointment)}
-                                  >
-                                    Check In
-                                  </button>
-                                )}
-                                {appointment.status === 'checked-in' && (
-                                  <button 
-                                    className="receptionist-btn-checkout" 
-                                    onClick={() => handleCheckOut(appointment)}
-                                  >
-                                    Check Out
-                                  </button>
-                                )}
                                 <button 
                                   className="receptionist-btn-bill" 
                                   onClick={() => handleGenerateBill(appointment)}
                                 >
                                   Bill
                                 </button>
+                                
+                                {/* Three-dot dropdown menu */}
+                                <div className="receptionist-dropdown-container">
+                                  <button 
+                                    className="receptionist-btn-dropdown"
+                                    onClick={() => toggleDropdown(appointment._id)}
+                                    aria-label="More actions"
+                                  >
+                                    ⋮
+                                  </button>
+                                  
+                                  {activeDropdown === appointment._id && (
+                                    <div className="receptionist-dropdown-menu">
+                                      <button 
+                                        className="receptionist-dropdown-item"
+                                        onClick={() => handleEditService(appointment)}
+                                      >
+                                        Edit Service
+                                      </button>
+                                      <button 
+                                        className="receptionist-dropdown-item"
+                                        onClick={() => handleEditStatus(appointment)}
+                                      >
+                                        Edit Status
+                                      </button>
+                                      <button 
+                                        className="receptionist-dropdown-item delete"
+                                        onClick={() => handleDeleteAppointment(appointment)}
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </td>
                           </tr>
@@ -979,160 +1095,6 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                       )}
                     </tbody>
                   </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeSection === 'walk-in-registration' && (
-            <div className="receptionist-management-container">
-              <div className="receptionist-management-header">
-                <div className="receptionist-management-title">
-                  <h2>Walk-in Registration</h2>
-                  <p>Register walk-in patients quickly - Receptionist Function</p>
-                </div>
-              </div>
-              <div className="receptionist-form-container">
-                <button className="receptionist-add-btn" onClick={handleWalkInRegistration}>
-                  + Register Walk-in Patient
-                </button>
-                <div className="receptionist-info-box">
-                  <h4>Walk-in Registration Guidelines:</h4>
-                  <ul>
-                    <li>Collect basic patient information</li>
-                    <li>Verify insurance or payment method</li>
-                    <li>Assign urgency level based on condition</li>
-                    <li>Notify medical staff of walk-in arrival</li>
-                    <li>Generate temporary patient ID if new</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeSection === 'check-in-out' && (
-            <div className="receptionist-management-container">
-              <div className="receptionist-management-header">
-                <div className="receptionist-management-title">
-                  <h2>Patient Check-In/Check-Out</h2>
-                  <p>Manage patient arrivals and departures - Receptionist Central Function</p>
-                </div>
-              </div>
-              <div className="receptionist-management-content">
-                <div className="receptionist-checkin-stats">
-                  <div className="receptionist-stat-card">
-                    <div className="receptionist-stat-info">
-                      <div className="receptionist-stat-label">Patients Waiting</div>
-                      <div className="receptionist-stat-value">{appointments.filter(apt => apt.status === 'checked-in').length}</div>
-                    </div>
-                  </div>
-                  <div className="receptionist-stat-card">
-                    <div className="receptionist-stat-info">
-                      <div className="receptionist-stat-label">Ready for Check-in</div>
-                      <div className="receptionist-stat-value">{appointments.filter(apt => apt.status === 'confirmed').length}</div>
-                    </div>
-                  </div>
-                </div>
-                <div className="receptionist-patient-queue">
-                  <h4>Today's Patient Queue</h4>
-                  {appointments.length === 0 ? (
-                    <p>No patients scheduled for today</p>
-                  ) : (
-                    <div className="receptionist-queue-list">
-                      {appointments.map((appointment) => (
-                        <div key={appointment._id} className="receptionist-queue-item">
-                          <div className="receptionist-patient-info">
-                            <strong>{appointment.patientName}</strong>
-                            <span>{appointment.serviceName} - {appointment.appointmentTime}</span>
-                          </div>
-                          <div className="receptionist-queue-actions">
-                            {appointment.status === 'confirmed' && (
-                              <button 
-                                className="receptionist-btn-checkin" 
-                                onClick={() => handleCheckIn(appointment)}
-                              >
-                                Check In
-                              </button>
-                            )}
-                            {appointment.status === 'checked-in' && (
-                              <button 
-                                className="receptionist-btn-checkout" 
-                                onClick={() => handleCheckOut(appointment)}
-                              >
-                                Check Out
-                              </button>
-                            )}
-                            <span className={`receptionist-status ${appointment.status}`}>
-                              {appointment.status}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeSection === 'patient-information' && (
-            <div className="receptionist-management-container">
-              <div className="receptionist-management-header">
-                <div className="receptionist-management-title">
-                  <h2>Patient Information</h2>
-                  <p>View patient details and history - Receptionist Access</p>
-                </div>
-              </div>
-              <div className="receptionist-form-container">
-                <div className="receptionist-search-patient">
-                  <input 
-                    type="text" 
-                    placeholder="Search patient by name, phone, or email..." 
-                    className="receptionist-search-input"
-                  />
-                  <button className="receptionist-btn-primary">Search Patient</button>
-                </div>
-                <div className="receptionist-patient-actions">
-                  <button className="receptionist-btn-secondary">View Patient History</button>
-                  <button className="receptionist-btn-secondary">Update Contact Info</button>
-                  <button className="receptionist-btn-secondary">Schedule Follow-up</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeSection === 'service-information' && (
-            <div className="receptionist-management-container">
-              <div className="receptionist-management-header">
-                <div className="receptionist-management-title">
-                  <h2>Service Information</h2>
-                  <p>Laboratory services reference for patient inquiries</p>
-                </div>
-              </div>
-              <div className="receptionist-services-grid">
-                <div className="receptionist-service-category">
-                  <h4>Hematology Tests</h4>
-                  <ul>
-                    <li onClick={() => handleViewServiceInfo('Complete Blood Count')}>Complete Blood Count - ₱800</li>
-                    <li onClick={() => handleViewServiceInfo('Platelet Count')}>Platelet Count - ₱500</li>
-                    <li onClick={() => handleViewServiceInfo('Blood Typing')}>Blood Typing - ₱400</li>
-                  </ul>
-                </div>
-                <div className="receptionist-service-category">
-                  <h4>Chemistry Tests</h4>
-                  <ul>
-                    <li onClick={() => handleViewServiceInfo('Lipid Profile')}>Lipid Profile - ₱1,500</li>
-                    <li onClick={() => handleViewServiceInfo('Blood Sugar')}>Blood Sugar - ₱300</li>
-                    <li onClick={() => handleViewServiceInfo('Liver Function')}>Liver Function - ₱2,000</li>
-                  </ul>
-                </div>
-                <div className="receptionist-service-category">
-                  <h4>Radiology</h4>
-                  <ul>
-                    <li onClick={() => handleViewServiceInfo('Chest X-Ray')}>Chest X-Ray - ₱1,200</li>
-                    <li onClick={() => handleViewServiceInfo('Ultrasound')}>Ultrasound - ₱2,500</li>
-                    <li onClick={() => handleViewServiceInfo('CT Scan')}>CT Scan - ₱8,000</li>
-                  </ul>
                 </div>
               </div>
             </div>
@@ -1170,530 +1132,315 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
 
       {/* Modals */}
       
-      {/* Schedule Appointment Modal */}
-      {showScheduleModal && (
+      {/* Schedule Appointment Modal - New Patient Info Collection */}
+      {showScheduleModal && !showAppointmentBooking && (
         <div className="receptionist-modal-overlay" onClick={() => setShowScheduleModal(false)}>
           <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
             <div className="receptionist-modal-header">
-              <h3>Schedule New Appointment</h3>
+              <h3>Schedule New Appointment - Patient Information</h3>
               <button className="receptionist-modal-close" onClick={() => setShowScheduleModal(false)}>×</button>
             </div>
             <div className="receptionist-modal-body">
-              <div className="receptionist-form-group">
-                <label>Patient Name *</label>
-                <input
-                  type="text"
-                  value={scheduleData.patientName}
-                  onChange={(e) => setScheduleData({...scheduleData, patientName: e.target.value})}
-                  placeholder="Enter patient name"
-                />
-              </div>
-              <div className="receptionist-form-row">
-                <div className="receptionist-form-group">
-                  <label>Contact Number *</label>
-                  <input
-                    type="text"
-                    value={scheduleData.contactNumber}
-                    onChange={(e) => setScheduleData({...scheduleData, contactNumber: e.target.value})}
-                    placeholder="+639XXXXXXXXX"
-                  />
-                </div>
-                <div className="receptionist-form-group">
-                  <label>Email *</label>
-                  <input
-                    type="email"
-                    value={scheduleData.email}
-                    onChange={(e) => setScheduleData({...scheduleData, email: e.target.value})}
-                    placeholder="patient@email.com"
-                  />
-                </div>
-              </div>
-              <div className="receptionist-form-group">
-                <label>Service *</label>
-                <select
-                  value={scheduleData.serviceId}
-                  onChange={(e) => {
-                    const selectedService = services.find(s => s._id === e.target.value);
-                    setScheduleData({
-                      ...scheduleData, 
-                      serviceId: e.target.value,
-                      serviceName: selectedService?.serviceName || ''
-                    });
-                  }}
-                >
-                  <option value="">Select Service</option>
-                  {services.map(service => (
-                    <option key={service._id} value={service._id}>
-                      {service.serviceName} - ₱{service.price}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="receptionist-form-row">
-                <div className="receptionist-form-group">
-                  <label>Appointment Date *</label>
-                  <input
-                    type="date"
-                    value={scheduleData.appointmentDate}
-                    onChange={(e) => setScheduleData({...scheduleData, appointmentDate: e.target.value})}
-                    min={new Date().toISOString().split('T')[0]}
-                  />
-                </div>
-                <div className="receptionist-form-group">
-                  <label>Appointment Time *</label>
-                  <select
-                    value={scheduleData.appointmentTime}
-                    onChange={(e) => setScheduleData({...scheduleData, appointmentTime: e.target.value})}
-                  >
-                    <option value="">Select Time</option>
-                    <option value="8:00 AM">8:00 AM</option>
-                    <option value="9:00 AM">9:00 AM</option>
-                    <option value="10:00 AM">10:00 AM</option>
-                    <option value="11:00 AM">11:00 AM</option>
-                    <option value="1:00 PM">1:00 PM</option>
-                    <option value="2:00 PM">2:00 PM</option>
-                    <option value="3:00 PM">3:00 PM</option>
-                    <option value="4:00 PM">4:00 PM</option>
-                  </select>
-                </div>
-              </div>
-              <div className="receptionist-form-group">
-                <label>Priority</label>
-                <select
-                  value={scheduleData.priority}
-                  onChange={(e) => setScheduleData({...scheduleData, priority: e.target.value})}
-                >
-                  <option value="low">Low</option>
-                  <option value="regular">Regular</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </div>
-              <div className="receptionist-form-group">
-                <label>Reason for Visit</label>
-                <input
-                  type="text"
-                  value={scheduleData.reasonForVisit}
-                  onChange={(e) => setScheduleData({...scheduleData, reasonForVisit: e.target.value})}
-                  placeholder="Brief description"
-                />
-              </div>
-              <div className="receptionist-form-group">
-                <label>Notes</label>
-                <textarea
-                  value={scheduleData.notes}
-                  onChange={(e) => setScheduleData({...scheduleData, notes: e.target.value})}
-                  placeholder="Additional notes (optional)"
-                  rows="3"
-                />
-              </div>
-            </div>
-            <div className="receptionist-modal-footer">
-              <button className="receptionist-btn-secondary" onClick={() => setShowScheduleModal(false)}>
-                Cancel
-              </button>
-              <button className="receptionist-btn-primary" onClick={processScheduleAppointment}>
-                Schedule Appointment
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Walk-in Registration Modal */}
-      {showWalkInModal && (
-        <div className="receptionist-modal-overlay" onClick={() => setShowWalkInModal(false)}>
-          <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
-            <div className="receptionist-modal-header">
-              <h3>Walk-in Patient Registration</h3>
-              <button className="receptionist-modal-close" onClick={() => setShowWalkInModal(false)}>×</button>
-            </div>
-            <div className="receptionist-modal-body">
-              <div className="receptionist-form-group">
-                <label>Patient Name *</label>
-                <input
-                  type="text"
-                  value={walkInData.patientName}
-                  onChange={(e) => setWalkInData({...walkInData, patientName: e.target.value})}
-                  placeholder="Enter patient name"
-                />
-              </div>
-              <div className="receptionist-form-row">
-                <div className="receptionist-form-group">
-                  <label>Contact Number *</label>
-                  <input
-                    type="text"
-                    value={walkInData.contactNumber}
-                    onChange={(e) => setWalkInData({...walkInData, contactNumber: e.target.value})}
-                    placeholder="+639XXXXXXXXX"
-                  />
-                </div>
-                <div className="receptionist-form-group">
-                  <label>Email *</label>
-                  <input
-                    type="email"
-                    value={walkInData.email}
-                    onChange={(e) => setWalkInData({...walkInData, email: e.target.value})}
-                    placeholder="patient@email.com"
-                  />
-                </div>
-              </div>
-              <div className="receptionist-form-group">
-                <label>Services Required</label>
-                <textarea
-                  value={walkInData.services.join(', ')}
-                  onChange={(e) => setWalkInData({...walkInData, services: e.target.value.split(', ').filter(s => s)})}
-                  placeholder="List services needed (comma separated)"
-                  rows="2"
-                />
-              </div>
-              <div className="receptionist-form-group">
-                <label>Urgency</label>
-                <select
-                  value={walkInData.urgency}
-                  onChange={(e) => setWalkInData({...walkInData, urgency: e.target.value})}
-                >
-                  <option value="regular">Regular</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </div>
-              <div className="receptionist-form-group">
-                <label>Notes</label>
-                <textarea
-                  value={walkInData.notes}
-                  onChange={(e) => setWalkInData({...walkInData, notes: e.target.value})}
-                  placeholder="Additional notes (optional)"
-                  rows="3"
-                />
-              </div>
-            </div>
-            <div className="receptionist-modal-footer">
-              <button className="receptionist-btn-secondary" onClick={() => setShowWalkInModal(false)}>
-                Cancel
-              </button>
-              <button className="receptionist-btn-primary" onClick={processWalkInRegistration}>
-                Register Walk-in Patient
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Check-in Confirmation Modal */}
-      {showCheckInModal && selectedPatient && (
-        <div className="receptionist-modal-overlay" onClick={() => setShowCheckInModal(false)}>
-          <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
-            <div className="receptionist-modal-header">
-              <h3>Check-in Patient</h3>
-              <button className="receptionist-modal-close" onClick={() => setShowCheckInModal(false)}>×</button>
-            </div>
-            <div className="receptionist-modal-body">
-              <p>Are you sure you want to check in the following patient?</p>
-              <div className="receptionist-patient-details">
-                <p><strong>Patient:</strong> {selectedPatient.patientName}</p>
-                <p><strong>Service:</strong> {selectedPatient.serviceName}</p>
-                <p><strong>Time:</strong> {selectedPatient.appointmentTime}</p>
-                <p><strong>Appointment ID:</strong> {selectedPatient.appointmentId}</p>
-              </div>
-            </div>
-            <div className="receptionist-modal-footer">
-              <button className="receptionist-btn-secondary" onClick={() => setShowCheckInModal(false)}>
-                Cancel
-              </button>
-              <button className="receptionist-btn-primary" onClick={processCheckIn}>
-                Confirm Check-in
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Check-out Confirmation Modal */}
-      {showCheckOutModal && selectedPatient && (
-        <div className="receptionist-modal-overlay" onClick={() => setShowCheckOutModal(false)}>
-          <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
-            <div className="receptionist-modal-header">
-              <h3>Check-out Patient</h3>
-              <button className="receptionist-modal-close" onClick={() => setShowCheckOutModal(false)}>×</button>
-            </div>
-            <div className="receptionist-modal-body">
-              <p>Are you sure you want to check out the following patient?</p>
-              <div className="receptionist-patient-details">
-                <p><strong>Patient:</strong> {selectedPatient.patientName}</p>
-                <p><strong>Service:</strong> {selectedPatient.serviceName}</p>
-                <p><strong>Time:</strong> {selectedPatient.appointmentTime}</p>
-                <p><strong>Appointment ID:</strong> {selectedPatient.appointmentId}</p>
-              </div>
-            </div>
-            <div className="receptionist-modal-footer">
-              <button className="receptionist-btn-secondary" onClick={() => setShowCheckOutModal(false)}>
-                Cancel
-              </button>
-              <button className="receptionist-btn-primary" onClick={processCheckOut}>
-                Confirm Check-out
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Service Information Modal */}
-      {showServiceInfoModal && selectedService && (
-        <div className="receptionist-modal-overlay" onClick={() => setShowServiceInfoModal(false)}>
-          <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
-            <div className="receptionist-modal-header">
-              <h3>Service Information</h3>
-              <button className="receptionist-modal-close" onClick={() => setShowServiceInfoModal(false)}>×</button>
-            </div>
-            <div className="receptionist-modal-body">
-              <div className="receptionist-service-details">
-                <h4>{selectedService.serviceName}</h4>
-                <p><strong>Price:</strong> ₱{selectedService.price}</p>
-                <p><strong>Description:</strong> {selectedService.description}</p>
-                <p><strong>Duration:</strong> {selectedService.duration}</p>
-                <p><strong>Preparation:</strong> {selectedService.preparation}</p>
-                <p><strong>Sample Type:</strong> {selectedService.sampleType}</p>
-                <p><strong>Turnaround Time:</strong> {selectedService.turnaroundTime}</p>
-              </div>
-            </div>
-            <div className="receptionist-modal-footer">
-              <button className="receptionist-btn-primary" onClick={() => setShowServiceInfoModal(false)}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Patient Information Modal */}
-      {showPatientInfoModal && patientInfo && (
-        <div className="receptionist-modal-overlay" onClick={() => setShowPatientInfoModal(false)}>
-          <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
-            <div className="receptionist-modal-header">
-              <h3>Patient Information</h3>
-              <button className="receptionist-modal-close" onClick={() => setShowPatientInfoModal(false)}>×</button>
-            </div>
-            <div className="receptionist-modal-body">
-              <div className="receptionist-patient-details">
-                <h4>{patientInfo.name}</h4>
-                <p><strong>Email:</strong> {patientInfo.email}</p>
-                <p><strong>Phone:</strong> {patientInfo.phone}</p>
-                <p><strong>Address:</strong> {patientInfo.address}</p>
-                <p><strong>Date of Birth:</strong> {new Date(patientInfo.dateOfBirth).toLocaleDateString()}</p>
-                <p><strong>Gender:</strong> {patientInfo.gender}</p>
-                <p><strong>Emergency Contact:</strong> {patientInfo.emergencyContact}</p>
-                <p><strong>Last Visit:</strong> {new Date(patientInfo.lastVisit).toLocaleDateString()}</p>
-                <div>
-                  <strong>Medical History:</strong>
-                  <ul>
-                    {patientInfo.medicalHistory.map((item, index) => (
-                      <li key={index}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-            <div className="receptionist-modal-footer">
-              <button className="receptionist-btn-primary" onClick={() => setShowPatientInfoModal(false)}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Appointment Scheduling Modal */}
-      {showScheduleModal && (
-        <div className="receptionist-modal-overlay" onClick={() => setShowScheduleModal(false)}>
-          <div className="receptionist-modal-content receptionist-large-modal" onClick={e => e.stopPropagation()}>
-            <div className="receptionist-modal-header">
-              <h3>Schedule {appointmentType === 'scheduled' ? 'Scheduled' : appointmentType === 'follow-up' ? 'Follow-up' : appointmentType === 'walk-in' ? 'Walk-in' : 'Emergency'} Appointment</h3>
-              <button className="receptionist-modal-close" onClick={() => setShowScheduleModal(false)}>×</button>
-            </div>
-            <div className="receptionist-modal-body">
+              <p style={{marginBottom: '20px', color: '#666'}}>
+                First, please enter the patient's information. Then you'll be able to select tests and schedule appointments.
+              </p>
               
-              {/* Patient Details for Walk-in */}
+              <div className="receptionist-form-group">
+                <label>Patient Name *</label>
+                <input
+                  type="text"
+                  value={patientData.patientName}
+                  onChange={(e) => setPatientData({...patientData, patientName: e.target.value})}
+                  placeholder="Enter patient full name"
+                />
+              </div>
+              
               <div className="receptionist-form-row">
-                <div className="receptionist-form-group">
-                  <label>Patient Name *</label>
-                  <input
-                    type="text"
-                    value={scheduleData.patientName}
-                    onChange={(e) => setScheduleData({...scheduleData, patientName: e.target.value})}
-                    placeholder="Enter patient name"
-                    required
-                  />
-                </div>
                 <div className="receptionist-form-group">
                   <label>Contact Number *</label>
                   <input
-                    type="text"
-                    value={scheduleData.contactNumber}
-                    onChange={(e) => setScheduleData({...scheduleData, contactNumber: e.target.value})}
+                    type="tel"
+                    value={patientData.contactNumber}
+                    onChange={(e) => {
+                      // Only allow numbers, plus sign, and spaces
+                      const value = e.target.value.replace(/[^0-9+\s]/g, '');
+                      setPatientData({...patientData, contactNumber: value});
+                    }}
                     placeholder="+639XXXXXXXXX"
-                    required
+                  />
+                </div>
+                <div className="receptionist-form-group">
+                  <label>Email *</label>
+                  <input
+                    type="email"
+                    value={patientData.email}
+                    onChange={(e) => setPatientData({...patientData, email: e.target.value})}
+                    placeholder="patient@email.com"
                   />
                 </div>
               </div>
-
-              <div className="receptionist-form-group">
-                <label>Email *</label>
-                <input
-                  type="email"
-                  value={scheduleData.email}
-                  onChange={(e) => setScheduleData({...scheduleData, email: e.target.value})}
-                  placeholder="patient@email.com"
-                  required
-                />
-              </div>
-
-              {/* Service Selection */}
-              <div className="receptionist-form-group">
-                <label>Service *</label>
-                <select
-                  value={scheduleData.serviceId}
-                  onChange={(e) => {
-                    const selectedService = services.find(s => s._id === e.target.value);
-                    setScheduleData({
-                      ...scheduleData,
-                      serviceId: e.target.value,
-                      serviceName: selectedService ? selectedService.serviceName : ''
-                    });
-                  }}
-                  required
+              
+              <div className="receptionist-modal-footer">
+                <button 
+                  className="receptionist-btn-secondary" 
+                  onClick={() => setShowScheduleModal(false)}
                 >
-                  <option value="">Select a service...</option>
-                  {services.map(service => (
-                    <option key={service._id} value={service._id}>
-                      {service.serviceName} - ₱{service.price}
-                    </option>
-                  ))}
-                </select>
+                  Cancel
+                </button>
+                <button 
+                  className="receptionist-btn-primary"
+                  onClick={() => {
+                    if (!patientData.patientName || !patientData.contactNumber || !patientData.email) {
+                      alert('Please fill in all patient information fields.');
+                      return;
+                    }
+                    // Patient info is collected, now proceed to appointment booking
+                    setShowAppointmentBooking(true);
+                  }}
+                >
+                  Continue to Test Selection
+                </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-              {/* Date and Time */}
-              <div className="receptionist-form-row">
-                <div className="receptionist-form-group">
-                  <label>Appointment Date *</label>
-                  <input
-                    type="date"
-                    value={scheduleData.appointmentDate}
-                    onChange={(e) => setScheduleData({...scheduleData, appointmentDate: e.target.value})}
-                    min={new Date().toISOString().split('T')[0]}
-                    required
-                  />
+      {/* Book Appointment Modal - Test Selection and Scheduling */}
+      <BookAppointmentModal
+        isOpen={showAppointmentBooking}
+        onClose={() => {
+          setShowScheduleModal(false);
+          setShowAppointmentBooking(false);
+          setPatientData({ patientName: '', contactNumber: '', email: '' });
+        }}
+        onSubmit={handleReceptionistAppointmentSubmit}
+        availableServices={services}
+        isRescheduling={false}
+      />
+
+      {/* OLD MODAL REMOVED - Now using BookAppointmentModal system */}
+
+      {/* Patient Details Modal */}
+      {showPatientDetailsModal && selectedAppointmentDetails && (
+        <div className="receptionist-modal-overlay" onClick={() => setShowPatientDetailsModal(false)}>
+          <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="receptionist-modal-header">
+              <h3>Patient & Appointment Details</h3>
+              <button className="receptionist-modal-close" onClick={() => setShowPatientDetailsModal(false)}>×</button>
+            </div>
+            <div className="receptionist-modal-body">
+              <div className="receptionist-patient-details">
+                <div className="patient-info-section">
+                  <h4>Patient Information</h4>
+                  <div className="info-grid">
+                    <p><strong>Name:</strong> {selectedAppointmentDetails.patientName}</p>
+                    <p><strong>Contact:</strong> {selectedAppointmentDetails.contactNumber}</p>
+                    <p><strong>Email:</strong> {selectedAppointmentDetails.email || 'Not provided'}</p>
+                    <p><strong>Age:</strong> {selectedAppointmentDetails.age || 'Not provided'}</p>
+                    <p><strong>Gender:</strong> {selectedAppointmentDetails.gender || 'Not provided'}</p>
+                    <p><strong>Address:</strong> {selectedAppointmentDetails.address || 'Not provided'}</p>
+                  </div>
                 </div>
-                <div className="receptionist-form-group">
-                  <label>Appointment Time *</label>
-                  <select
-                    value={scheduleData.appointmentTime}
-                    onChange={(e) => setScheduleData({...scheduleData, appointmentTime: e.target.value})}
-                    required
-                  >
-                    <option value="">Select time slot...</option>
-                    <option value="7:00 AM - 10:00 AM">7:00 AM - 10:00 AM (Morning - Fasting Tests)</option>
-                    <option value="1:00 PM - 4:00 PM">1:00 PM - 4:00 PM (Afternoon - After Lunch)</option>
-                  </select>
+                
+                <div className="appointment-info-section">
+                  <h4>Appointment Details</h4>
+                  <div className="info-grid">
+                    <p><strong>Appointment ID:</strong> {selectedAppointmentDetails.appointmentId}</p>
+                    <p><strong>Date:</strong> {selectedAppointmentDetails.appointmentDate}</p>
+                    <p><strong>Time:</strong> {selectedAppointmentDetails.appointmentTime}</p>
+                    <p><strong>Status:</strong> 
+                      <span className={`status-badge ${selectedAppointmentDetails.status}`}>
+                        {selectedAppointmentDetails.status}
+                      </span>
+                    </p>
+                  </div>
                 </div>
+
+                <div className="tests-info-section">
+                  <h4>Laboratory Tests</h4>
+                  <div className="tests-container">
+                    {(() => {
+                      const testInfo = getTestDisplayInfo(selectedAppointmentDetails.serviceName);
+                      
+                      if (testInfo.hasMultiple && testInfo.allTests && testInfo.allTests.length > 0) {
+                        return (
+                          <div className="multiple-tests">
+                            <div className="test-summary">
+                              <span className="test-count-badge">{testInfo.testCount} Tests Ordered</span>
+                            </div>
+                            <div className="test-list">
+                              {testInfo.allTests.map((test, index) => (
+                                <div key={index} className="test-item">
+                                  <span className="test-name">{test}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="single-test">
+                            <div className="test-item">
+                              <span className="test-name">{selectedAppointmentDetails.serviceName || 'Lab Test'}</span>
+                            </div>
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                </div>
+
+                {selectedAppointmentDetails.notes && (
+                  <div className="notes-section">
+                    <h4>Additional Notes</h4>
+                    <p className="notes-text">{selectedAppointmentDetails.notes}</p>
+                  </div>
+                )}
               </div>
-
-              {/* Follow-up specific fields */}
-              {appointmentType === 'follow-up' && (
-                <div className="receptionist-form-group">
-                  <label>Follow-up for (Previous Appointment ID)</label>
-                  <input
-                    type="text"
-                    value={scheduleData.followUpFor}
-                    onChange={(e) => setScheduleData({...scheduleData, followUpFor: e.target.value})}
-                    placeholder="Enter previous appointment ID"
-                  />
-                </div>
-              )}
-
-              {/* Group appointment specific fields */}
-              {appointmentType === 'group' && (
-                <div className="receptionist-form-group">
-                  <label>Group Size</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={scheduleData.groupSize}
-                    onChange={(e) => setScheduleData({...scheduleData, groupSize: parseInt(e.target.value)})}
-                  />
-                </div>
-              )}
-
-              {/* Reason for Visit */}
-              <div className="receptionist-form-group">
-                <label>Reason for Visit *</label>
-                <textarea
-                  value={scheduleData.reasonForVisit}
-                  onChange={(e) => setScheduleData({...scheduleData, reasonForVisit: e.target.value})}
-                  placeholder="Describe the reason for this appointment"
-                  rows="3"
-                  required
-                />
-              </div>
-
-              {/* Notes */}
-              <div className="receptionist-form-group">
-                <label>Additional Notes</label>
-                <textarea
-                  value={scheduleData.notes}
-                  onChange={(e) => setScheduleData({...scheduleData, notes: e.target.value})}
-                  placeholder="Any additional information or special instructions"
-                  rows="2"
-                />
-              </div>
-
             </div>
             <div className="receptionist-modal-footer">
-              <button 
-                className="receptionist-btn-secondary" 
-                onClick={() => setShowScheduleModal(false)}
-              >
-                Cancel
+              <button className="receptionist-btn-secondary" onClick={() => setShowPatientDetailsModal(false)}>
+                Close
               </button>
               <button 
-                className="receptionist-btn-primary"
-                onClick={handleScheduleSubmit}
+                className="receptionist-btn-primary" 
+                onClick={() => {
+                  setShowPatientDetailsModal(false);
+                  handleGenerateBill(selectedAppointmentDetails);
+                }}
               >
-                Schedule Appointment
+                Generate Bill
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Bill Generation Modal */}
+      {/* Bill Generation Modal - Payment Confirmation */}
       {showBillModal && billData && (
         <div className="receptionist-modal-overlay" onClick={() => setShowBillModal(false)}>
           <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
             <div className="receptionist-modal-header">
-              <h3>Bill Information</h3>
+              <h3>Billing Information</h3>
               <button className="receptionist-modal-close" onClick={() => setShowBillModal(false)}>×</button>
             </div>
             <div className="receptionist-modal-body">
-              <div className="receptionist-bill-details">
-                <h4>Bill Summary</h4>
-                <p><strong>Appointment ID:</strong> {billData.appointmentId}</p>
-                <p><strong>Patient:</strong> {billData.patientName}</p>
-                <p><strong>Service:</strong> {billData.service}</p>
-                <p><strong>Amount:</strong> ₱{billData.amount}</p>
-                <p><strong>Date:</strong> {billData.date}</p>
-                <p><strong>Status:</strong> {billData.status}</p>
-                <p><strong>Generated by:</strong> {billData.generatedBy}</p>
-                <p><strong>Notes:</strong> {billData.notes}</p>
+              <div className="billing-details">
+                <div className="billing-section">
+                  <h4>Patient Details</h4>
+                  <p><strong>Name:</strong> {billData.patientName}</p>
+                  <p><strong>Contact:</strong> {billData.contactNumber}</p>
+                  <p><strong>Email:</strong> {billData.email}</p>
+                </div>
+                
+                <div className="billing-section">
+                  <h4>Service Details</h4>
+                  <p><strong>Service:</strong> {billData.service}</p>
+                  <p><strong>Date:</strong> {billData.date}</p>
+                  <p><strong>Time:</strong> {billData.time}</p>
+                  <p><strong>Location:</strong> MDLAB Clinic</p>
+                </div>
+                
+                <div className="billing-section">
+                  <h4>Payment Details</h4>
+                  <p><strong>Service Price:</strong> ₱{billData.price}</p>
+                  <p><strong>Payment Method:</strong> Cash Payment</p>
+                </div>
+                
+                <div className="payment-confirmation">
+                  <p><strong>Has the patient paid for this service?</strong></p>
+                </div>
               </div>
             </div>
             <div className="receptionist-modal-footer">
-              <button className="receptionist-btn-secondary" onClick={() => setShowBillModal(false)}>
+              <button className="receptionist-btn-secondary" onClick={() => handlePaymentConfirmation(false)}>
+                Not Paid
+              </button>
+              <button className="receptionist-btn-primary" onClick={() => handlePaymentConfirmation(true)}>
+                Payment Confirmed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Service Modal */}
+      {showEditServiceModal && editingAppointmentData && (
+        <div className="receptionist-modal-overlay" onClick={() => setShowEditServiceModal(false)}>
+          <div className="receptionist-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="receptionist-modal-header">
+              <h3>Edit Service - Appointment {editingAppointmentData.appointmentId}</h3>
+              <button className="receptionist-modal-close" onClick={() => setShowEditServiceModal(false)}>×</button>
+            </div>
+            <div className="receptionist-modal-body">
+              <div className="receptionist-form-container">
+                <p><strong>Patient:</strong> {editingAppointmentData.patientName}</p>
+                <p><strong>Current Service:</strong> {editingAppointmentData.serviceName}</p>
+                <p style={{color: '#6b7280', fontStyle: 'italic', marginTop: '10px'}}>
+                  Service editing functionality will be implemented soon. This allows changing the tests/services for this appointment.
+                </p>
+              </div>
+            </div>
+            <div className="receptionist-modal-footer">
+              <button className="receptionist-btn-secondary" onClick={() => setShowEditServiceModal(false)}>
                 Close
               </button>
-              <button className="receptionist-btn-primary">
-                Print Bill
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Status Modal */}
+      {showEditStatusModal && editingAppointmentData && (
+        <div className="receptionist-modal-overlay" onClick={() => setShowEditStatusModal(false)}>
+          <div className="receptionist-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="receptionist-modal-header">
+              <h3>Edit Status - Appointment {editingAppointmentData.appointmentId}</h3>
+              <button className="receptionist-modal-close" onClick={() => setShowEditStatusModal(false)}>×</button>
+            </div>
+            <div className="receptionist-modal-body">
+              <div className="receptionist-form-container">
+                <p><strong>Patient:</strong> {editingAppointmentData.patientName}</p>
+                <p><strong>Current Status:</strong> <span className={`receptionist-status ${editingAppointmentData.status}`}>{editingAppointmentData.status}</span></p>
+                
+                <div style={{marginTop: '20px'}}>
+                  <label htmlFor="newStatus" style={{display: 'block', marginBottom: '8px', fontWeight: '600'}}>
+                    New Status:
+                  </label>
+                  <select 
+                    id="newStatus" 
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    defaultValue={editingAppointmentData.status}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="checked-in">Checked In</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="no-show">No Show</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="receptionist-modal-footer">
+              <button className="receptionist-btn-secondary" onClick={() => setShowEditStatusModal(false)}>
+                Cancel
+              </button>
+              <button className="receptionist-btn-primary" onClick={() => {
+                const newStatus = document.getElementById('newStatus').value;
+                // This will be implemented to actually update the status
+                alert(`Status update functionality will be implemented soon. Would change to: ${newStatus}`);
+                setShowEditStatusModal(false);
+              }}>
+                Update Status
               </button>
             </div>
           </div>

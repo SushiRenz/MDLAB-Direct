@@ -106,6 +106,7 @@ const getAppointments = asyncHandler(async (req, res) => {
     const appointments = await Appointment.find(query)
       .populate('patient', 'name email phone')
       .populate('service', 'serviceName price category')
+      .populate('services', 'serviceName price category')
       .populate('createdBy', 'name role')
       .populate('checkedInBy', 'name role')
       .populate('checkedOutBy', 'name role')
@@ -154,6 +155,7 @@ const getAppointment = asyncHandler(async (req, res) => {
     const appointment = await Appointment.findById(req.params.id)
       .populate('patient', 'name email phone address dateOfBirth gender')
       .populate('service', 'serviceName price category description')
+      .populate('services', 'serviceName price category description')
       .populate('createdBy', 'name role')
       .populate('checkedInBy', 'name role')
       .populate('checkedOutBy', 'name role')
@@ -197,6 +199,8 @@ const getAppointment = asyncHandler(async (req, res) => {
 const createAppointment = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    console.log('Validation errors:', errors.array());
+    console.log('Request body:', req.body);
     return res.status(400).json({
       success: false,
       message: 'Validation failed',
@@ -210,22 +214,51 @@ const createAppointment = asyncHandler(async (req, res) => {
     contactNumber,
     email,
     serviceId,
+    serviceIds, // New field for multiple services
     serviceName,
     appointmentDate,
     appointmentTime,
     type = 'scheduled',
     priority = 'regular',
     notes,
-    reasonForVisit
+    reasonForVisit,
+    totalPrice // New field for total price
   } = req.body;
 
   try {
-    // Verify service exists
-    const service = await Service.findById(serviceId);
-    if (!service) {
-      return res.status(404).json({
+    // Handle both single service (backward compatibility) and multiple services
+    let services = [];
+    let totalCost = 0;
+    let combinedServiceName = serviceName || '';
+
+    if (serviceIds && Array.isArray(serviceIds) && serviceIds.length > 0) {
+      // Multiple services case
+      const foundServices = await Service.find({ _id: { $in: serviceIds } });
+      if (foundServices.length !== serviceIds.length) {
+        return res.status(404).json({
+          success: false,
+          message: 'One or more services not found'
+        });
+      }
+      services = foundServices;
+      totalCost = totalPrice || foundServices.reduce((sum, service) => sum + service.price, 0);
+      combinedServiceName = combinedServiceName || foundServices.map(s => s.serviceName).join(', ');
+    } else if (serviceId) {
+      // Single service case (backward compatibility)
+      const service = await Service.findById(serviceId);
+      if (!service) {
+        return res.status(404).json({
+          success: false,
+          message: 'Service not found'
+        });
+      }
+      services = [service];
+      totalCost = service.price;
+      combinedServiceName = combinedServiceName || service.serviceName;
+    } else {
+      return res.status(400).json({
         success: false,
-        message: 'Service not found'
+        message: 'Either serviceId or serviceIds must be provided'
       });
     }
 
@@ -245,51 +278,74 @@ const createAppointment = asyncHandler(async (req, res) => {
     // Use just the appointmentDate for the database field, not combined datetime
     const appointmentDateOnly = new Date(appointmentDate);
     
-    // For lab services, multiple appointments can be booked at the same time
-    // Only check if the same patient is trying to book the same service at the same time
-    const existingAppointment = await Appointment.findOne({
-      appointmentDate: {
-        $gte: new Date(appointmentDate + 'T00:00:00.000Z'),
-        $lte: new Date(appointmentDate + 'T23:59:59.999Z')
-      },
-      appointmentTime,
-      service: serviceId,
-      patient: patientId, // Same patient, same service, same time = conflict
-      status: { $nin: ['cancelled', 'completed', 'no-show'] }
-    });
-
-    if (existingAppointment) {
-      return res.status(409).json({
-        success: false,
-        message: 'You already have an appointment for this service at this time'
+    // For medical lab services, we allow multiple appointments per day
+    // Only prevent exact duplicate appointments (same patient, same exact service combination, same date)
+    // This is more flexible for lab operations
+    if (patientId && services.length === 1) {
+      // Only check for exact duplicates when it's a single service and we have a patient ID
+      const existingAppointment = await Appointment.findOne({
+        appointmentDate: {
+          $gte: new Date(appointmentDate + 'T00:00:00.000Z'),
+          $lte: new Date(appointmentDate + 'T23:59:59.999Z')
+        },
+        $or: [
+          { service: services[0]._id }, // Single service compatibility
+          { services: { $in: [services[0]._id] } } // Multiple services containing this service
+        ],
+        patient: patientId,
+        status: { $nin: ['cancelled', 'completed', 'no-show'] }
       });
+
+      if (existingAppointment) {
+        return res.status(409).json({
+          success: false,
+          message: `You already have an appointment for ${services[0].serviceName} on this date. Please choose a different date or cancel your existing appointment.`
+        });
+      }
     }
+    // For multiple services or walk-in patients, allow all appointments
+    // Medical labs can handle multiple appointments per day
 
     // Create appointment
-    const appointment = new Appointment({
+    const appointmentData = {
       patient: patientId || null,
       patientName: patientName || patient?.name,
       contactNumber: contactNumber || patient?.phone,
       email: email || patient?.email,
-      service: serviceId,
-      serviceName: serviceName || service.serviceName,
+      serviceName: combinedServiceName,
       appointmentDate: appointmentDateOnly, // Use the properly formatted date
       appointmentTime,
       type,
       priority,
       notes: notes || '',
       reasonForVisit: reasonForVisit || '',
-      estimatedCost: service.price,
+      estimatedCost: totalCost,
+      totalPrice: totalCost,
       createdBy: req.user._id,
       createdByName: `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.username || 'System',
       status: type === 'walk-in' ? 'walk-in' : 'pending'
-    });
+    };
+
+    // Add services (support both single and multiple)
+    if (services.length === 1) {
+      // Single service for backward compatibility
+      appointmentData.service = services[0]._id;
+      appointmentData.services = [services[0]._id];
+    } else {
+      // Multiple services
+      appointmentData.services = services.map(s => s._id);
+      // Keep first service as primary for backward compatibility
+      appointmentData.service = services[0]._id;
+    }
+
+    const appointment = new Appointment(appointmentData);
 
     await appointment.save();
 
     // Populate the appointment for response
     const populatedAppointment = await Appointment.findById(appointment._id)
       .populate('service', 'serviceName price category')
+      .populate('services', 'serviceName price category')
       .populate('createdBy', 'name role');
 
     res.status(201).json({
@@ -576,9 +632,34 @@ const getAppointmentStats = asyncHandler(async (req, res) => {
       endDate = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59, 999);
     }
 
-    const stats = await Appointment.getAppointmentStats(startDate);
+    console.log('Stats query range:', { startDate, endDate, targetDate, period });
+
+    // Get all appointments for the specified period
+    const allAppointments = await Appointment.find({
+      appointmentDate: {
+        $gte: startDate,
+        $lte: endDate
+      }
+    });
+
+    console.log('Found appointments for period:', allAppointments.length);
+
+    // Calculate statistics
+    const stats = {
+      total: allAppointments.length,
+      pending: allAppointments.filter(apt => apt.status === 'pending').length,
+      confirmed: allAppointments.filter(apt => apt.status === 'confirmed').length,
+      checkedIn: allAppointments.filter(apt => apt.status === 'checked-in').length,
+      inProgress: allAppointments.filter(apt => apt.status === 'in-progress').length,
+      completed: allAppointments.filter(apt => apt.status === 'completed').length,
+      cancelled: allAppointments.filter(apt => apt.status === 'cancelled').length,
+      noShow: allAppointments.filter(apt => apt.status === 'no-show').length,
+      walkIn: allAppointments.filter(apt => apt.status === 'walk-in').length
+    };
+
+    console.log('Calculated stats:', stats);
     
-    // Get recent appointments
+    // Get recent appointments (last 10 from the period)
     const recentAppointments = await Appointment.find({
       appointmentDate: {
         $gte: startDate,
@@ -590,12 +671,13 @@ const getAppointmentStats = asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 })
     .limit(10);
 
-    // Get upcoming appointments (next 7 days)
+    // Get upcoming appointments (next 7 days from today)
+    const today = new Date();
     const nextWeek = new Date();
-    nextWeek.setDate(nextWeek.getDate() + 7);
+    nextWeek.setDate(today.getDate() + 7);
     const upcomingAppointments = await Appointment.find({
       appointmentDate: {
-        $gte: new Date(),
+        $gte: today,
         $lte: nextWeek
       },
       status: { $in: ['pending', 'confirmed'] }

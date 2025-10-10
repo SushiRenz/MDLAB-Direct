@@ -716,6 +716,9 @@ export const appointmentAPI = {
       };
     } catch (error) {
       console.error('Create appointment error:', error);
+      console.error('Error response data:', error.response?.data);
+      console.error('Error response status:', error.response?.status);
+      console.error('Error response headers:', error.response?.headers);
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to create appointment',

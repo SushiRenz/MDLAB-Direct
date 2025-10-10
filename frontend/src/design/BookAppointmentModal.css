@@ -48,6 +48,153 @@
   gap: 0.5rem;
 }
 
+/* Test Selection Button */
+.test-selection-button {
+  width: 100%;
+  padding: 16px 20px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  font-size: 16px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.3s ease;
+  position: relative;
+  color: #374151;
+  font-weight: 500;
+}
+
+.test-selection-button:hover {
+  border-color: #3b82f6;
+  background: #f8fafc;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.test-selection-button:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.test-selection-button:after {
+  content: '▼';
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  font-size: 12px;
+  transition: transform 0.3s ease;
+}
+
+.test-selection-button:hover:after {
+  color: #3b82f6;
+  transform: translateY(-50%) scale(1.1);
+}
+
+/* Selected Tests Preview */
+.selected-tests-preview {
+  margin-top: 12px;
+  padding: 16px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+}
+
+.selected-tests-preview h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #495057;
+}
+
+.tests-list {
+  margin-bottom: 12px;
+}
+
+.test-item-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.test-item-preview:last-child {
+  margin-bottom: 0;
+}
+
+.test-item-preview .test-name {
+  flex: 1;
+  font-weight: 500;
+  color: #495057;
+  font-size: 14px;
+}
+
+.test-item-preview .test-price {
+  margin-right: 8px;
+  font-weight: 600;
+  color: #28a745;
+  font-size: 14px;
+}
+
+.remove-test-preview {
+  background: #dc3545;
+  color: white;
+  border: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+}
+
+.remove-test-preview:hover {
+  background: #c82333;
+}
+
+.total-price-preview {
+  text-align: right;
+  padding-top: 12px;
+  border-top: 1px solid #dee2e6;
+  font-size: 16px;
+  color: #28a745;
+}
+
+/* Location Display */
+.location-display {
+  padding: 16px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+}
+
+.location-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.location-name {
+  font-weight: 600;
+  color: #495057;
+  font-size: 16px;
+}
+
+.location-details {
+  font-size: 14px;
+  color: #6c757d;
+}
+
 .calendar-group {
   align-items: center;
 }

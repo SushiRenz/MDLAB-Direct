@@ -42,13 +42,13 @@ function PatientDashboard(props) {
   const upcomingAppointments = appointments.filter(appointment => {
     const appointmentDate = new Date(appointment.date);
     appointmentDate.setHours(0, 0, 0, 0);
-    return appointmentDate >= today;
+    return appointmentDate >= today && appointment.status !== 'cancelled';
   });
   
   const pastAppointments = appointments.filter(appointment => {
     const appointmentDate = new Date(appointment.date);
     appointmentDate.setHours(0, 0, 0, 0);
-    return appointmentDate < today;
+    return appointmentDate < today || appointment.status === 'cancelled';
   });
 
   // Sync currentUser state with props - CRITICAL for profile data visibility
@@ -352,36 +352,53 @@ function PatientDashboard(props) {
     }
   };
 
+  // Helper function to parse and display multiple tests
+  const parseTestNames = (testTypeString) => {
+    if (!testTypeString) return [];
+    
+    // Split by comma and clean up each test name
+    const tests = testTypeString.split(',').map(test => test.trim());
+    
+    return tests;
+  };
+
+  // Helper function to get test count display
+  const getTestDisplayInfo = (testTypeString) => {
+    const tests = parseTestNames(testTypeString);
+    
+    if (tests.length <= 1) {
+      return {
+        mainTitle: tests[0] || 'Lab Test',
+        hasMultiple: false,
+        testCount: tests.length,
+        allTests: tests
+      };
+    }
+    
+    return {
+      mainTitle: `${tests.length} Laboratory Tests`,
+      hasMultiple: true,
+      testCount: tests.length,
+      allTests: tests
+    };
+  };
+
   const handleAppointmentSubmit = async (appointmentData) => {
     try {
       console.log('=== APPOINTMENT SUBMISSION DEBUG ===');
       console.log('appointmentData:', appointmentData);
-      console.log('appointmentData.testType:', appointmentData.testType);
-      console.log('availableServices:', availableServices);
-      console.log('availableServices length:', availableServices.length);
+      console.log('appointmentData.selectedTests:', appointmentData.selectedTests);
       
-      // Find the selected service by serviceName (testType contains the serviceName)
-      const selectedService = availableServices.find(service => 
-        service.serviceName === appointmentData.testType ||
-        service._id === appointmentData.testType
-      );
+      // Handle multiple tests - create single appointment with all tests
+      const selectedTests = appointmentData.selectedTests || [];
       
-      console.log('selectedService found:', selectedService);
-      console.log('Trying to match testType:', appointmentData.testType);
-      console.log('Against serviceName options:', availableServices.map(s => s.serviceName));
-
-      if (!selectedService) {
-        console.error('❌ Selected service not found!');
-        console.log('Appointment testType received:', appointmentData.testType);
-        console.log('Available service names:', availableServices.map(s => s.serviceName));
-        console.log('Available services full data:', availableServices);
-        alert('Selected service not found. Please try again.');
+      if (selectedTests.length === 0) {
+        alert('Please select at least one test.');
         return;
       }
 
-      console.log('✅ Selected service found:', selectedService);
-      console.log('Service ID:', selectedService._id);
-      console.log('Service Name:', selectedService.serviceName);
+      console.log('✅ Selected tests:', selectedTests);
+      console.log('Number of tests:', selectedTests.length);
 
       // Validate required fields
       if (!appointmentData.date) {
@@ -390,38 +407,8 @@ function PatientDashboard(props) {
         return;
       }
 
-      if (!appointmentData.time) {
-        console.error('❌ No time selected!');
-        alert('Please select a time for your appointment.');
-        return;
-      }
-
-      // Helper function to convert 12-hour to 24-hour format
-      const convertTo24HourFormat = (time12h) => {
-        const [time, modifier] = time12h.split(' ');
-        let [hours, minutes] = time.split(':');
-        if (hours === '12') {
-          hours = '00';
-        }
-        if (modifier === 'PM') {
-          hours = parseInt(hours, 10) + 12;
-        }
-        return `${hours.padStart(2, '0')}:${minutes}:00`;
-      };
-
-      console.log('Current user phone:', currentUser.phone);
-      console.log('Current user contactNumber:', currentUser.contactNumber);
-      console.log('All current user data:', currentUser);
-
-      // Convert time format from "7:00 AM" to "07:00:00" for proper date construction
-      const timeString = appointmentData.time.split(' - ')[0]; // Get "7:00 AM"
-      const convertedTime = convertTo24HourFormat(timeString); // Convert to "07:00:00"
-      
-      console.log('Original time:', timeString);
-      console.log('Converted time:', convertedTime);
-      console.log('Raw date object:', appointmentData.date);
-      console.log('Date toISOString():', appointmentData.date.toISOString());
-      console.log('Date split result:', appointmentData.date.toISOString().split('T')[0]);
+      // Since patients can come anytime, use a default time
+      const timeString = appointmentData.time || 'Any time during clinic hours';
       
       // Fix timezone issue - format date in local timezone
       const year = appointmentData.date.getFullYear();
@@ -431,75 +418,65 @@ function PatientDashboard(props) {
       
       console.log('Local date string (fixed):', localDateString);
 
+      // Create ONE appointment with all selected tests
+      const testNames = selectedTests.map(test => test.serviceName).join(', ');
+      const testIds = selectedTests.map(test => test._id);
+      const totalPrice = selectedTests.reduce((sum, test) => sum + (test.price || 0), 0);
+      
+      console.log('Creating single appointment with multiple tests:', testNames);
+      
       // Create appointment data for API
       const apiAppointmentData = {
-        patientId: currentUser._id || currentUser.id, // Controller expects patientId
+        patientId: currentUser._id || currentUser.id,
         patientName: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.name || 'Patient',
-        contactNumber: currentUser.phone || currentUser.contactNumber || '09123456789', // Fallback phone number
+        contactNumber: currentUser.phone || currentUser.contactNumber || '09123456789',
         email: currentUser.email || '',
-        serviceId: selectedService._id, // Controller expects serviceId
-        serviceName: selectedService.serviceName,
-        appointmentDate: localDateString, // Use local timezone date instead of UTC
-        appointmentTime: timeString, // Keep original format for display
+        serviceIds: testIds, // Array of service IDs
+        serviceName: testNames, // Combined service names
+        appointmentDate: localDateString,
+        appointmentTime: timeString,
         type: 'scheduled',
         priority: 'regular',
-        notes: 'Patient booking',
-        reasonForVisit: `${appointmentData.testType} - Patient self-booking`
+        totalPrice: totalPrice, // Fixed: changed from 'price' to 'totalPrice'
+        notes: `Patient booking - Multiple tests: ${testNames}`,
+        reasonForVisit: `Multiple tests - Patient self-booking (${selectedTests.length} tests)`
       };
 
-      console.log('Creating appointment with data:', apiAppointmentData);
-      console.log('📋 Appointment data details:');
-      console.log('  - patientId:', apiAppointmentData.patientId);
-      console.log('  - patientName:', apiAppointmentData.patientName);
-      console.log('  - contactNumber:', apiAppointmentData.contactNumber);
-      console.log('  - email:', apiAppointmentData.email);
-      console.log('  - serviceId:', apiAppointmentData.serviceId);
-      console.log('  - appointmentDate:', apiAppointmentData.appointmentDate);
-      console.log('  - appointmentTime:', apiAppointmentData.appointmentTime);
-      
-      console.log('🚀 About to call appointmentAPI.createAppointment...');
+      console.log('Creating single appointment with data:', apiAppointmentData);
       
       const response = await appointmentAPI.createAppointment(apiAppointmentData);
-      
-      console.log('📦 Received response from API!');
-      console.log('✅ Appointment creation response:', response);
-      console.log('Response success:', response.success);
-      console.log('Response message:', response.message);
-      console.log('Response error:', response.error);
-      console.log('Full response object:', JSON.stringify(response, null, 2));
+      console.log('📦 Received response:', response);
       
       if (response.success) {
         // Transform API response to match component format
         const newAppointment = {
           id: response.data._id,
-          _id: response.data._id, // Keep original ID for API calls
+          _id: response.data._id,
           date: new Date(response.data.appointmentDate),
           time: response.data.appointmentTime,
           testType: response.data.serviceName,
-          location: appointmentData.location === 'main' ? 'MDLAB Direct - Main Branch' : 'Mobile Lab Service',
+          location: 'MDLAB Direct - Main Branch',
           status: response.data.status,
           appointmentId: response.data.appointmentId,
-          notes: response.data.notes || ''
+          notes: response.data.notes || '',
+          price: response.data.price || totalPrice
         };
 
-        // Add the new appointment to the state
+        console.log('✅ Single appointment created successfully!', newAppointment);
+        
+        // Add new appointment to the state
         setAppointments([...appointments, newAppointment]);
         setIsBookingModalOpen(false);
-        alert('Appointment booked successfully! Your appointment ID is: ' + response.data.appointmentId);
+        
+        alert(`Appointment booked successfully! Your appointment ID is: ${newAppointment.appointmentId}. Services: ${testNames}`);
       } else {
         console.error('❌ Appointment creation failed:', response.message);
-        console.error('❌ Validation errors:', response.errors);
-        if (response.errors && response.errors.length > 0) {
-          console.log('Detailed validation errors:');
-          response.errors.forEach((error, index) => {
-            console.log(`Error ${index + 1}:`, error);
-          });
-        }
-        throw new Error(response.message || 'Failed to create appointment');
+        throw new Error(`Failed to create appointment: ${response.message}`);
       }
+      
     } catch (error) {
-      console.error('Error booking appointment:', error);
-      alert('Failed to book appointment: ' + (error.message || 'Please try again'));
+      console.error('Error booking appointments:', error);
+      alert('Failed to book appointments: ' + (error.message || 'Please try again'));
     }
   };
 
@@ -763,7 +740,10 @@ function PatientDashboard(props) {
               No upcoming appointments. Book one to get started!
             </div>
           ) : (
-            upcomingAppointments.map(appointment => (
+            upcomingAppointments.map(appointment => {
+              const testInfo = getTestDisplayInfo(appointment.testType);
+              
+              return (
               <div key={appointment.id} className="appointment-card upcoming">
                 <div className="appointment-header">
                   <div className="appointment-date">
@@ -777,7 +757,24 @@ function PatientDashboard(props) {
                   <div className="appointment-status">{appointment.status}</div>
                 </div>
                 <div className="appointment-details">
-                  <h4>{appointment.testType}</h4>
+                  <h4 className="appointment-title">{testInfo.mainTitle}</h4>
+                  
+                  {testInfo.hasMultiple && (
+                    <div className="multiple-tests-info">
+                      <div className="tests-summary">
+                        <span className="test-count-badge">{testInfo.testCount} tests</span>
+                      </div>
+                      <div className="tests-list">
+                        {testInfo.allTests.map((test, index) => (
+                          <div key={index} className="test-item">
+                            <span className="test-bullet">•</span>
+                            <span className="test-name">{test}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="appointment-time">
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
@@ -808,7 +805,8 @@ function PatientDashboard(props) {
                   </button>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

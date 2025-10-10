@@ -27,8 +27,12 @@ const appointmentSchema = new mongoose.Schema({
   service: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Service',
-    required: true
+    required: false // Make optional for backward compatibility
   },
+  services: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Service'
+  }],
   serviceName: {
     type: String,
     required: true
@@ -96,6 +100,10 @@ const appointmentSchema = new mongoose.Schema({
   },
   // Billing information
   estimatedCost: {
+    type: Number,
+    default: 0
+  },
+  totalPrice: {
     type: Number,
     default: 0
   },

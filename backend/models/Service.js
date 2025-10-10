@@ -25,7 +25,7 @@ const serviceSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Service category is required'],
     enum: {
-      values: ['blood_tests', 'urine_tests', 'imaging', 'pathology', 'special_tests', 'package_deals', 'emergency_tests'],
+      values: ['clinical_chemistry', 'hematology', 'clinical_microscopy', 'serology_immunology', 'blood_tests', 'urine_tests', 'imaging', 'pathology', 'special_tests', 'package_deals', 'emergency_tests'],
       message: 'Please select a valid category'
     }
   },
