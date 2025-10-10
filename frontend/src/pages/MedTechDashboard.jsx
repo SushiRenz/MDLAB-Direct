@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import '../design/Dashboard.css';
 
 function MedTechDashboard({ currentUser, onLogout }) {
-  const [activeSection, setActiveSection] = useState('dashboard');
+  const [activeSection, setActiveSection] = useState('testing-queue');
   const [sampleManagementOpen, setSampleManagementOpen] = useState(false);
   const [testingOpen, setTestingOpen] = useState(false);
   
@@ -19,6 +19,36 @@ function MedTechDashboard({ currentUser, onLogout }) {
     urgent: 8
   });
   const [selectedSample, setSelectedSample] = useState(null);
+
+  // Testing Queue State
+  const [testingQueue, setTestingQueue] = useState([
+    {
+      _id: 'mock_1',
+      status: 'confirmed',
+      isUrgent: true,
+      appointmentDate: '2025-10-10T09:00:00Z',
+      patientInfo: { firstName: 'Maria', lastName: 'Santos', phoneNumber: '+63 917 123 4567', age: 34, gender: 'Female' },
+      services: [{ name: 'Complete Blood Count (CBC)' }, { name: 'Blood Chemistry Panel' }]
+    },
+    {
+      _id: 'mock_2',
+      status: 'confirmed',
+      isUrgent: false,
+      appointmentDate: '2025-10-10T10:30:00Z',
+      patientInfo: { firstName: 'Juan', lastName: 'Dela Cruz', phoneNumber: '+63 918 987 6543', age: 45, gender: 'Male' },
+      services: [{ name: 'Lipid Profile' }, { name: 'HbA1c' }]
+    },
+    {
+      _id: 'mock_3',
+      status: 'in-progress',
+      isUrgent: false,
+      appointmentDate: '2025-10-10T08:15:00Z',
+      testStartTime: new Date(Date.now() - 15 * 60 * 1000),
+      patientInfo: { firstName: 'Anna', lastName: 'Reyes', phoneNumber: '+63 919 555 0123', age: 28, gender: 'Female' },
+      services: [{ name: 'Urinalysis' }, { name: 'Pregnancy Test' }]
+    }
+  ]);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
 
   // Test Results State
   const [testResults, setTestResults] = useState([]);
@@ -261,6 +291,10 @@ function MedTechDashboard({ currentUser, onLogout }) {
 
   const renderContent = () => {
     switch (activeSection) {
+      case 'dashboard': return renderDashboardHome();
+      case 'testing-queue': return renderTestingQueue();
+      case 'enter-results': return renderEnterResults();
+      case 'review': return renderReview();
       case 'sample-collection': return renderSampleCollection();
       case 'sample-tracking': return renderSampleTracking();
       case 'result-entry': return renderResultEntry();
@@ -1086,6 +1120,498 @@ function MedTechDashboard({ currentUser, onLogout }) {
     </div>
   );
 
+  const renderTestingQueue = () => {
+    const readyForTesting = testingQueue.filter(apt => apt.status === 'confirmed');
+    const inProgress = testingQueue.filter(apt => apt.status === 'in-progress');
+
+    const handleStartTesting = (appointmentId) => {
+      setTestingQueue(prev => 
+        prev.map(apt => 
+          apt._id === appointmentId 
+            ? { ...apt, status: 'in-progress', testStartTime: new Date() }
+            : apt
+        )
+      );
+      const appointment = testingQueue.find(apt => apt._id === appointmentId);
+      setSelectedAppointment(appointment);
+      setActiveSection('enter-results');
+    };
+
+    return (
+      <div style={{ padding: '20px' }}>
+        <div style={{ 
+          background: '#21AEA8', 
+          color: 'white', 
+          padding: '20px', 
+          borderRadius: '8px',
+          marginBottom: '20px'
+        }}>
+          <h2 style={{ margin: '0 0 10px 0' }}>Testing Queue</h2>
+          <div style={{ display: 'flex', gap: '20px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{readyForTesting.length}</div>
+              <div style={{ fontSize: '12px', opacity: 0.8 }}>Ready for Testing</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{inProgress.length}</div>
+              <div style={{ fontSize: '12px', opacity: 0.8 }}>In Progress</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ffeb3b' }}>
+                {testingQueue.filter(apt => apt.isUrgent).length}
+              </div>
+              <div style={{ fontSize: '12px', opacity: 0.8 }}>Urgent</div>
+            </div>
+          </div>
+        </div>
+
+        {readyForTesting.length > 0 && (
+          <div style={{ marginBottom: '30px' }}>
+            <h3 style={{ color: '#21AEA8', marginBottom: '15px' }}>
+              Ready for Testing ({readyForTesting.length})
+            </h3>
+            <div style={{ display: 'grid', gap: '10px' }}>
+              {readyForTesting.map((appointment) => (
+                <div 
+                  key={appointment._id} 
+                  style={{
+                    background: appointment.isUrgent ? '#fff3cd' : 'white',
+                    border: appointment.isUrgent ? '2px solid #ffc107' : '1px solid #dee2e6',
+                    borderRadius: '8px',
+                    padding: '20px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '20px', alignItems: 'center' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 8px 0', color: '#333' }}>
+                        {appointment.patientInfo?.firstName} {appointment.patientInfo?.lastName}
+                        {appointment.isUrgent && <span style={{ color: '#dc3545', marginLeft: '10px' }}>URGENT</span>}
+                      </h4>
+                      <div style={{ color: '#666', fontSize: '14px' }}>
+                        <div>Services: {appointment.services?.map(s => s.name).join(', ')}</div>
+                        <div>Phone: {appointment.patientInfo?.phoneNumber}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#666' }}>
+                      <div><strong>Age:</strong> {appointment.patientInfo?.age}</div>
+                      <div><strong>Gender:</strong> {appointment.patientInfo?.gender}</div>
+                    </div>
+                    <button
+                      onClick={() => handleStartTesting(appointment._id)}
+                      style={{
+                        background: '#21AEA8',
+                        color: 'white',
+                        border: 'none',
+                        padding: '12px 20px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      Start Testing
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {inProgress.length > 0 && (
+          <div>
+            <h3 style={{ color: '#21AEA8', marginBottom: '15px' }}>
+              Tests in Progress ({inProgress.length})
+            </h3>
+            <div style={{ display: 'grid', gap: '10px' }}>
+              {inProgress.map((appointment) => (
+                <div 
+                  key={appointment._id} 
+                  style={{
+                    background: '#e8f5e8',
+                    border: '2px solid #21AEA8',
+                    borderRadius: '8px',
+                    padding: '20px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '20px', alignItems: 'center' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 8px 0', color: '#333' }}>
+                        {appointment.patientInfo?.firstName} {appointment.patientInfo?.lastName}
+                      </h4>
+                      <div style={{ color: '#666', fontSize: '14px' }}>
+                        <div>Services: {appointment.services?.map(s => s.name).join(', ')}</div>
+                        <div>Started: {appointment.testStartTime ? 
+                          new Date(appointment.testStartTime).toLocaleString() : 
+                          'Just now'
+                        }</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#666' }}>
+                      <div><strong>Status:</strong> Testing in progress</div>
+                      <div><strong>MedTech:</strong> {currentUser?.name || 'Current user'}</div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedAppointment(appointment);
+                        setActiveSection('enter-results');
+                      }}
+                      style={{
+                        background: '#21AEA8',
+                        color: 'white',
+                        border: 'none',
+                        padding: '12px 20px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      Continue Testing
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {testingQueue.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '60px', background: '#f8f9fa', borderRadius: '10px', color: '#6c757d' }}>
+            <h3>No Tests in Queue</h3>
+            <p>All patients have been processed. Great work!</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderEnterResults = () => {
+    if (!selectedAppointment) {
+      return (
+        <div style={{ padding: '20px', textAlign: 'center' }}>
+          <h3>No Patient Selected</h3>
+          <p>Please select a patient from the testing queue to enter results.</p>
+          <button
+            onClick={() => setActiveSection('testing-queue')}
+            style={{
+              background: '#21AEA8',
+              color: 'white',
+              border: 'none',
+              padding: '12px 24px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Go to Testing Queue
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ padding: '20px' }}>
+        <div style={{ 
+          background: '#21AEA8', 
+          color: 'white', 
+          padding: '20px', 
+          borderRadius: '8px',
+          marginBottom: '20px'
+        }}>
+          <h2 style={{ margin: '0 0 10px 0' }}>Enter Test Results</h2>
+          <p style={{ margin: 0, opacity: 0.9 }}>
+            Patient: {selectedAppointment.patientInfo?.firstName} {selectedAppointment.patientInfo?.lastName}
+          </p>
+        </div>
+
+        <div style={{ 
+          background: 'white', 
+          padding: '20px', 
+          borderRadius: '8px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <h3 style={{ margin: '0 0 15px 0', color: '#333' }}>Test Results Form</h3>
+          <p style={{ color: '#666', marginBottom: '20px' }}>
+            Complete the test results for {selectedAppointment.patientInfo?.firstName} {selectedAppointment.patientInfo?.lastName}
+          </p>
+          
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => setActiveSection('testing-queue')}
+              style={{
+                background: '#6c757d',
+                color: 'white',
+                border: 'none',
+                padding: '12px 24px',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Back to Queue
+            </button>
+            <button
+              style={{
+                background: '#21AEA8',
+                color: 'white',
+                border: 'none',
+                padding: '12px 24px',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Submit Results
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderReview = () => {
+    // Mock data for completed test results awaiting review
+    const pendingReviews = [
+      {
+        _id: 'result_1',
+        patientInfo: { firstName: 'Carlos', lastName: 'Rodriguez', age: 38, gender: 'Male' },
+        testDate: '2025-10-09T14:30:00Z',
+        services: ['Complete Blood Count (CBC)', 'Blood Chemistry Panel'],
+        status: 'pending-review',
+        isUrgent: false,
+        enteredBy: 'MedTech A. Cruz',
+        enteredAt: '2025-10-09T16:45:00Z'
+      },
+      {
+        _id: 'result_2',
+        patientInfo: { firstName: 'Elena', lastName: 'Gonzalez', age: 29, gender: 'Female' },
+        testDate: '2025-10-09T11:15:00Z',
+        services: ['Urinalysis', 'Pregnancy Test'],
+        status: 'pending-review',
+        isUrgent: true,
+        enteredBy: 'MedTech B. Silva',
+        enteredAt: '2025-10-09T13:20:00Z'
+      },
+      {
+        _id: 'result_3',
+        patientInfo: { firstName: 'Miguel', lastName: 'Torres', age: 52, gender: 'Male' },
+        testDate: '2025-10-09T09:00:00Z',
+        services: ['Lipid Profile', 'HbA1c'],
+        status: 'reviewed',
+        isUrgent: false,
+        enteredBy: 'MedTech C. Mendoza',
+        enteredAt: '2025-10-09T11:30:00Z',
+        reviewedBy: 'Pathologist Dr. Reyes',
+        reviewedAt: '2025-10-09T15:10:00Z'
+      }
+    ];
+
+    const pendingCount = pendingReviews.filter(r => r.status === 'pending-review').length;
+    const reviewedCount = pendingReviews.filter(r => r.status === 'reviewed').length;
+
+    return (
+      <div style={{ padding: '20px' }}>
+        <div style={{ marginBottom: '30px' }}>
+          <h2 style={{ color: '#21AEA8', marginBottom: '10px' }}>Review Test Results</h2>
+          <p style={{ color: '#666', marginBottom: '20px' }}>
+            Review and validate test results before final approval
+          </p>
+          
+          {/* Review Stats */}
+          <div style={{ display: 'flex', gap: '20px', marginBottom: '30px' }}>
+            <div style={{ 
+              background: '#FFF3CD', 
+              border: '1px solid #FFEAA7', 
+              borderRadius: '8px', 
+              padding: '15px', 
+              flex: 1 
+            }}>
+              <h4 style={{ margin: '0 0 5px 0', color: '#856404' }}>Pending Review</h4>
+              <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#856404' }}>
+                {pendingCount}
+              </p>
+            </div>
+            <div style={{ 
+              background: '#D4EDDA', 
+              border: '1px solid #C3E6CB', 
+              borderRadius: '8px', 
+              padding: '15px', 
+              flex: 1 
+            }}>
+              <h4 style={{ margin: '0 0 5px 0', color: '#155724' }}>Reviewed Today</h4>
+              <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#155724' }}>
+                {reviewedCount}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Pending Reviews Section */}
+        <div style={{ marginBottom: '40px' }}>
+          <h3 style={{ color: '#21AEA8', marginBottom: '20px', borderBottom: '2px solid #21AEA8', paddingBottom: '10px' }}>
+            Pending Reviews ({pendingCount})
+          </h3>
+          
+          {pendingReviews.filter(r => r.status === 'pending-review').length === 0 ? (
+            <p style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
+              No test results pending review
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              {pendingReviews.filter(r => r.status === 'pending-review').map(result => (
+                <div key={result._id} style={{
+                  border: `2px solid ${result.isUrgent ? '#DC3545' : '#DEE2E6'}`,
+                  borderRadius: '8px',
+                  padding: '20px',
+                  background: result.isUrgent ? '#FFF5F5' : 'white'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 5px 0', color: '#333' }}>
+                        {result.patientInfo.firstName} {result.patientInfo.lastName}
+                        {result.isUrgent && <span style={{ color: '#DC3545', marginLeft: '10px', fontSize: '12px', fontWeight: 'bold' }}>URGENT</span>}
+                      </h4>
+                      <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>
+                        {result.patientInfo.age} years old, {result.patientInfo.gender}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ margin: '0', fontSize: '12px', color: '#666' }}>
+                        Test Date: {new Date(result.testDate).toLocaleDateString()}
+                      </p>
+                      <p style={{ margin: '0', fontSize: '12px', color: '#666' }}>
+                        Entered by: {result.enteredBy}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div style={{ marginBottom: '15px' }}>
+                    <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#333' }}>Tests:</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {result.services.map((service, index) => (
+                        <span key={index} style={{
+                          background: '#E3F2FD',
+                          color: '#1976D2',
+                          padding: '4px 12px',
+                          borderRadius: '20px',
+                          fontSize: '12px'
+                        }}>
+                          {service}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button style={{
+                      background: '#6C757D',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}>
+                      View Results
+                    </button>
+                    <button style={{
+                      background: '#DC3545',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}>
+                      Request Revision
+                    </button>
+                    <button style={{
+                      background: '#21AEA8',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}>
+                      Approve
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Reviewed Results Section */}
+        <div>
+          <h3 style={{ color: '#21AEA8', marginBottom: '20px', borderBottom: '2px solid #21AEA8', paddingBottom: '10px' }}>
+            Recently Reviewed ({reviewedCount})
+          </h3>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            {pendingReviews.filter(r => r.status === 'reviewed').map(result => (
+              <div key={result._id} style={{
+                border: '1px solid #28A745',
+                borderRadius: '8px',
+                padding: '20px',
+                background: '#F8FFF9'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 5px 0', color: '#333' }}>
+                      {result.patientInfo.firstName} {result.patientInfo.lastName}
+                      <span style={{ color: '#28A745', marginLeft: '10px', fontSize: '12px', fontWeight: 'bold' }}>✓ APPROVED</span>
+                    </h4>
+                    <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>
+                      {result.patientInfo.age} years old, {result.patientInfo.gender}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ margin: '0', fontSize: '12px', color: '#666' }}>
+                      Reviewed by: {result.reviewedBy}
+                    </p>
+                    <p style={{ margin: '0', fontSize: '12px', color: '#666' }}>
+                      Reviewed: {new Date(result.reviewedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                
+                <div style={{ marginBottom: '15px' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {result.services.map((service, index) => (
+                      <span key={index} style={{
+                        background: '#E8F5E8',
+                        color: '#28A745',
+                        padding: '4px 12px',
+                        borderRadius: '20px',
+                        fontSize: '12px'
+                      }}>
+                        {service}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button style={{
+                    background: '#6C757D',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}>
+                    View Report
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="dashboard-container">
       {/* Sidebar */}
@@ -1101,6 +1627,27 @@ function MedTechDashboard({ currentUser, onLogout }) {
             onClick={() => handleSectionClick('dashboard')}
           >
             <span className="dashboard-nav-text">Dashboard</span>
+          </div>
+
+          <div 
+            className={`dashboard-nav-item ${activeSection === 'testing-queue' ? 'active' : ''}`}
+            onClick={() => handleSectionClick('testing-queue')}
+          >
+            <span className="dashboard-nav-text">Testing Queue</span>
+          </div>
+
+          <div 
+            className={`dashboard-nav-item ${activeSection === 'enter-results' ? 'active' : ''}`}
+            onClick={() => handleSectionClick('enter-results')}
+          >
+            <span className="dashboard-nav-text">Enter Results</span>
+          </div>
+
+          <div 
+            className={`dashboard-nav-item ${activeSection === 'review' ? 'active' : ''}`}
+            onClick={() => handleSectionClick('review')}
+          >
+            <span className="dashboard-nav-text">Review</span>
           </div>
 
           <div className="dashboard-dropdown">
