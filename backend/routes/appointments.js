@@ -7,6 +7,7 @@ const {
   createAppointment,
   updateAppointment,
   cancelAppointment,
+  deleteAppointment,
   checkInPatient,
   checkOutPatient,
   getAppointmentStats,
@@ -55,13 +56,31 @@ router.post('/',
     body('contactNumber')
       .notEmpty()
       .withMessage('Contact number is required')
-      .matches(/^(\+63|0)[0-9]{9,10}$/)
-      .withMessage('Please provide a valid Philippine phone number'),
+      .matches(/^(\+63|63|0)?[0-9]{9,11}$/)
+      .withMessage('Please provide a valid phone number'),
     
     body('email')
       .isEmail()
       .withMessage('Please provide a valid email address')
       .normalizeEmail(),
+    
+    body('age')
+      .optional()
+      .custom((value) => {
+        if (!value) return true; // Allow empty/null values since it's optional
+        
+        const numValue = parseInt(value);
+        if (isNaN(numValue) || numValue < 1 || numValue > 120) {
+          throw new Error('Age must be a number between 1 and 120');
+        }
+        return true;
+      })
+      .withMessage('Age must be between 1 and 120'),
+    
+    body('sex')
+      .optional()
+      .isIn(['Male', 'Female'])
+      .withMessage('Sex must be either Male or Female'),
     
     body('serviceId')
       .optional()
@@ -81,9 +100,10 @@ router.post('/',
         // If serviceIds is provided, validate each ID
         if (value && value.length > 0) {
           const mongoose = require('mongoose');
-          for (const id of value) {
+          for (let i = 0; i < value.length; i++) {
+            const id = value[i];
             if (!mongoose.Types.ObjectId.isValid(id)) {
-              throw new Error('All service IDs must be valid MongoDB ObjectIds');
+              throw new Error(`Service ID at position ${i + 1} is not a valid MongoDB ObjectId: ${id}`);
             }
           }
         }
@@ -94,15 +114,25 @@ router.post('/',
     body('appointmentDate')
       .notEmpty()
       .withMessage('Appointment date is required')
-      .isDate()
-      .withMessage('Please provide a valid date'),
+      .custom((value) => {
+        const date = new Date(value);
+        if (isNaN(date.getTime())) {
+          throw new Error('Please provide a valid date');
+        }
+        return true;
+      }),
     
     body('totalPrice')
       .optional()
-      .isNumeric()
-      .withMessage('Total price must be a number')
-      .isFloat({ min: 0 })
-      .withMessage('Total price must be a positive number'),
+      .custom((value) => {
+        if (!value) return true; // Allow empty/null values since it's optional
+        
+        const numValue = parseFloat(value);
+        if (isNaN(numValue) || numValue < 0) {
+          throw new Error('Total price must be a positive number');
+        }
+        return true;
+      }),
     
     body('type')
       .optional()
@@ -205,6 +235,14 @@ router.put('/:id/cancel',
       .withMessage('Cancellation reason cannot exceed 300 characters')
   ],
   cancelAppointment
+);
+
+// @route   DELETE /api/appointments/:id
+// @desc    Delete appointment permanently
+// @access  Private (Admin, Receptionist)
+router.delete('/:id',
+  authorize('admin', 'receptionist'),
+  deleteAppointment
 );
 
 // @route   PUT /api/appointments/:id/checkin

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../design/Dashboard.css';
+import { appointmentAPI } from '../services/api';
 
 function MedTechDashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('testing-queue');
@@ -20,34 +21,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
   });
   const [selectedSample, setSelectedSample] = useState(null);
 
-  // Testing Queue State
-  const [testingQueue, setTestingQueue] = useState([
-    {
-      _id: 'mock_1',
-      status: 'confirmed',
-      isUrgent: true,
-      appointmentDate: '2025-10-10T09:00:00Z',
-      patientInfo: { firstName: 'Maria', lastName: 'Santos', phoneNumber: '+63 917 123 4567', age: 34, gender: 'Female' },
-      services: [{ name: 'Complete Blood Count (CBC)' }, { name: 'Blood Chemistry Panel' }]
-    },
-    {
-      _id: 'mock_2',
-      status: 'confirmed',
-      isUrgent: false,
-      appointmentDate: '2025-10-10T10:30:00Z',
-      patientInfo: { firstName: 'Juan', lastName: 'Dela Cruz', phoneNumber: '+63 918 987 6543', age: 45, gender: 'Male' },
-      services: [{ name: 'Lipid Profile' }, { name: 'HbA1c' }]
-    },
-    {
-      _id: 'mock_3',
-      status: 'in-progress',
-      isUrgent: false,
-      appointmentDate: '2025-10-10T08:15:00Z',
-      testStartTime: new Date(Date.now() - 15 * 60 * 1000),
-      patientInfo: { firstName: 'Anna', lastName: 'Reyes', phoneNumber: '+63 919 555 0123', age: 28, gender: 'Female' },
-      services: [{ name: 'Urinalysis' }, { name: 'Pregnancy Test' }]
-    }
-  ]);
+  // Testing Queue State - now fetches real checked-in appointments
+  const [testingQueue, setTestingQueue] = useState([]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
 
   // Test Results State
@@ -67,12 +42,103 @@ function MedTechDashboard({ currentUser, onLogout }) {
     testRequests: []
   });
 
+  // Result form state - comprehensive laboratory test results
   const [resultForm, setResultForm] = useState({
-    hemoglobin: '',
-    hematocrit: '',
+    // Blood Chemistry
+    fbs: '',
+    bua: '',
+    bun: '',
+    creatinine: '',
+    cholesterol: '',
+    triglyceride: '',
+    hdl: '',
+    ldl: '',
+    ast_sgot: '',
+    alt_sgpt: '',
+    
+    // Electrolytes
+    sodium: '',
+    potassium: '',
+    chloride: '',
+    magnesium: '',
+    phosphorus: '',
+    
+    // Hematology/CBC
     wbc: '',
     rbc: '',
-    platelets: ''
+    hemoglobin: '',
+    hematocrit: '',
+    platelets: '',
+    esr: '',
+    
+    // RBC Indices
+    mcv: '',
+    mch: '',
+    mchc: '',
+    
+    // Differential Count
+    lymphocytes: '',
+    neutrophils: '',
+    monocytes: '',
+    eosinophils: '',
+    basophils: '',
+    
+    // Clinical Microscopy - Urinalysis
+    urine_color: '',
+    urine_transparency: '',
+    urine_specific_gravity: '',
+    urine_ph: '',
+    urine_protein: '',
+    urine_glucose: '',
+    urine_ketones: '',
+    urine_blood: '',
+    urine_leukocytes: '',
+    urine_nitrites: '',
+    urine_urobilinogen: '',
+    urine_bilirubin: '',
+    urine_rbc: '',
+    urine_wbc: '',
+    urine_epithelial: '',
+    urine_bacteria: '',
+    urine_crystals: '',
+    urine_casts: '',
+    urine_mucus_thread: '',
+    urine_amorphous_urates: '',
+    
+    // Clinical Microscopy - Fecalysis
+    fecal_color: '',
+    fecal_consistency: '',
+    fecal_occult_blood: '',
+    fecal_rbc: '',
+    fecal_wbc: '',
+    fecal_bacteria: '',
+    fecal_parasite_ova: '',
+    
+    // Pregnancy Test
+    pregnancy_test: '',
+    
+    // Immunology & Serology
+    blood_type: '',
+    rh_factor: '',
+    hepatitis_b: '',
+    hepatitis_c: '',
+    hiv: '',
+    vdrl: '',
+    dengue_duo: '',
+    salmonella: '',
+    
+    // Thyroid Tests
+    tsh: '',
+    ft3: '',
+    ft4: '',
+    t3: '',
+    t4: '',
+    
+    // Additional fields
+    remarks: '',
+    technician: '',
+    datePerformed: new Date().toISOString().split('T')[0],
+    timePerformed: new Date().toTimeString().split(' ')[0].substring(0, 5)
   });
 
   // Filter States
@@ -82,6 +148,9 @@ function MedTechDashboard({ currentUser, onLogout }) {
     priority: '',
     search: ''
   });
+
+  // Test category state for results entry
+  const [activeTestCategory, setActiveTestCategory] = useState('Blood Chemistry');
 
   const [resultFilters, setResultFilters] = useState({
     status: '',
@@ -246,6 +315,62 @@ function MedTechDashboard({ currentUser, onLogout }) {
     }
   };
 
+  // Fetch testing queue - gets checked-in appointments ready for testing
+  const fetchTestingQueue = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      console.log('Fetching testing queue with status: checked-in');
+      console.log('Current user from context:', currentUser);
+      console.log('Token from sessionStorage:', sessionStorage.getItem('token') ? 'Present' : 'Missing');
+      
+      // Try lowercase first
+      let response = await appointmentAPI.getAppointments({
+        status: 'checked-in',
+        limit: 50,
+        sortBy: 'appointmentDate',
+        sortOrder: 'asc'
+      });
+
+      console.log('Testing queue API response (lowercase):', response);
+      console.log('Response data structure:', {
+        success: response.success,
+        dataType: typeof response.data,
+        isArray: Array.isArray(response.data),
+        dataLength: response.data?.length,
+        firstItem: response.data?.[0]
+      });
+
+      // If no results with lowercase, try uppercase
+      if (response.success && (!response.data || response.data.length === 0)) {
+        console.log('No lowercase results, trying uppercase CHECKED-IN');
+        response = await appointmentAPI.getAppointments({
+          status: 'CHECKED-IN',
+          limit: 50,
+          sortBy: 'appointmentDate',
+          sortOrder: 'asc'
+        });
+        console.log('Testing queue API response (uppercase):', response);
+      }
+
+      if (response.success) {
+        console.log('Found appointments:', response.data);
+        console.log('Setting testing queue with:', response.data);
+        // The API returns data directly as an array
+        setTestingQueue(response.data || []);
+      } else {
+        console.error('API returned error:', response.message);
+        throw new Error(response.message || 'Failed to fetch testing queue');
+      }
+    } catch (error) {
+      console.error('Failed to fetch testing queue:', error);
+      setError('Failed to load testing queue: ' + error.message);
+      setTestingQueue([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Effect to fetch data when section changes
   useEffect(() => {
     if (['sample-collection', 'sample-tracking'].includes(activeSection)) {
@@ -253,6 +378,9 @@ function MedTechDashboard({ currentUser, onLogout }) {
     }
     if (activeSection === 'result-entry') {
       fetchTestResults();
+    }
+    if (activeSection === 'testing-queue') {
+      fetchTestingQueue();
     }
   }, [activeSection]);
 
@@ -793,46 +921,1043 @@ function MedTechDashboard({ currentUser, onLogout }) {
     </div>
   );
 
+  // Helper function to get reference ranges
+  const getReferenceRange = (test) => {
+    const ranges = {
+      // Blood Chemistry
+      fbs: '70-100 mg/dL',
+      bua: '3.5-7.0 mg/dL',
+      bun: '7-18 mg/dL',
+      creatinine: '0.6-1.2 mg/dL',
+      cholesterol: '<200 mg/dL',
+      triglyceride: '<150 mg/dL',
+      hdl: '>40 mg/dL (M), >50 mg/dL (F)',
+      ldl: '<100 mg/dL',
+      ast_sgot: '10-40 U/L',
+      alt_sgpt: '7-35 U/L',
+      
+      // Electrolytes
+      sodium: '135-145 mEq/L',
+      potassium: '3.5-5.1 mEq/L',
+      chloride: '98-107 mEq/L',
+      magnesium: '1.7-2.2 mg/dL',
+      phosphorus: '2.5-4.5 mg/dL',
+      
+      // Hematology
+      wbc: '4.5-11.0 x10³/µL',
+      rbc: '4.2-5.4 x10⁶/µL (M), 3.6-5.0 x10⁶/µL (F)',
+      hemoglobin: '14-18 g/dL (M), 12-16 g/dL (F)',
+      hematocrit: '42-52% (M), 37-47% (F)',
+      platelets: '150-400 x10³/µL',
+      esr: '0-15 mm/hr (M), 0-20 mm/hr (F)',
+      
+      // RBC Indices
+      mcv: '80.0-100.0 fL',
+      mch: '27.0-34.0 pg',
+      mchc: '320-360 g/L',
+      
+      // Differential Count
+      lymphocytes: '20-40%',
+      neutrophils: '50-70%',
+      monocytes: '2-8%',
+      eosinophils: '1-4%',
+      basophils: '0.5-1%',
+      
+      // Urinalysis
+      urine_specific_gravity: '1.003-1.030',
+      urine_ph: '4.6-8.0',
+      urine_protein: 'Negative',
+      urine_glucose: 'Negative',
+      urine_ketones: 'Negative',
+      urine_blood: 'Negative',
+      urine_leukocytes: 'Negative',
+      urine_nitrites: 'Negative',
+      urine_urobilinogen: 'Normal',
+      urine_bilirubin: 'Negative',
+      urine_rbc: '0-3/hpf',
+      urine_wbc: '0-5/hpf',
+      urine_epithelial: 'Few',
+      urine_bacteria: 'Few',
+      urine_mucus_thread: 'Few',
+      urine_amorphous_urates: 'Few',
+      
+      // Fecalysis
+      fecal_rbc: '0/hpf',
+      fecal_wbc: '0-5/hpf',
+      fecal_occult_blood: 'Negative',
+      fecal_bacteria: 'Few',
+      fecal_parasite_ova: 'None seen',
+      
+      // Pregnancy Test
+      pregnancy_test: 'Negative',
+      
+      // Thyroid Tests
+      tsh: '0.4-4.0 mIU/L',
+      ft3: '2.3-4.2 pg/mL',
+      ft4: '0.8-1.8 ng/dL',
+      t3: '80-200 ng/dL',
+      t4: '4.5-12.0 µg/dL'
+    };
+    return ranges[test] || '';
+  };
+
+  // Render Blood Chemistry Form
+  const renderBloodChemistryForm = () => (
+    <div>
+      <h3 style={{ marginBottom: '20px', color: '#21AEA8', borderBottom: '2px solid #21AEA8', paddingBottom: '10px' }}>
+        Blood Chemistry Panel
+      </h3>
+      
+      {/* Regular Blood Chemistry Tests */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+        {[
+          { key: 'fbs', label: 'FBS/Glucose', unit: 'mg/dL' },
+          { key: 'bua', label: 'BUA (Uric Acid)', unit: 'mg/dL' },
+          { key: 'bun', label: 'BUN', unit: 'mg/dL' },
+          { key: 'creatinine', label: 'Creatinine', unit: 'mg/dL' },
+          { key: 'cholesterol', label: 'Total Cholesterol', unit: 'mg/dL' },
+          { key: 'triglyceride', label: 'Triglyceride', unit: 'mg/dL' },
+          { key: 'hdl', label: 'HDL Cholesterol', unit: 'mg/dL' },
+          { key: 'ldl', label: 'LDL Cholesterol', unit: 'mg/dL' },
+          { key: 'ast_sgot', label: 'AST/SGOT', unit: 'U/L' },
+          { key: 'alt_sgpt', label: 'ALT/SGPT', unit: 'U/L' },
+          { key: 'magnesium', label: 'Magnesium (Mg)', unit: 'mg/dL' },
+          { key: 'phosphorus', label: 'Phosphorus (P)', unit: 'mg/dL' }
+        ].map(test => (
+          <div key={test.key} style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>
+              {test.label} ({test.unit})
+            </label>
+            <input 
+              type="number" 
+              step="0.01"
+              placeholder={`Enter ${test.label.toLowerCase()}`}
+              style={{ 
+                width: '100%', 
+                padding: '10px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px', 
+                fontSize: '14px',
+                backgroundColor: '#fff',
+                color: '#333'
+              }}
+              value={resultForm[test.key]}
+              onChange={(e) => handleResultChange(test.key, e.target.value)}
+            />
+            <span style={{ fontSize: '12px', color: '#6c757d', fontStyle: 'italic' }}>
+              Reference: {getReferenceRange(test.key)}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Electrolytes Section - Grouped in a Box */}
+      <div style={{ 
+        border: '2px solid #21AEA8', 
+        borderRadius: '8px', 
+        padding: '20px', 
+        backgroundColor: '#f8fcfc',
+        marginTop: '20px' 
+      }}>
+        <h4 style={{ 
+          marginTop: '0', 
+          marginBottom: '20px', 
+          color: '#21AEA8', 
+          fontSize: '18px',
+          fontWeight: 'bold',
+          textAlign: 'center'
+        }}>
+          Electrolytes
+        </h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+          {[
+            { key: 'sodium', label: 'Sodium (Na+)', unit: 'mEq/L' },
+            { key: 'potassium', label: 'Potassium (K+)', unit: 'mEq/L' },
+            { key: 'chloride', label: 'Chloride (Cl-)', unit: 'mEq/L' }
+          ].map(test => (
+            <div key={test.key} style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>
+                {test.label} ({test.unit})
+              </label>
+              <input 
+                type="number" 
+                step="0.1"
+                placeholder={`Enter ${test.label.toLowerCase()}`}
+                style={{ 
+                  width: '100%', 
+                  padding: '10px', 
+                  border: '1px solid #21AEA8', 
+                  borderRadius: '4px', 
+                  fontSize: '14px',
+                  backgroundColor: '#fff',
+                  color: '#333'
+                }}
+                value={resultForm[test.key]}
+                onChange={(e) => handleResultChange(test.key, e.target.value)}
+              />
+              <span style={{ fontSize: '12px', color: '#21AEA8', fontStyle: 'italic', fontWeight: '500' }}>
+                Reference: {getReferenceRange(test.key)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render Hematology Form
+  const renderHematologyForm = () => (
+    <div>
+      <h3 style={{ marginBottom: '20px', color: '#21AEA8', borderBottom: '2px solid #21AEA8', paddingBottom: '10px' }}>
+        Complete Blood Count (CBC) & Hematology
+      </h3>
+      
+      {/* Basic CBC Tests */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+        {[
+          { key: 'wbc', label: 'WBC Count', unit: 'x10³/µL' },
+          { key: 'rbc', label: 'RBC Count', unit: 'x10⁶/µL' },
+          { key: 'hemoglobin', label: 'Hemoglobin', unit: 'g/dL' },
+          { key: 'hematocrit', label: 'Hematocrit', unit: '%' },
+          { key: 'platelets', label: 'Platelet Count', unit: 'x10³/µL' },
+          { key: 'esr', label: 'ESR', unit: 'mm/hr' }
+        ].map(test => (
+          <div key={test.key} style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>
+              {test.label} ({test.unit})
+            </label>
+            <input 
+              type="number" 
+              step="0.01"
+              placeholder={`Enter ${test.label.toLowerCase()}`}
+              style={{ 
+                width: '100%', 
+                padding: '10px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px', 
+                fontSize: '14px',
+                backgroundColor: '#fff',
+                color: '#333'
+              }}
+              value={resultForm[test.key]}
+              onChange={(e) => handleResultChange(test.key, e.target.value)}
+            />
+            <span style={{ fontSize: '12px', color: '#6c757d', fontStyle: 'italic' }}>
+              Reference: {getReferenceRange(test.key)}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* RBC Indices Section - Grouped in a Box */}
+      <div style={{ 
+        border: '2px solid #21AEA8', 
+        borderRadius: '8px', 
+        padding: '20px', 
+        backgroundColor: '#f8fcfc',
+        marginTop: '20px' 
+      }}>
+        <h4 style={{ 
+          marginTop: '0', 
+          marginBottom: '20px', 
+          color: '#21AEA8', 
+          fontSize: '18px',
+          fontWeight: 'bold',
+          textAlign: 'center'
+        }}>
+          RBC Indices
+        </h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+          {[
+            { key: 'mcv', label: 'MCV', unit: 'fL' },
+            { key: 'mch', label: 'MCH', unit: 'pg' },
+            { key: 'mchc', label: 'MCHC', unit: 'g/L' }
+          ].map(test => (
+            <div key={test.key} style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>
+                {test.label} ({test.unit})
+              </label>
+              <input 
+                type="number" 
+                step="0.1"
+                placeholder={`Enter ${test.label}`}
+                style={{ 
+                  width: '100%', 
+                  padding: '10px', 
+                  border: '1px solid #21AEA8', 
+                  borderRadius: '4px', 
+                  fontSize: '14px',
+                  backgroundColor: '#fff',
+                  color: '#333'
+                }}
+                value={resultForm[test.key]}
+                onChange={(e) => handleResultChange(test.key, e.target.value)}
+              />
+              <span style={{ fontSize: '12px', color: '#21AEA8', fontStyle: 'italic', fontWeight: '500' }}>
+                Reference: {getReferenceRange(test.key)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Differential Count Section - Grouped in a Box */}
+      <div style={{ 
+        border: '2px solid #21AEA8', 
+        borderRadius: '8px', 
+        padding: '20px', 
+        backgroundColor: '#f8fcfc',
+        marginTop: '20px' 
+      }}>
+        <h4 style={{ 
+          marginTop: '0', 
+          marginBottom: '20px', 
+          color: '#21AEA8', 
+          fontSize: '18px',
+          fontWeight: 'bold',
+          textAlign: 'center'
+        }}>
+          Differential Count
+        </h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+          {[
+            { key: 'lymphocytes', label: 'Lymphocytes', unit: '%' },
+            { key: 'neutrophils', label: 'Neutrophils', unit: '%' },
+            { key: 'monocytes', label: 'Monocytes', unit: '%' },
+            { key: 'eosinophils', label: 'Eosinophils', unit: '%' },
+            { key: 'basophils', label: 'Basophils', unit: '%' }
+          ].map(test => (
+            <div key={test.key} style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>
+                {test.label} ({test.unit})
+              </label>
+              <input 
+                type="number" 
+                step="0.1"
+                placeholder={`Enter ${test.label.toLowerCase()}`}
+                style={{ 
+                  width: '100%', 
+                  padding: '10px', 
+                  border: '1px solid #21AEA8', 
+                  borderRadius: '4px', 
+                  fontSize: '14px',
+                  backgroundColor: '#fff',
+                  color: '#333'
+                }}
+                value={resultForm[test.key]}
+                onChange={(e) => handleResultChange(test.key, e.target.value)}
+              />
+              <span style={{ fontSize: '12px', color: '#21AEA8', fontStyle: 'italic', fontWeight: '500' }}>
+                Reference: {getReferenceRange(test.key)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render Clinical Microscopy Form
+  const renderClinicalMicroscopyForm = () => (
+    <div>
+      <h3 style={{ marginBottom: '20px', color: '#21AEA8', borderBottom: '2px solid #21AEA8', paddingBottom: '10px' }}>
+        Clinical Microscopy (Urinalysis & Fecalysis)
+      </h3>
+      
+      {/* Urinalysis Section */}
+      <div style={{ marginBottom: '30px' }}>
+        <h4 style={{ color: '#495057', marginBottom: '15px' }}>Urinalysis</h4>
+        
+        {/* Physical Examination */}
+        <div style={{ marginBottom: '20px' }}>
+          <h5 style={{ color: '#6c757d', marginBottom: '10px', fontSize: '14px', fontWeight: '600' }}>Physical Examination</h5>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Color</label>
+              <select 
+                style={{ 
+                  width: '100%', 
+                  padding: '8px', 
+                  border: '1px solid #ddd', 
+                  borderRadius: '4px',
+                  backgroundColor: '#fff',
+                  color: '#333'
+                }}
+                value={resultForm.urine_color}
+                onChange={(e) => handleResultChange('urine_color', e.target.value)}
+              >
+                <option value="">Select color</option>
+                <option value="Yellow">Yellow</option>
+                <option value="Light Yellow">Light Yellow</option>
+                <option value="Dark Yellow">Dark Yellow</option>
+                <option value="Amber">Amber</option>
+                <option value="Red">Red</option>
+                <option value="Brown">Brown</option>
+              </select>
+            </div>
+            
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Transparency</label>
+              <select 
+                style={{ 
+                  width: '100%', 
+                  padding: '8px', 
+                  border: '1px solid #ddd', 
+                  borderRadius: '4px',
+                  backgroundColor: '#fff',
+                  color: '#333'
+                }}
+                value={resultForm.urine_transparency}
+                onChange={(e) => handleResultChange('urine_transparency', e.target.value)}
+              >
+                <option value="">Select transparency</option>
+                <option value="Clear">Clear</option>
+                <option value="Slightly Turbid">Slightly Turbid</option>
+                <option value="Turbid">Turbid</option>
+                <option value="Cloudy">Cloudy</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Specific Gravity</label>
+              <input 
+                type="number"
+                step="0.001"
+                style={{ 
+                  width: '100%', 
+                  padding: '8px', 
+                  border: '1px solid #ddd', 
+                  borderRadius: '4px',
+                  backgroundColor: '#fff',
+                  color: '#333'
+                }}
+                value={resultForm.urine_specific_gravity}
+                onChange={(e) => handleResultChange('urine_specific_gravity', e.target.value)}
+              />
+              <span style={{ fontSize: '11px', color: '#6c757d' }}>Ref: {getReferenceRange('urine_specific_gravity')}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Chemical Examination */}
+        <div style={{ marginBottom: '20px' }}>
+          <h5 style={{ color: '#6c757d', marginBottom: '10px', fontSize: '14px', fontWeight: '600' }}>Chemical Examination</h5>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>pH</label>
+              <input 
+                type="number"
+                step="0.1"
+                style={{ 
+                  width: '100%', 
+                  padding: '8px', 
+                  border: '1px solid #ddd', 
+                  borderRadius: '4px',
+                  backgroundColor: '#fff',
+                  color: '#333'
+                }}
+                value={resultForm.urine_ph}
+                onChange={(e) => handleResultChange('urine_ph', e.target.value)}
+              />
+              <span style={{ fontSize: '11px', color: '#6c757d' }}>Ref: {getReferenceRange('urine_ph')}</span>
+            </div>
+
+            {/* Chemical Tests with dropdown options */}
+            {[
+              'urine_protein', 'urine_glucose', 'urine_ketones', 'urine_blood', 
+              'urine_leukocytes', 'urine_nitrites', 'urobilinogen', 'bilirubin'
+            ].map(test => (
+              <div key={test}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>
+                  {test.replace('urine_', '').replace('_', ' ').toUpperCase()}
+                </label>
+                <select 
+                  style={{ 
+                    width: '100%', 
+                    padding: '8px', 
+                    border: '1px solid #ddd', 
+                    borderRadius: '4px',
+                    backgroundColor: '#fff',
+                    color: '#333'
+                  }}
+                  value={resultForm[test]}
+                  onChange={(e) => handleResultChange(test, e.target.value)}
+                >
+                  <option value="">Select result</option>
+                  <option value="Negative">Negative</option>
+                  <option value="Trace">Trace</option>
+                  <option value="1+">1+</option>
+                  <option value="2+">2+</option>
+                  <option value="3+">3+</option>
+                  <option value="4+">4+</option>
+                  {test === 'urobilinogen' && <option value="Normal">Normal</option>}
+                </select>
+                <span style={{ fontSize: '11px', color: '#6c757d' }}>Ref: {getReferenceRange(test)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Microscopic Examination */}
+        <div>
+          <h5 style={{ color: '#6c757d', marginBottom: '10px', fontSize: '14px', fontWeight: '600' }}>Microscopic Examination</h5>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
+            {/* Cellular Elements */}
+            {[
+              { key: 'urine_rbc', label: 'RBC' },
+              { key: 'urine_wbc', label: 'WBC' },
+              { key: 'urine_epithelial', label: 'Epithelial Cells' }
+            ].map(test => (
+              <div key={test.key}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>{test.label}</label>
+                <input 
+                  type="text"
+                  placeholder={getReferenceRange(test.key)}
+                  style={{ 
+                    width: '100%', 
+                    padding: '8px', 
+                    border: '1px solid #ddd', 
+                    borderRadius: '4px',
+                    backgroundColor: '#fff',
+                    color: '#333'
+                  }}
+                  value={resultForm[test.key]}
+                  onChange={(e) => handleResultChange(test.key, e.target.value)}
+                />
+                <span style={{ fontSize: '11px', color: '#6c757d' }}>Ref: {getReferenceRange(test.key)}</span>
+              </div>
+            ))}
+
+            {/* Other Microscopic Elements */}
+            {[
+              { key: 'urine_bacteria', label: 'Bacteria' },
+              { key: 'urine_crystals', label: 'Crystals' },
+              { key: 'urine_casts', label: 'Casts' },
+              { key: 'mucus_thread', label: 'Mucus Thread' },
+              { key: 'amorphous_urates', label: 'Amorphous Urates' }
+            ].map(test => (
+              <div key={test.key}>
+                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>{test.label}</label>
+                <select 
+                  style={{ 
+                    width: '100%', 
+                    padding: '8px', 
+                    border: '1px solid #ddd', 
+                    borderRadius: '4px',
+                    backgroundColor: '#fff',
+                    color: '#333'
+                  }}
+                  value={resultForm[test.key]}
+                  onChange={(e) => handleResultChange(test.key, e.target.value)}
+                >
+                  <option value="">Select result</option>
+                  <option value="None">None</option>
+                  <option value="Few">Few</option>
+                  <option value="Moderate">Moderate</option>
+                  <option value="Many">Many</option>
+                  <option value="Rare">Rare</option>
+                  <option value="Occasional">Occasional</option>
+                  {test.key === 'urine_bacteria' && <option value="Negative">Negative</option>}
+                  {test.key === 'urine_casts' && <option value="Negative">Negative</option>}
+                </select>
+                <span style={{ fontSize: '11px', color: '#6c757d' }}>Ref: {getReferenceRange(test.key)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Fecalysis Section */}
+      <div>
+        <h4 style={{ color: '#495057', marginBottom: '15px' }}>Fecalysis</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Color</label>
+            <select 
+              style={{ 
+                width: '100%', 
+                padding: '8px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px',
+                backgroundColor: '#fff',
+                color: '#333'
+              }}
+              value={resultForm.fecal_color}
+              onChange={(e) => handleResultChange('fecal_color', e.target.value)}
+            >
+              <option value="">Select color</option>
+              <option value="Brown">Brown</option>
+              <option value="Dark Brown">Dark Brown</option>
+              <option value="Light Brown">Light Brown</option>
+              <option value="Yellow">Yellow</option>
+              <option value="Green">Green</option>
+              <option value="Black">Black</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Consistency</label>
+            <select 
+              style={{ 
+                width: '100%', 
+                padding: '8px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px',
+                backgroundColor: '#fff',
+                color: '#333'
+              }}
+              value={resultForm.fecal_consistency}
+              onChange={(e) => handleResultChange('fecal_consistency', e.target.value)}
+            >
+              <option value="">Select consistency</option>
+              <option value="Formed">Formed</option>
+              <option value="Semi-formed">Semi-formed</option>
+              <option value="Soft">Soft</option>
+              <option value="Watery">Watery</option>
+              <option value="Mucoid">Mucoid</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Occult Blood</label>
+            <select 
+              style={{ 
+                width: '100%', 
+                padding: '8px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px',
+                backgroundColor: '#fff',
+                color: '#333'
+              }}
+              value={resultForm.fecal_occult_blood}
+              onChange={(e) => handleResultChange('fecal_occult_blood', e.target.value)}
+            >
+              <option value="">Select result</option>
+              <option value="Negative">Negative</option>
+              <option value="Positive">Positive</option>
+            </select>
+            <span style={{ fontSize: '11px', color: '#6c757d' }}>Ref: {getReferenceRange('fecal_occult_blood')}</span>
+          </div>
+
+          {['fecal_rbc', 'fecal_wbc', 'fecal_bacteria', 'fecal_parasite_ova'].map(test => (
+            <div key={test}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>
+                {test === 'fecal_parasite_ova' 
+                  ? 'PARASITE/OVA' 
+                  : test.replace('fecal_', '').replace('_', ' ').toUpperCase()
+                }
+              </label>
+              <input 
+                type="text"
+                placeholder={getReferenceRange(test)}
+                style={{ 
+                  width: '100%', 
+                  padding: '8px', 
+                  border: '1px solid #ddd', 
+                  borderRadius: '4px',
+                  backgroundColor: '#fff',
+                  color: '#333'
+                }}
+                value={resultForm[test]}
+                onChange={(e) => handleResultChange(test, e.target.value)}
+              />
+              <span style={{ fontSize: '11px', color: '#6c757d' }}>Ref: {getReferenceRange(test)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Pregnancy Test Section */}
+      <div>
+        <h4 style={{ color: '#495057', marginBottom: '15px' }}>Pregnancy Test</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Result</label>
+            <select 
+              style={{ 
+                width: '100%', 
+                padding: '8px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px',
+                backgroundColor: '#fff',
+                color: '#333'
+              }}
+              value={resultForm.pregnancy_test}
+              onChange={(e) => handleResultChange('pregnancy_test', e.target.value)}
+            >
+              <option value="">Select result</option>
+              <option value="Negative">Negative</option>
+              <option value="Positive">Positive</option>
+            </select>
+            <span style={{ fontSize: '11px', color: '#6c757d' }}>Ref: {getReferenceRange('pregnancy_test')}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render Immunology & Serology Form
+  const renderImmunologyForm = () => (
+    <div>
+      <h3 style={{ marginBottom: '20px', color: '#21AEA8', borderBottom: '2px solid #21AEA8', paddingBottom: '10px' }}>
+        Immunology & Serology Tests
+      </h3>
+      
+      {/* Blood Typing Section */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+        <div>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>Blood Type</label>
+          <select 
+            style={{ 
+              width: '100%', 
+              padding: '10px', 
+              border: '1px solid #ddd', 
+              borderRadius: '4px',
+              backgroundColor: '#fff',
+              color: '#333'
+            }}
+            value={resultForm.blood_type}
+            onChange={(e) => handleResultChange('blood_type', e.target.value)}
+          >
+            <option value="">Select blood type</option>
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="AB">AB</option>
+            <option value="O">O</option>
+          </select>
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>Rh Factor</label>
+          <select 
+            style={{ 
+              width: '100%', 
+              padding: '10px', 
+              border: '1px solid #ddd', 
+              borderRadius: '4px',
+              backgroundColor: '#fff',
+              color: '#333'
+            }}
+            value={resultForm.rh_factor}
+            onChange={(e) => handleResultChange('rh_factor', e.target.value)}
+          >
+            <option value="">Select Rh factor</option>
+            <option value="Positive">Positive (+)</option>
+            <option value="Negative">Negative (-)</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Serology Tests Section */}
+      <div style={{ marginBottom: '30px' }}>
+        <h4 style={{ color: '#495057', marginBottom: '15px' }}>Serology Tests</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+          
+          {/* Tests with Reactive/Non-Reactive options */}
+          {[
+            { key: 'hepatitis_b', label: 'Hepatitis B (HBsAg)' },
+            { key: 'hepatitis_c', label: 'Hepatitis C' },
+            { key: 'hiv', label: 'HIV' },
+            { key: 'vdrl', label: 'VDRL (Syphilis)' },
+            { key: 'salmonella', label: 'Salmonella Typhi' }
+          ].map(test => (
+            <div key={test.key}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>
+                {test.label}
+              </label>
+              <select 
+                style={{ 
+                  width: '100%', 
+                  padding: '10px', 
+                  border: '1px solid #ddd', 
+                  borderRadius: '4px',
+                  backgroundColor: '#fff',
+                  color: '#333'
+                }}
+                value={resultForm[test.key]}
+                onChange={(e) => handleResultChange(test.key, e.target.value)}
+              >
+                <option value="">Select result</option>
+                <option value="Reactive">Reactive</option>
+                <option value="Non-Reactive">Non-Reactive</option>
+              </select>
+            </div>
+          ))}
+
+          {/* Dengue Duo with Positive/Negative options */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>
+              Dengue Duo
+            </label>
+            <select 
+              style={{ 
+                width: '100%', 
+                padding: '10px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px',
+                backgroundColor: '#fff',
+                color: '#333'
+              }}
+              value={resultForm.dengue_duo}
+              onChange={(e) => handleResultChange('dengue_duo', e.target.value)}
+            >
+              <option value="">Select result</option>
+              <option value="Positive">Positive</option>
+              <option value="Negative">Negative</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Thyroid Tests Section - Grouped in a Box */}
+      <div style={{ 
+        border: '2px solid #21AEA8', 
+        borderRadius: '8px', 
+        padding: '20px', 
+        backgroundColor: '#f8fcfc',
+        marginTop: '20px' 
+      }}>
+        <h4 style={{ 
+          marginTop: '0', 
+          marginBottom: '20px', 
+          color: '#21AEA8', 
+          fontSize: '18px',
+          fontWeight: 'bold',
+          textAlign: 'center'
+        }}>
+          Thyroid Tests
+        </h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+          {[
+            { key: 'tsh', label: 'TSH', unit: 'mIU/L' },
+            { key: 'ft3', label: 'FT3', unit: 'pg/mL' },
+            { key: 'ft4', label: 'FT4', unit: 'ng/dL' },
+            { key: 't3', label: 'T3', unit: 'ng/dL' },
+            { key: 't4', label: 'T4', unit: 'µg/dL' }
+          ].map(test => (
+            <div key={test.key} style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>
+                {test.label} ({test.unit})
+              </label>
+              <input 
+                type="number" 
+                step="0.01"
+                placeholder={`Enter ${test.label.toLowerCase()}`}
+                style={{ 
+                  width: '100%', 
+                  padding: '10px', 
+                  border: '1px solid #21AEA8', 
+                  borderRadius: '4px', 
+                  fontSize: '14px',
+                  backgroundColor: '#fff',
+                  color: '#333'
+                }}
+                value={resultForm[test.key]}
+                onChange={(e) => handleResultChange(test.key, e.target.value)}
+              />
+              <span style={{ fontSize: '12px', color: '#21AEA8', fontStyle: 'italic', fontWeight: '500' }}>
+                Reference: {getReferenceRange(test.key)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render test category forms
+  const renderTestCategoryForm = () => {
+    switch (activeTestCategory) {
+      case 'Blood Chemistry':
+        return renderBloodChemistryForm();
+      case 'Hematology':
+        return renderHematologyForm();
+      case 'Clinical Microscopy':
+        return renderClinicalMicroscopyForm();
+      case 'Immunology & Serology':
+        return renderImmunologyForm();
+      default:
+        return renderBloodChemistryForm();
+    }
+  };
+
+  // Handle saving results (draft)
+  const handleSaveResults = () => {
+    if (!selectedAppointment) {
+      alert('No appointment selected');
+      return;
+    }
+
+    try {
+      // Add technician info
+      const resultsWithMeta = {
+        ...resultForm,
+        technician: currentUser?.name || 'Unknown Technician',
+        appointmentId: selectedAppointment._id,
+        patientName: selectedAppointment.patientName,
+        serviceRequested: selectedAppointment.serviceName,
+        status: 'draft'
+      };
+
+      console.log('Saving results as draft:', resultsWithMeta);
+      alert('Results saved as draft successfully!');
+    } catch (error) {
+      console.error('Error saving results:', error);
+      alert('Failed to save results. Please try again.');
+    }
+  };
+
+  // Handle completing and submitting results
+  const handleCompleteTest = async () => {
+    if (!selectedAppointment) {
+      alert('No appointment selected');
+      return;
+    }
+
+    try {
+      // Add technician info and completion timestamp
+      const finalResults = {
+        ...resultForm,
+        technician: currentUser?.name || 'Unknown Technician',
+        appointmentId: selectedAppointment._id,
+        patientName: selectedAppointment.patientName,
+        serviceRequested: selectedAppointment.serviceName,
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        completedBy: currentUser?._id
+      };
+
+      console.log('Completing test with results:', finalResults);
+
+      // Update appointment status to completed
+      if (selectedAppointment._id) {
+        // TODO: Add API call to save test results and update appointment
+        // await testResultAPI.createTestResult(finalResults);
+        // await appointmentAPI.updateAppointment(selectedAppointment._id, { status: 'completed' });
+      }
+
+      alert(`Test completed successfully for ${selectedAppointment.patientName}!`);
+      
+      // Reset form and go back to queue
+      setResultForm({
+        fbs: '', bua: '', bun: '', creatinine: '', cholesterol: '', triglyceride: '',
+        hdl: '', ldl: '', ast_sgot: '', alt_sgpt: '', sodium: '', potassium: '', chloride: '',
+        magnesium: '', phosphorus: '', wbc: '', rbc: '', hemoglobin: '',
+        hematocrit: '', platelets: '', esr: '', mcv: '', mch: '', mchc: '', lymphocytes: '', neutrophils: '', monocytes: '',
+        eosinophils: '', basophils: '', urine_color: '', urine_transparency: '',
+        urine_specific_gravity: '', urine_ph: '', urine_protein: '', urine_glucose: '',
+        urine_ketones: '', urine_blood: '', urine_leukocytes: '', urine_nitrites: '',
+        urobilinogen: '', bilirubin: '', urine_rbc: '', urine_wbc: '', urine_epithelial: '', urine_bacteria: '',
+        urine_crystals: '', urine_casts: '', mucus_thread: '', amorphous_urates: '', fecal_color: '', fecal_consistency: '',
+        fecal_occult_blood: '', fecal_rbc: '', fecal_wbc: '', fecal_bacteria: '', fecal_parasite_ova: '', pregnancy_test: '', blood_type: '', rh_factor: '', hepatitis_b: '', hepatitis_c: '',
+        hiv: '', vdrl: '', dengue_duo: '', salmonella: '', 
+        tsh: '', ft3: '', ft4: '', t3: '', t4: '',
+        remarks: '', technician: '',
+        datePerformed: new Date().toISOString().split('T')[0],
+        timePerformed: new Date().toTimeString().split(' ')[0].substring(0, 5)
+      });
+      
+      setSelectedAppointment(null);
+      setActiveSection('testing-queue');
+      
+      // Refresh the testing queue
+      fetchTestingQueue();
+      
+    } catch (error) {
+      console.error('Error completing test:', error);
+      alert('Failed to complete test. Please try again.');
+    }
+  };
+
   const renderResultEntry = () => {
-    const handleSampleSelect = (sample) => {
-      setSelectedSample(sample);
-      setResultForm({
-        hemoglobin: '',
-        hematocrit: '',
-        wbc: '',
-        rbc: '',
-        platelets: ''
-      });
-    };
 
-    const handleResultChange = (field, value) => {
-      setResultForm(prev => ({
-        ...prev,
-        [field]: value
-      }));
-    };
 
+    // Handle saving results (draft)
     const handleSaveResults = () => {
-      if (!selectedSample) {
-        alert('Please select a sample first');
+      if (!selectedAppointment) {
+        alert('No appointment selected');
         return;
       }
 
-      const hasResults = Object.values(resultForm).some(value => value.trim() !== '');
-      if (!hasResults) {
-        alert('Please enter at least one test result');
+      try {
+        // Add technician info
+        const resultsWithMeta = {
+          ...resultForm,
+          technician: currentUser?.name || 'Unknown Technician',
+          appointmentId: selectedAppointment._id,
+          patientName: selectedAppointment.patientName,
+          serviceRequested: selectedAppointment.serviceName,
+          status: 'draft'
+        };
+
+        console.log('Saving results as draft:', resultsWithMeta);
+        alert('Results saved as draft successfully!');
+      } catch (error) {
+        console.error('Error saving results:', error);
+        alert('Failed to save results. Please try again.');
+      }
+    };
+
+    // Handle completing and submitting results
+    const handleCompleteTest = async () => {
+      if (!selectedAppointment) {
+        alert('No appointment selected');
         return;
       }
 
-      handleResultSubmit(selectedSample.id, resultForm);
-      setSelectedSample(null);
-      setResultForm({
-        hemoglobin: '',
-        hematocrit: '',
-        wbc: '',
-        rbc: '',
-        platelets: ''
-      });
+      try {
+        // Add technician info and completion timestamp
+        const finalResults = {
+          ...resultForm,
+          technician: currentUser?.name || 'Unknown Technician',
+          appointmentId: selectedAppointment._id,
+          patientName: selectedAppointment.patientName,
+          serviceRequested: selectedAppointment.serviceName,
+          status: 'completed',
+          completedAt: new Date().toISOString(),
+          completedBy: currentUser?._id
+        };
+
+        console.log('Completing test with results:', finalResults);
+
+        // Update appointment status to completed
+        if (selectedAppointment._id) {
+          // TODO: Add API call to save test results and update appointment
+          // await testResultAPI.createTestResult(finalResults);
+          // await appointmentAPI.updateAppointment(selectedAppointment._id, { status: 'completed' });
+        }
+
+        alert(`Test completed successfully for ${selectedAppointment.patientName}!`);
+        
+        // Reset form and go back to queue
+        setResultForm({
+          fbs: '', bua: '', bun: '', creatinine: '', cholesterol: '', triglyceride: '',
+          hdl: '', ldl: '', ast_sgot: '', alt_sgpt: '', sodium: '', potassium: '', chloride: '',
+          magnesium: '', phosphorus: '', wbc: '', rbc: '', hemoglobin: '',
+          hematocrit: '', platelets: '', esr: '', mcv: '', mch: '', mchc: '', lymphocytes: '', neutrophils: '', monocytes: '',
+          eosinophils: '', basophils: '', urine_color: '', urine_transparency: '',
+          urine_specific_gravity: '', urine_ph: '', urine_protein: '', urine_glucose: '',
+          urine_ketones: '', urine_blood: '', urine_leukocytes: '', urine_nitrites: '',
+          urobilinogen: '', bilirubin: '', urine_rbc: '', urine_wbc: '', urine_epithelial: '', urine_bacteria: '',
+          urine_crystals: '', urine_casts: '', mucus_thread: '', amorphous_urates: '', fecal_color: '', fecal_consistency: '',
+          fecal_occult_blood: '', fecal_rbc: '', fecal_wbc: '', fecal_bacteria: '', fecal_parasite_ova: '', pregnancy_test: '', blood_type: '', rh_factor: '', hepatitis_b: '', hepatitis_c: '',
+          hiv: '', vdrl: '', dengue_duo: '', salmonella: '', 
+          tsh: '', ft3: '', ft4: '', t3: '', t4: '',
+          remarks: '', technician: '',
+          datePerformed: new Date().toISOString().split('T')[0],
+          timePerformed: new Date().toTimeString().split(' ')[0].substring(0, 5)
+        });
+        
+        setSelectedAppointment(null);
+        setActiveSection('testing-queue');
+        
+        // Refresh the testing queue
+        fetchTestingQueue();
+        
+      } catch (error) {
+        console.error('Error completing test:', error);
+        alert('Failed to complete test. Please try again.');
+      }
     };
 
     const pendingSamples = samples.filter(sample => 
@@ -1121,17 +2246,11 @@ function MedTechDashboard({ currentUser, onLogout }) {
   );
 
   const renderTestingQueue = () => {
-    const readyForTesting = testingQueue.filter(apt => apt.status === 'confirmed');
+    const readyForTesting = testingQueue.filter(apt => apt.status === 'checked-in');
     const inProgress = testingQueue.filter(apt => apt.status === 'in-progress');
 
-    const handleStartTesting = (appointmentId) => {
-      setTestingQueue(prev => 
-        prev.map(apt => 
-          apt._id === appointmentId 
-            ? { ...apt, status: 'in-progress', testStartTime: new Date() }
-            : apt
-        )
-      );
+    const handleInputResults = (appointmentId) => {
+      // Go directly to results input without changing status to in-progress
       const appointment = testingQueue.find(apt => apt._id === appointmentId);
       setSelectedAppointment(appointment);
       setActiveSection('enter-results');
@@ -1147,6 +2266,24 @@ function MedTechDashboard({ currentUser, onLogout }) {
           marginBottom: '20px'
         }}>
           <h2 style={{ margin: '0 0 10px 0' }}>Testing Queue</h2>
+          <button
+            onClick={() => {
+              fetchTestingQueue();
+              console.log('Manual refresh triggered');
+            }}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.3)',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              marginBottom: '10px',
+              fontSize: '14px'
+            }}
+          >
+            🔄 Refresh Queue
+          </button>
           <div style={{ display: 'flex', gap: '20px' }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{readyForTesting.length}</div>
@@ -1185,20 +2322,22 @@ function MedTechDashboard({ currentUser, onLogout }) {
                   <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '20px', alignItems: 'center' }}>
                     <div>
                       <h4 style={{ margin: '0 0 8px 0', color: '#333' }}>
-                        {appointment.patientInfo?.firstName} {appointment.patientInfo?.lastName}
+                        {appointment.patientName}
                         {appointment.isUrgent && <span style={{ color: '#dc3545', marginLeft: '10px' }}>URGENT</span>}
                       </h4>
                       <div style={{ color: '#666', fontSize: '14px' }}>
-                        <div>Services: {appointment.services?.map(s => s.name).join(', ')}</div>
-                        <div>Phone: {appointment.patientInfo?.phoneNumber}</div>
+                        <div>Service: {appointment.serviceName}</div>
+                        <div>Phone: {appointment.contactNumber}</div>
+                        <div>Email: {appointment.email}</div>
                       </div>
                     </div>
                     <div style={{ fontSize: '14px', color: '#666' }}>
-                      <div><strong>Age:</strong> {appointment.patientInfo?.age}</div>
-                      <div><strong>Gender:</strong> {appointment.patientInfo?.gender}</div>
+                      <div><strong>Appointment:</strong> {appointment.appointmentDate}</div>
+                      <div><strong>Time:</strong> {appointment.appointmentTime}</div>
+                      <div><strong>Status:</strong> {appointment.status}</div>
                     </div>
                     <button
-                      onClick={() => handleStartTesting(appointment._id)}
+                      onClick={() => handleInputResults(appointment._id)}
                       style={{
                         background: '#21AEA8',
                         color: 'white',
@@ -1209,7 +2348,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
                         fontWeight: 'bold'
                       }}
                     >
-                      Start Testing
+                      Input Results
                     </button>
                   </div>
                 </div>
@@ -1310,58 +2449,143 @@ function MedTechDashboard({ currentUser, onLogout }) {
     }
 
     return (
-      <div style={{ padding: '20px' }}>
+      <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+        {/* Patient Header */}
         <div style={{ 
           background: '#21AEA8', 
           color: 'white', 
           padding: '20px', 
           borderRadius: '8px',
-          marginBottom: '20px'
+          marginBottom: '20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
         }}>
-          <h2 style={{ margin: '0 0 10px 0' }}>Enter Test Results</h2>
-          <p style={{ margin: 0, opacity: 0.9 }}>
-            Patient: {selectedAppointment.patientInfo?.firstName} {selectedAppointment.patientInfo?.lastName}
-          </p>
+          <div>
+            <h2 style={{ margin: '0 0 10px 0' }}>Laboratory Test Results</h2>
+            <p style={{ margin: 0, opacity: 0.9 }}>
+              Patient: {selectedAppointment.patientName} | Service: {selectedAppointment.serviceName}
+            </p>
+          </div>
+          <div style={{ textAlign: 'right', fontSize: '14px' }}>
+            <div>Date: {resultForm.datePerformed}</div>
+            <div>Time: {resultForm.timePerformed}</div>
+          </div>
         </div>
 
+        {/* Test Categories Tabs */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '10px', 
+          marginBottom: '20px',
+          borderBottom: '2px solid #e9ecef'
+        }}>
+          {['Blood Chemistry', 'Hematology', 'Clinical Microscopy', 'Immunology & Serology'].map(category => (
+            <button
+              key={category}
+              onClick={() => setActiveTestCategory(category)}
+              style={{
+                background: activeTestCategory === category ? '#21AEA8' : 'transparent',
+                color: activeTestCategory === category ? 'white' : '#21AEA8',
+                border: `2px solid #21AEA8`,
+                padding: '10px 20px',
+                borderRadius: '6px 6px 0 0',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '14px'
+              }}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+
+        {/* Test Results Forms */}
         <div style={{ 
           background: 'white', 
-          padding: '20px', 
+          padding: '30px', 
           borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          minHeight: '500px'
         }}>
-          <h3 style={{ margin: '0 0 15px 0', color: '#333' }}>Test Results Form</h3>
-          <p style={{ color: '#666', marginBottom: '20px' }}>
-            Complete the test results for {selectedAppointment.patientInfo?.firstName} {selectedAppointment.patientInfo?.lastName}
-          </p>
+          {renderTestCategoryForm()}
           
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <button
-              onClick={() => setActiveSection('testing-queue')}
-              style={{
-                background: '#6c757d',
-                color: 'white',
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: '4px',
-                cursor: 'pointer'
+          {/* Remarks Section */}
+          <div style={{ marginTop: '30px', borderTop: '1px solid #e9ecef', paddingTop: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600', color: '#2c3e50' }}>
+              Remarks/Comments
+            </label>
+            <textarea
+              placeholder="Enter any additional remarks or observations..."
+              style={{ 
+                width: '100%', 
+                padding: '12px', 
+                border: '1px solid #ddd', 
+                borderRadius: '6px', 
+                fontSize: '14px',
+                minHeight: '80px',
+                resize: 'vertical',
+                backgroundColor: '#fff',
+                color: '#333'
               }}
-            >
-              Back to Queue
-            </button>
-            <button
-              style={{
-                background: '#21AEA8',
-                color: 'white',
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Submit Results
-            </button>
+              value={resultForm.remarks}
+              onChange={(e) => handleResultChange('remarks', e.target.value)}
+            />
           </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '15px', 
+          justifyContent: 'center',
+          marginTop: '30px' 
+        }}>
+          <button
+            onClick={() => setActiveSection('testing-queue')}
+            style={{
+              background: '#6c757d',
+              color: 'white',
+              border: 'none',
+              padding: '15px 30px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: 'bold'
+            }}
+          >
+            Back to Queue
+          </button>
+          <button
+            onClick={handleSaveResults}
+            style={{
+              background: '#28a745',
+              color: 'white',
+              border: 'none',
+              padding: '15px 30px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: 'bold'
+            }}
+          >
+            Save Results
+          </button>
+          <button
+            onClick={handleCompleteTest}
+            style={{
+              background: '#21AEA8',
+              color: 'white',
+              border: 'none',
+              padding: '15px 30px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: 'bold'
+            }}
+          >
+            Complete & Submit
+          </button>
         </div>
       </div>
     );

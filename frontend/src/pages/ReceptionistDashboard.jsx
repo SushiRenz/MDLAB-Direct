@@ -113,16 +113,18 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
   };
 
   const handleDeleteAppointment = async (appointment) => {
-    if (window.confirm(`Are you sure you want to delete appointment ${appointment.appointmentId} for ${appointment.patientName}?\n\nThis action cannot be undone.`)) {
+    if (window.confirm(`Are you sure you want to permanently delete appointment ${appointment.appointmentId} for ${appointment.patientName}?\n\nThis action cannot be undone.`)) {
       try {
-        // Call API to delete appointment
-        await appointmentAPI.cancelAppointment(appointment._id, {
-          reason: 'Deleted by receptionist'
-        });
+        // Call API to delete appointment permanently
+        const response = await appointmentAPI.deleteAppointment(appointment._id);
         
-        // Update local state
-        setAppointments(appointments.filter(apt => apt._id !== appointment._id));
-        alert(`Appointment ${appointment.appointmentId} has been cancelled successfully.`);
+        if (response.success) {
+          // Update local state
+          setAppointments(appointments.filter(apt => apt._id !== appointment._id));
+          alert(`Appointment ${appointment.appointmentId} has been deleted successfully.`);
+        } else {
+          alert(`Failed to delete appointment: ${response.message}`);
+        }
       } catch (error) {
         console.error('Error deleting appointment:', error);
         alert('Failed to delete appointment. Please try again.');
@@ -145,7 +147,9 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
   const [patientData, setPatientData] = useState({
     patientName: '',
     contactNumber: '',
-    email: ''
+    email: '',
+    age: '',
+    sex: ''
   });
   
   // Legacy schedule data (keeping for compatibility)
@@ -301,6 +305,63 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
   };
 
   // Bill generation and appointment management functions
+  
+  // Check-in/Check-out functions for appointment workflow
+  const handleCheckIn = async (appointment) => {
+    try {
+      const response = await appointmentAPI.checkInPatient(appointment._id);
+      
+      if (response.success) {
+        // Update local state with the response data
+        setAppointments(prev => 
+          prev.map(apt => 
+            apt._id === appointment._id 
+              ? { ...apt, status: 'checked-in' }
+              : apt
+          )
+        );
+        
+        alert(`Patient ${appointment.patientName} checked in successfully!`);
+        
+        // Update dashboard stats
+        fetchReceptionistDashboardData();
+      } else {
+        throw new Error(response.message || 'Failed to check in patient');
+      }
+    } catch (error) {
+      console.error('Check-in error:', error);
+      setError('Failed to check in patient: ' + error.message);
+      alert('Failed to check in patient: ' + error.message);
+    }
+  };
+
+  const handleCheckOut = async (appointment) => {
+    try {
+      const response = await appointmentAPI.checkOutPatient(appointment._id, 'completed');
+      
+      if (response.success) {
+        // Update local state with the response data
+        setAppointments(prev => 
+          prev.map(apt => 
+            apt._id === appointment._id 
+              ? { ...apt, status: 'completed' }
+              : apt
+          )
+        );
+        
+        alert(`Patient ${appointment.patientName} checked out successfully!`);
+        
+        // Update dashboard stats
+        fetchReceptionistDashboardData();
+      } else {
+        throw new Error(response.message || 'Failed to check out patient');
+      }
+    } catch (error) {
+      console.error('Check-out error:', error);
+      setError('Failed to check out patient: ' + error.message);
+      alert('Failed to check out patient: ' + error.message);
+    }
+  };
   
   // View patient details function
   const handleViewPatientDetails = (appointment) => {
@@ -463,6 +524,12 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     console.log('Generating bill for specific appointment:', appointment.appointmentId);
     console.log('Appointment details:', appointment);
     
+    // Prevent billing for cancelled appointments
+    if (appointment.status === 'cancelled') {
+      alert('Cannot generate bill for cancelled appointments.');
+      return;
+    }
+    
     // Set appointment data for billing modal
     setBillData({
       appointment: appointment,
@@ -553,6 +620,12 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
         return;
       }
 
+      // Check if date is provided
+      if (!appointmentData.date) {
+        alert('Please select an appointment date.');
+        return;
+      }
+
       // Fix timezone issue - format date in local timezone
       const year = appointmentData.date.getFullYear();
       const month = String(appointmentData.date.getMonth() + 1).padStart(2, '0');
@@ -572,6 +645,8 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
         patientName: patientData.patientName,
         contactNumber: patientData.contactNumber,
         email: patientData.email,
+        age: patientData.age ? parseInt(patientData.age) : null,
+        sex: patientData.sex,
         serviceIds: serviceIds, 
         serviceName: serviceNames.join(', '),
         appointmentDate: localDateString,
@@ -585,6 +660,15 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
       };
 
       console.log('Creating single appointment with data:', apiAppointmentData);
+      console.log('📋 Detailed API data validation:');
+      console.log('- patientName:', apiAppointmentData.patientName, typeof apiAppointmentData.patientName);
+      console.log('- contactNumber:', apiAppointmentData.contactNumber, typeof apiAppointmentData.contactNumber);
+      console.log('- email:', apiAppointmentData.email, typeof apiAppointmentData.email);
+      console.log('- age:', apiAppointmentData.age, typeof apiAppointmentData.age);
+      console.log('- sex:', apiAppointmentData.sex, typeof apiAppointmentData.sex);
+      console.log('- serviceIds:', apiAppointmentData.serviceIds, Array.isArray(apiAppointmentData.serviceIds), apiAppointmentData.serviceIds?.length);
+      console.log('- appointmentDate:', apiAppointmentData.appointmentDate, typeof apiAppointmentData.appointmentDate);
+      console.log('- totalPrice:', apiAppointmentData.totalPrice, typeof apiAppointmentData.totalPrice);
       
       const response = await appointmentAPI.createAppointment(apiAppointmentData);
       console.log('📦 Received response:', response);
@@ -621,7 +705,9 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
         setPatientData({
           patientName: '',
           contactNumber: '',
-          email: ''
+          email: '',
+          age: '',
+          sex: ''
         });
         
         alert(`Appointment scheduled successfully!\n\nPatient: ${patientData.patientName}\nTests: ${serviceNames.join(', ')}\nAppointment ID: ${newAppointment.appointmentId}\nTotal: ₱${totalPrice}`);
@@ -1048,12 +1134,31 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                                 >
                                   View
                                 </button>
-                                <button 
-                                  className="receptionist-btn-bill" 
-                                  onClick={() => handleGenerateBill(appointment)}
-                                >
-                                  Bill
-                                </button>
+                                {appointment.status === 'confirmed' && (
+                                  <button 
+                                    className="receptionist-btn-checkin" 
+                                    onClick={() => handleCheckIn(appointment)}
+                                  >
+                                    Check In
+                                  </button>
+                                )}
+                                {appointment.status === 'checked-in' && (
+                                  <button 
+                                    className="receptionist-btn-checkout" 
+                                    onClick={() => handleCheckOut(appointment)}
+                                  >
+                                    Check Out
+                                  </button>
+                                )}
+                                {/* Only show bill button for non-cancelled appointments */}
+                                {appointment.status !== 'cancelled' && (
+                                  <button 
+                                    className="receptionist-btn-bill" 
+                                    onClick={() => handleGenerateBill(appointment)}
+                                  >
+                                    Bill
+                                  </button>
+                                )}
                                 
                                 {/* Three-dot dropdown menu */}
                                 <div className="receptionist-dropdown-container">
@@ -1180,6 +1285,45 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                 </div>
               </div>
               
+              <div className="receptionist-form-row">
+                <div className="receptionist-form-group">
+                  <label>Age *</label>
+                  <input
+                    type="number"
+                    value={patientData.age}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || (parseInt(value) >= 1 && parseInt(value) <= 120)) {
+                        setPatientData({...patientData, age: value});
+                      }
+                    }}
+                    placeholder="Enter age"
+                    min="1"
+                    max="120"
+                  />
+                </div>
+                <div className="receptionist-form-group">
+                  <label>Sex *</label>
+                  <select
+                    value={patientData.sex}
+                    onChange={(e) => setPatientData({...patientData, sex: e.target.value})}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      backgroundColor: '#fff',
+                      color: '#333',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="">Select sex</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+              </div>
+              
               <div className="receptionist-modal-footer">
                 <button 
                   className="receptionist-btn-secondary" 
@@ -1190,7 +1334,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                 <button 
                   className="receptionist-btn-primary"
                   onClick={() => {
-                    if (!patientData.patientName || !patientData.contactNumber || !patientData.email) {
+                    if (!patientData.patientName || !patientData.contactNumber || !patientData.email || !patientData.age || !patientData.sex) {
                       alert('Please fill in all patient information fields.');
                       return;
                     }
@@ -1212,7 +1356,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
         onClose={() => {
           setShowScheduleModal(false);
           setShowAppointmentBooking(false);
-          setPatientData({ patientName: '', contactNumber: '', email: '' });
+          setPatientData({ patientName: '', contactNumber: '', email: '', age: '', sex: '' });
         }}
         onSubmit={handleReceptionistAppointmentSubmit}
         availableServices={services}

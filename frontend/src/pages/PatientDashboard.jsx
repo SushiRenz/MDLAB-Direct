@@ -42,13 +42,13 @@ function PatientDashboard(props) {
   const upcomingAppointments = appointments.filter(appointment => {
     const appointmentDate = new Date(appointment.date);
     appointmentDate.setHours(0, 0, 0, 0);
-    return appointmentDate >= today && appointment.status !== 'cancelled';
+    return appointmentDate >= today && !['cancelled', 'completed', 'no-show'].includes(appointment.status);
   });
   
   const pastAppointments = appointments.filter(appointment => {
     const appointmentDate = new Date(appointment.date);
     appointmentDate.setHours(0, 0, 0, 0);
-    return appointmentDate < today || appointment.status === 'cancelled';
+    return appointmentDate < today || ['cancelled', 'completed', 'no-show'].includes(appointment.status);
   });
 
   // Sync currentUser state with props - CRITICAL for profile data visibility

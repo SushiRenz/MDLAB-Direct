@@ -199,8 +199,10 @@ const getAppointment = asyncHandler(async (req, res) => {
 const createAppointment = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log('Validation errors:', errors.array());
-    console.log('Request body:', req.body);
+    console.log('❌ Validation errors:', errors.array());
+    console.log('📦 Request body:', JSON.stringify(req.body, null, 2));
+    console.log('📞 Contact number:', req.body.contactNumber);
+    console.log('🆔 ServiceIds:', req.body.serviceIds);
     return res.status(400).json({
       success: false,
       message: 'Validation failed',
@@ -213,6 +215,8 @@ const createAppointment = asyncHandler(async (req, res) => {
     patientName,
     contactNumber,
     email,
+    age,
+    sex,
     serviceId,
     serviceIds, // New field for multiple services
     serviceName,
@@ -312,6 +316,8 @@ const createAppointment = asyncHandler(async (req, res) => {
       patientName: patientName || patient?.name,
       contactNumber: contactNumber || patient?.phone,
       email: email || patient?.email,
+      age: age ? parseInt(age) : null,
+      sex: sex || null,
       serviceName: combinedServiceName,
       appointmentDate: appointmentDateOnly, // Use the properly formatted date
       appointmentTime,
@@ -391,6 +397,14 @@ const updateAppointment = asyncHandler(async (req, res) => {
       return res.status(400).json({
         success: false,
         message: `Appointment cannot be modified. Current status: ${appointment.status}`
+      });
+    }
+
+    // Additional check for payment-related updates on cancelled appointments
+    if (appointment.status === 'cancelled' && (req.body.billGenerated || req.body.actualCost)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot process payment for cancelled appointments'
       });
     }
 
@@ -671,7 +685,7 @@ const getAppointmentStats = asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 })
     .limit(10);
 
-    // Get upcoming appointments (next 7 days from today)
+    // Get upcoming appointments (next 7 days from today) - only active appointments
     const today = new Date();
     const nextWeek = new Date();
     nextWeek.setDate(today.getDate() + 7);
@@ -680,7 +694,7 @@ const getAppointmentStats = asyncHandler(async (req, res) => {
         $gte: today,
         $lte: nextWeek
       },
-      status: { $in: ['pending', 'confirmed'] }
+      status: { $in: ['pending', 'confirmed', 'checked-in', 'in-progress'] } // Only active appointments
     })
     .populate('patient', 'name')
     .populate('service', 'serviceName')
@@ -801,12 +815,66 @@ const assignMedicalStaff = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Delete appointment permanently
+// @route   DELETE /api/appointments/:id
+// @access  Private (Admin, Receptionist)
+const deleteAppointment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const appointment = await Appointment.findById(id);
+
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found'
+      });
+    }
+
+    // Only allow admin and receptionist to delete appointments
+    if (req.user.role !== 'admin' && req.user.role !== 'receptionist') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Only admin and receptionist can delete appointments.'
+      });
+    }
+
+    // For extra security, don't allow deletion of completed appointments with test results
+    if (appointment.status === 'completed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete completed appointments. Please cancel instead.'
+      });
+    }
+
+    await Appointment.findByIdAndDelete(id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Appointment deleted successfully',
+      data: {
+        deletedAppointmentId: id,
+        appointmentId: appointment.appointmentId
+      }
+    });
+
+  } catch (error) {
+    console.error('Delete appointment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete appointment',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Server error'
+    });
+  }
+});
+
 module.exports = {
   getAppointments,
   getAppointment,
   createAppointment,
   updateAppointment,
   cancelAppointment,
+  deleteAppointment,
   checkInPatient,
   checkOutPatient,
   getAppointmentStats,

@@ -767,6 +767,25 @@ export const appointmentAPI = {
     }
   },
 
+  // Delete appointment permanently
+  deleteAppointment: async (appointmentId) => {
+    try {
+      const response = await api.delete(`/appointments/${appointmentId}`);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Delete appointment error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to delete appointment',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
   // Check-in patient
   checkInPatient: async (appointmentId) => {
     try {
