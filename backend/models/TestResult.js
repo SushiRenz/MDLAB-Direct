@@ -11,11 +11,25 @@ const testResultSchema = new mongoose.Schema({
     }
   },
   
-  // Patient reference
+  // Patient reference - can be ObjectId for registered patients or String for walk-ins
   patient: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    type: mongoose.Schema.Types.Mixed, // Allows both ObjectId and String
     required: true
+  },
+  
+  // Patient information for walk-ins (when patient is not a registered user)
+  patientInfo: {
+    name: { type: String },
+    age: { type: Number },
+    gender: { type: String },
+    contactNumber: { type: String },
+    address: { type: String }
+  },
+  
+  // Flag to indicate if this is a walk-in patient
+  isWalkInPatient: {
+    type: Boolean,
+    default: false
   },
   
   // Associated appointment (if exists)

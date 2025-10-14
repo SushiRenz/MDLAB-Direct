@@ -30,10 +30,20 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      sessionStorage.removeItem('token');
-      sessionStorage.removeItem('user');
-      window.location.href = '/login';
+      // Only logout for authentication-specific 401 errors, not all 401s
+      const authPaths = ['/auth/login', '/auth/me', '/auth/logout'];
+      const isAuthRequest = authPaths.some(path => error.config?.url?.includes(path));
+      
+      if (isAuthRequest || error.response?.data?.message?.includes('token')) {
+        // Token expired or invalid during auth operations
+        console.log('Authentication failed, logging out:', error.response?.data?.message);
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        window.location.href = '/login';
+      } else {
+        // For other 401 errors (like insufficient permissions), don't logout
+        console.log('Authorization failed but not logging out:', error.response?.data?.message);
+      }
     }
     return Promise.reject(error);
   }
@@ -1050,6 +1060,95 @@ export const testResultsAPI = {
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to fetch test results',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Create new test result (MedTech, Pathologist, Admin)
+  createTestResult: async (testResultData) => {
+    try {
+      const response = await api.post('/test-results', testResultData);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Create test result error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to create test result',
+        error: error.response?.data?.error,
+        errors: error.response?.data?.errors
+      };
+    }
+  },
+
+  // Update test result (MedTech, Pathologist, Admin)
+  updateTestResult: async (testResultId, updateData) => {
+    try {
+      const response = await api.put(`/test-results/${testResultId}`, updateData);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Update test result error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to update test result',
+        error: error.response?.data?.error,
+        errors: error.response?.data?.errors
+      };
+    }
+  },
+
+  // Release test result to patient (Pathologist, Admin)
+  releaseTestResult: async (testResultId) => {
+    try {
+      const response = await api.put(`/test-results/${testResultId}/release`);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Release test result error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to release test result',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Get test result statistics (Staff only)
+  getTestResultStats: async (params = {}) => {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      Object.keys(params).forEach(key => {
+        if (params[key] !== null && params[key] !== undefined && params[key] !== '') {
+          queryParams.append(key, params[key]);
+        }
+      });
+      
+      const queryString = queryParams.toString();
+      const url = `/test-results/stats${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await api.get(url);
+      return {
+        success: true,
+        data: response.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get test result stats error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch test result statistics',
         error: error.response?.data?.error
       };
     }

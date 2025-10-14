@@ -199,10 +199,15 @@ const getAppointment = asyncHandler(async (req, res) => {
 const createAppointment = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log('❌ Validation errors:', errors.array());
-    console.log('📦 Request body:', JSON.stringify(req.body, null, 2));
-    console.log('📞 Contact number:', req.body.contactNumber);
-    console.log('🆔 ServiceIds:', req.body.serviceIds);
+    console.log('❌ Validation errors:', JSON.stringify(errors.array(), null, 2));
+    console.log('📦 Request body keys:', Object.keys(req.body));
+    console.log('📦 Request body serviceIds:', req.body.serviceIds);
+    console.log('📦 ServiceIds type:', typeof req.body.serviceIds);
+    console.log('� ServiceIds isArray:', Array.isArray(req.body.serviceIds));
+    if (req.body.serviceIds) {
+      console.log('📦 ServiceIds length:', req.body.serviceIds.length);
+      console.log('📦 First few serviceIds:', req.body.serviceIds.slice(0, 3));
+    }
     return res.status(400).json({
       success: false,
       message: 'Validation failed',

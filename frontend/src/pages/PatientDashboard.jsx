@@ -204,7 +204,7 @@ function PatientDashboard(props) {
     console.log('🔄 Starting fetchServices...');
     try {
       console.log('📡 Calling servicesAPI.getServices()...');
-      const response = await servicesAPI.getServices();
+      const response = await servicesAPI.getServices({ limit: 100 }); // Request all services
       console.log('✅ Services API response received:', response); // Debug log
       if (response.success) {
         // API returns services directly in response.data (array)

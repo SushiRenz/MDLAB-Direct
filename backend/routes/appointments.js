@@ -102,14 +102,22 @@ router.post('/',
           const mongoose = require('mongoose');
           for (let i = 0; i < value.length; i++) {
             const id = value[i];
-            if (!mongoose.Types.ObjectId.isValid(id)) {
-              throw new Error(`Service ID at position ${i + 1} is not a valid MongoDB ObjectId: ${id}`);
+            // Convert to string if it's not already
+            const idStr = typeof id === 'string' ? id : String(id);
+            if (!mongoose.Types.ObjectId.isValid(idStr)) {
+              throw new Error(`Service ID at position ${i + 1} is not a valid MongoDB ObjectId: ${idStr} (type: ${typeof id})`);
             }
           }
         }
         
         return true;
       }),
+
+    body('serviceName')
+      .notEmpty()
+      .withMessage('Service name is required')
+      .isLength({ min: 1, max: 5000 })
+      .withMessage('Service name must be between 1 and 5000 characters'),
     
     body('appointmentDate')
       .notEmpty()
@@ -121,7 +129,13 @@ router.post('/',
         }
         return true;
       }),
-    
+
+    body('appointmentTime')
+      .notEmpty()
+      .withMessage('Appointment time is required')
+      .isLength({ min: 1, max: 50 })
+      .withMessage('Appointment time must be between 1 and 50 characters'),
+
     body('totalPrice')
       .optional()
       .custom((value) => {
@@ -146,13 +160,13 @@ router.post('/',
     
     body('notes')
       .optional()
-      .isLength({ max: 500 })
-      .withMessage('Notes cannot exceed 500 characters'),
+      .isLength({ max: 2000 })
+      .withMessage('Notes cannot exceed 2000 characters'),
     
     body('reasonForVisit')
       .optional()
-      .isLength({ max: 300 })
-      .withMessage('Reason for visit cannot exceed 300 characters')
+      .isLength({ max: 2000 })
+      .withMessage('Reason for visit cannot exceed 2000 characters')
   ], 
   createAppointment
 );

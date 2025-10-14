@@ -667,7 +667,9 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
       console.log('- age:', apiAppointmentData.age, typeof apiAppointmentData.age);
       console.log('- sex:', apiAppointmentData.sex, typeof apiAppointmentData.sex);
       console.log('- serviceIds:', apiAppointmentData.serviceIds, Array.isArray(apiAppointmentData.serviceIds), apiAppointmentData.serviceIds?.length);
+      console.log('- serviceName:', apiAppointmentData.serviceName, typeof apiAppointmentData.serviceName);
       console.log('- appointmentDate:', apiAppointmentData.appointmentDate, typeof apiAppointmentData.appointmentDate);
+      console.log('- appointmentTime:', apiAppointmentData.appointmentTime, typeof apiAppointmentData.appointmentTime);
       console.log('- totalPrice:', apiAppointmentData.totalPrice, typeof apiAppointmentData.totalPrice);
       
       const response = await appointmentAPI.createAppointment(apiAppointmentData);
@@ -779,7 +781,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
   // Load services for dropdown
   const fetchServices = async () => {
     try {
-      const response = await servicesAPI.getServices();
+      const response = await servicesAPI.getServices({ limit: 100 }); // Request all services
       if (response.success) {
         setServices(response.data || []);
       }

@@ -32,7 +32,6 @@ const protect = async (req, res, next) => {
 
       // Check if the session is still valid (single session per user)
       if (!req.user.isSessionValid(token)) {
-        console.log(`Invalid session for user: ${req.user.username}, token mismatch or expired`);
         return res.status(401).json({
           success: false,
           message: 'Session has been invalidated. Please log in again.'
@@ -41,7 +40,7 @@ const protect = async (req, res, next) => {
 
       next();
     } catch (error) {
-      console.error('Token verification error:', error);
+      console.error('Token verification error:', error.message);
       return res.status(401).json({
         success: false,
         message: 'Not authorized, token failed'

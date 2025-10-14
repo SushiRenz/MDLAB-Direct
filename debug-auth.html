@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Auth</title>
+</head>
+<body>
+    <h1>Debug Authentication</h1>
+    <div id="debug-info"></div>
+    
+    <script>
+        // Check if running in browser context
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+            const token = sessionStorage.getItem('token');
+            const user = sessionStorage.getItem('user');
+            
+            const debugInfo = document.getElementById('debug-info');
+            debugInfo.innerHTML = `
+                <h3>SessionStorage Contents:</h3>
+                <p><strong>Token:</strong> ${token ? 'Present (' + token.substring(0, 20) + '...)' : 'NOT FOUND'}</p>
+                <p><strong>User:</strong> ${user ? 'Present' : 'NOT FOUND'}</p>
+                <p><strong>User Details:</strong> ${user || 'N/A'}</p>
+                
+                <h3>Test API Call:</h3>
+                <button onclick="testAPI()">Test API with Current Token</button>
+                <div id="api-result"></div>
+            `;
+        }
+        
+        async function testAPI() {
+            const token = sessionStorage.getItem('token');
+            const resultDiv = document.getElementById('api-result');
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/test-results', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const data = await response.json();
+                resultDiv.innerHTML = `
+                    <h4>API Response:</h4>
+                    <p><strong>Status:</strong> ${response.status}</p>
+                    <p><strong>Response:</strong></p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h4>API Error:</h4>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

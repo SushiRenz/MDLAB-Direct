@@ -15,7 +15,7 @@ const logsRoutes = require('./routes/logs');
 const servicesRoutes = require('./routes/services');
 const appointmentRoutes = require('./routes/appointments');
 const mobileLabRoutes = require('./routes/mobileLab');
-// const testResultRoutes = require('./routes/testResults'); // Temporarily disabled
+const testResultRoutes = require('./routes/testResults'); // Re-enabled for test result functionality
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -176,7 +176,7 @@ app.use('/api/logs', logsRoutes);
 app.use('/api/services', servicesRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/mobile-lab', mobileLabRoutes);
-// app.use('/api/test-results', testResultRoutes); // Temporarily disabled
+app.use('/api/test-results', testResultRoutes); // Re-enabled for test result functionality
 
 // 404 handler
 app.use('*', (req, res) => {

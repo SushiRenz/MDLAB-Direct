@@ -18,8 +18,13 @@ const validateCreateTestResult = [
   body('patientId')
     .notEmpty()
     .withMessage('Patient ID is required')
-    .isMongoId()
-    .withMessage('Invalid patient ID'),
+    .custom((value) => {
+      // Allow either MongoDB ObjectId (for registered patients) or any string (for walk-in patients)
+      if (typeof value === 'string' && value.trim() !== '') {
+        return true;
+      }
+      throw new Error('Patient ID must be a non-empty string');
+    }),
   body('serviceId')
     .notEmpty()
     .withMessage('Service ID is required')
@@ -202,41 +207,51 @@ const validateStatsQuery = [
 // @route   GET /api/test-results
 // @desc    Get all test results with filtering and pagination
 // @access  Private (All authenticated users)
-router.get('/', auth, validateGetTestResults, getTestResults);
+router.get('/', 
+  (req, res, next) => {
+    console.log('🚀 ROUTE DEBUG - GET /api/test-results hit with query:', req.query);
+    console.log('🚀 ROUTE DEBUG - User:', req.user ? `${req.user.role} (${req.user._id})` : 'No user');
+    next();
+  },
+  auth.protect, 
+  auth.staffOnly, 
+  validateGetTestResults, 
+  getTestResults
+);
 
 // @route   GET /api/test-results/stats
 // @desc    Get test result statistics
 // @access  Private (Staff only)
-router.get('/stats', auth, validateStatsQuery, getTestResultStats);
+router.get('/stats', auth.protect, auth.staffOnly, validateStatsQuery, getTestResultStats);
 
 // @route   GET /api/test-results/:id
 // @desc    Get single test result by ID
 // @access  Private
-router.get('/:id', auth, validateIdParam, getTestResult);
+router.get('/:id', auth.protect, validateIdParam, getTestResult);
 
 // @route   POST /api/test-results
 // @desc    Create new test result
 // @access  Private (MedTech, Pathologist, Admin)
-router.post('/', auth, validateCreateTestResult, createTestResult);
+router.post('/', auth.protect, auth.staffOnly, validateCreateTestResult, createTestResult);
 
 // @route   PUT /api/test-results/:id
 // @desc    Update test result
 // @access  Private (MedTech, Pathologist, Admin)
-router.put('/:id', auth, validateIdParam, validateUpdateTestResult, updateTestResult);
+router.put('/:id', auth.protect, auth.staffOnly, validateIdParam, validateUpdateTestResult, updateTestResult);
 
 // @route   DELETE /api/test-results/:id
 // @desc    Delete test result (soft delete)
 // @access  Private (Admin only)
-router.delete('/:id', auth, validateIdParam, deleteTestResult);
+router.delete('/:id', auth.protect, auth.adminOnly, validateIdParam, deleteTestResult);
 
 // @route   PUT /api/test-results/:id/release
 // @desc    Release test result to patient
 // @access  Private (Pathologist, Admin)
-router.put('/:id/release', auth, validateIdParam, releaseTestResult);
+router.put('/:id/release', auth.protect, auth.medicalOnly, validateIdParam, releaseTestResult);
 
 // @route   PUT /api/test-results/:id/mark-viewed
 // @desc    Mark test result as viewed by patient
 // @access  Private (Patient only)
-router.put('/:id/mark-viewed', auth, validateIdParam, markAsViewed);
+router.put('/:id/mark-viewed', auth.protect, validateIdParam, markAsViewed);
 
 module.exports = router;

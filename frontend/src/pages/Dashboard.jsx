@@ -272,7 +272,7 @@ function Dashboard({ currentUser, onLogout }) {
     currentPage: 1,
     totalPages: 1,
     totalServices: 0,
-    limit: 20
+    limit: 100  // Increased to show all services by default
   });
 
   // Service Modal State

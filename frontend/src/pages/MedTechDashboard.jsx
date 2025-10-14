@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../design/Dashboard.css';
-import { appointmentAPI } from '../services/api';
+import { appointmentAPI, testResultsAPI, servicesAPI } from '../services/api';
 
 function MedTechDashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('testing-queue');
@@ -104,6 +104,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
     urine_casts: '',
     urine_mucus_thread: '',
     urine_amorphous_urates: '',
+    urine_others: '',
     
     // Clinical Microscopy - Fecalysis
     fecal_color: '',
@@ -160,6 +161,27 @@ function MedTechDashboard({ currentUser, onLogout }) {
   });
 
   const user = currentUser;
+
+  // Draft management state
+  const [savedDrafts, setSavedDrafts] = useState(new Map()); // appointmentId -> draft data
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSavedForm, setLastSavedForm] = useState(null);
+
+  // Handle result form changes
+  const handleResultChange = (fieldName, value) => {
+    setResultForm(prev => {
+      const newForm = {
+        ...prev,
+        [fieldName]: value
+      };
+      
+      // Check if form has changed from last saved state
+      const formChanged = JSON.stringify(newForm) !== JSON.stringify(lastSavedForm);
+      setHasUnsavedChanges(formChanged);
+      
+      return newForm;
+    });
+  };
 
   // Data fetching functions
   const fetchSamples = async () => {
@@ -320,8 +342,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
     setLoading(true);
     setError('');
     try {
-      console.log('Fetching testing queue with status: checked-in');
-      console.log('Current user from context:', currentUser);
+      // Remove excessive debugging - keeping essential ones only
       console.log('Token from sessionStorage:', sessionStorage.getItem('token') ? 'Present' : 'Missing');
       
       // Try lowercase first
@@ -358,6 +379,9 @@ function MedTechDashboard({ currentUser, onLogout }) {
         console.log('Setting testing queue with:', response.data);
         // The API returns data directly as an array
         setTestingQueue(response.data || []);
+        
+        // Check for existing test results/drafts for all appointments
+        await checkExistingDrafts(response.data || []);
       } else {
         console.error('API returned error:', response.message);
         throw new Error(response.message || 'Failed to fetch testing queue');
@@ -384,7 +408,25 @@ function MedTechDashboard({ currentUser, onLogout }) {
     }
   }, [activeSection]);
 
-  const handleSectionClick = (section) => {
+  const handleSectionClick = async (section) => {
+    // Protect navigation when in enter-results mode with unsaved changes
+    if (activeSection === 'enter-results') {
+      const canNavigate = await handleNavigateAway(section);
+      if (!canNavigate) {
+        return;
+      }
+    }
+    
+    // If leaving enter-results, reset appointment selection
+    if (activeSection === 'enter-results' && section !== 'enter-results') {
+      setSelectedAppointment(null);
+      
+      // Reset form only if no saved draft exists
+      if (!selectedAppointment || !savedDrafts.has(selectedAppointment._id)) {
+        resetResultForm();
+      }
+    }
+    
     setActiveSection(section);
   };
 
@@ -980,6 +1022,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
       urine_bacteria: 'Few',
       urine_mucus_thread: 'Few',
       urine_amorphous_urates: 'Few',
+      urine_others: '',
       
       // Fecalysis
       fecal_rbc: '0/hpf',
@@ -1001,9 +1044,210 @@ function MedTechDashboard({ currentUser, onLogout }) {
     return ranges[test] || '';
   };
 
+  // ===== TEST ENABLEMENT SYSTEM =====
+  
+  // Service-to-Test Category Mapping
+  const getTestCategoriesFromServices = () => {
+    if (!selectedAppointment) {
+      return [];
+    }
+
+    // Extract service names from appointment - handle both services array and serviceName string
+    let serviceNames = [];
+    
+    // Check if appointment has services array (individual service objects)
+    if (selectedAppointment.services && Array.isArray(selectedAppointment.services)) {
+      serviceNames = selectedAppointment.services.map(service => {
+        if (typeof service === 'string') return service;
+        if (service?.name || service?.serviceName) return service.name || service.serviceName;
+        return '';
+      }).filter(name => name);
+    }
+    
+    // If no services array or it's empty, use the combined serviceName string
+    if (serviceNames.length === 0 && selectedAppointment.serviceName) {
+      // Split the combined service names string by comma and clean up
+      serviceNames = selectedAppointment.serviceName
+        .split(',')
+        .map(name => name.trim())
+        .filter(name => name);
+    }
+
+    // Map services to test categories
+    const enabledCategories = new Set();
+    
+    serviceNames.forEach(serviceName => {
+      const normalizedService = serviceName.toLowerCase().trim();
+      
+      // Blood Chemistry mapping - expanded for more comprehensive coverage
+      if (normalizedService.includes('blood chemistry') || 
+          normalizedService.includes('fbs') || normalizedService.includes('rbs') ||
+          normalizedService.includes('glucose') || normalizedService.includes('blood sugar') ||
+          normalizedService.includes('fasting blood sugar') ||
+          normalizedService.includes('cholesterol') ||
+          normalizedService.includes('lipid') || normalizedService.includes('lipid profile') ||
+          normalizedService.includes('liver function') || normalizedService.includes('lft') ||
+          normalizedService.includes('kidney function') || normalizedService.includes('kft') ||
+          normalizedService.includes('basic metabolic') || normalizedService.includes('bmp') ||
+          normalizedService.includes('uric acid') ||
+          normalizedService.includes('creatinine') ||
+          normalizedService.includes('bun') || normalizedService.includes('blood urea nitrogen') ||
+          normalizedService.includes('ast') || normalizedService.includes('sgot') ||
+          normalizedService.includes('alt') || normalizedService.includes('sgpt') ||
+          normalizedService.includes('magnesium') || normalizedService.includes('phosphorus') ||
+          normalizedService.includes('electrolytes') ||
+          normalizedService.includes('hba1c') || normalizedService.includes('glycated hemoglobin') ||
+          normalizedService.includes('ogtt') || normalizedService.includes('oral glucose tolerance')) {
+        enabledCategories.add('blood_chemistry');
+        console.log(`  ✅ Matched blood_chemistry for: "${serviceName}"`);
+      }
+      
+      // Hematology/CBC mapping
+      if (normalizedService.includes('cbc') || 
+          normalizedService.includes('complete blood count') ||
+          normalizedService.includes('hematology') ||
+          normalizedService.includes('blood count')) {
+        enabledCategories.add('hematology');
+        console.log(`  ✅ Matched hematology for: "${serviceName}"`);
+      }
+      
+      // Clinical Microscopy mapping
+      if (normalizedService.includes('urinalysis') || 
+          normalizedService.includes('urine') ||
+          normalizedService.includes('urine examination') ||
+          normalizedService.includes('complete urine examination') ||
+          normalizedService.includes('clinical microscopy')) {
+        enabledCategories.add('urinalysis');
+        console.log(`  ✅ Matched urinalysis for: "${serviceName}"`);
+      }
+      
+      if (normalizedService.includes('fecalysis') || 
+          normalizedService.includes('stool') ||
+          normalizedService.includes('stool examination') ||
+          normalizedService.includes('sputum')) {
+        enabledCategories.add('fecalysis');
+        console.log(`  ✅ Matched fecalysis for: "${serviceName}"`);
+      }
+      
+      if (normalizedService.includes('pregnancy test') || normalizedService.includes('serum pregnancy') ||
+          normalizedService.includes('beta hcg') || normalizedService.includes('pregnancy')) {
+        enabledCategories.add('pregnancy_test');
+        console.log(`  ✅ Matched pregnancy_test for: "${serviceName}"`);
+      }
+      
+      // Immunology & Serology mapping - expanded for comprehensive coverage
+      if (normalizedService.includes('blood typing') || 
+          normalizedService.includes('blood type')) {
+        enabledCategories.add('blood_typing');
+        console.log(`  ✅ Matched blood_typing for: "${serviceName}"`);
+      }
+      
+      if (normalizedService.includes('hepatitis') || normalizedService.includes('hbsag') ||
+          normalizedService.includes('hepatitis b surface antigen') ||
+          normalizedService.includes('hiv') || normalizedService.includes('anti hcv') ||
+          normalizedService.includes('vdrl') || normalizedService.includes('syphilis') ||
+          normalizedService.includes('dengue') || normalizedService.includes('ns1') ||
+          normalizedService.includes('salmonella') || normalizedService.includes('typhoid') ||
+          normalizedService.includes('h. pylori') || normalizedService.includes('helicobacter') ||
+          normalizedService.includes('rapid antigen') || normalizedService.includes('covid') ||
+          normalizedService.includes('psa') || normalizedService.includes('prostate specific') ||
+          normalizedService.includes('immunology') ||
+          normalizedService.includes('serology')) {
+        enabledCategories.add('immunology');
+        console.log(`  ✅ Matched immunology for: "${serviceName}"`);
+      }
+      
+      // Thyroid mapping - expanded
+      if (normalizedService.includes('thyroid') || 
+          normalizedService.includes('thyroid function') || normalizedService.includes('tft') ||
+          normalizedService.includes('tsh') || normalizedService.includes('thyroid stimulating') ||
+          normalizedService.includes('ft3') || normalizedService.includes('free triiodothyronine') ||
+          normalizedService.includes('ft4') || normalizedService.includes('free thyroxine') ||
+          normalizedService.includes('t3') || normalizedService.includes('triiodothyronine') ||
+          normalizedService.includes('t4') || normalizedService.includes('thyroxine')) {
+        enabledCategories.add('thyroid');
+        console.log(`  ✅ Matched thyroid for: "${serviceName}"`);
+      }
+      
+      // Add a message if no category was matched
+      const beforeSize = enabledCategories.size;
+      const afterCheck = new Set(enabledCategories);
+      if (beforeSize === afterCheck.size) {
+        console.log(`  ❌ No category matched for: "${serviceName}"`);
+      }
+    });
+
+    const categoriesArray = Array.from(enabledCategories);
+    console.log('✅ Enabled test categories:', categoriesArray);
+    return categoriesArray;
+  };
+
+  // Check if a test category is enabled
+  const isTestCategoryEnabled = (category) => {
+    if (!selectedAppointment) return false; // Disable all by default
+    
+    const enabledCategories = getTestCategoriesFromServices();
+    return enabledCategories.includes(category);
+  };
+
+  // Get overlay styles for disabled sections
+  const getTestSectionStyles = (category, isEnabled = null) => {
+    const enabled = isEnabled !== null ? isEnabled : isTestCategoryEnabled(category);
+    
+    return {
+      position: 'relative',
+      opacity: enabled ? 1 : 0.6,
+      pointerEvents: enabled ? 'auto' : 'none',
+      filter: enabled ? 'none' : 'grayscale(50%)',
+      transition: 'all 0.3s ease'
+    };
+  };
+
+  // Get disabled overlay component
+  const DisabledOverlay = ({ category, testName }) => {
+    const enabled = isTestCategoryEnabled(category);
+    
+    if (enabled) return null;
+    
+    return (
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.1)',
+        backdropFilter: 'blur(1px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10,
+        borderRadius: '8px'
+      }}>
+        <div style={{
+          backgroundColor: 'rgba(255, 107, 107, 0.9)',
+          color: 'white',
+          padding: '8px 16px',
+          borderRadius: '4px',
+          fontSize: '14px',
+          fontWeight: '600',
+          textAlign: 'center',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+        }}>
+          ❌ {testName} Not Selected
+          <div style={{ fontSize: '12px', marginTop: '4px', opacity: 0.9 }}>
+            Patient hasn't paid for this test
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Render Blood Chemistry Form
   const renderBloodChemistryForm = () => (
-    <div>
+    <div style={getTestSectionStyles('blood_chemistry')}>
+      <DisabledOverlay category="blood_chemistry" testName="Blood Chemistry" />
+      
       <h3 style={{ marginBottom: '20px', color: '#21AEA8', borderBottom: '2px solid #21AEA8', paddingBottom: '10px' }}>
         Blood Chemistry Panel
       </h3>
@@ -1057,7 +1301,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
         borderRadius: '8px', 
         padding: '20px', 
         backgroundColor: '#f8fcfc',
-        marginTop: '20px' 
+        marginTop: '20px',
+        ...getTestSectionStyles('blood_chemistry')
       }}>
         <h4 style={{ 
           marginTop: '0', 
@@ -1107,7 +1352,9 @@ function MedTechDashboard({ currentUser, onLogout }) {
 
   // Render Hematology Form
   const renderHematologyForm = () => (
-    <div>
+    <div style={getTestSectionStyles('hematology')}>
+      <DisabledOverlay category="hematology" testName="Hematology (CBC)" />
+      
       <h3 style={{ marginBottom: '20px', color: '#21AEA8', borderBottom: '2px solid #21AEA8', paddingBottom: '10px' }}>
         Complete Blood Count (CBC) & Hematology
       </h3>
@@ -1265,7 +1512,12 @@ function MedTechDashboard({ currentUser, onLogout }) {
       </h3>
       
       {/* Urinalysis Section */}
-      <div style={{ marginBottom: '30px' }}>
+      <div style={{ 
+        marginBottom: '30px',
+        ...getTestSectionStyles('urinalysis')
+      }}>
+        <DisabledOverlay category="urinalysis" testName="Urinalysis" />
+        
         <h4 style={{ color: '#495057', marginBottom: '15px' }}>Urinalysis</h4>
         
         {/* Physical Examination */}
@@ -1463,12 +1715,34 @@ function MedTechDashboard({ currentUser, onLogout }) {
                 <span style={{ fontSize: '11px', color: '#6c757d' }}>Ref: {getReferenceRange(test.key)}</span>
               </div>
             ))}
+
+            {/* Others - for additional findings */}
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Others</label>
+              <input 
+                type="text"
+                placeholder="Enter any additional findings..."
+                style={{ 
+                  width: '100%', 
+                  padding: '8px', 
+                  border: '1px solid #ddd', 
+                  borderRadius: '4px',
+                  backgroundColor: '#fff',
+                  color: '#333'
+                }}
+                value={resultForm.urine_others}
+                onChange={(e) => handleResultChange('urine_others', e.target.value)}
+              />
+              <span style={{ fontSize: '11px', color: '#6c757d' }}>Additional findings not covered by standard parameters</span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Fecalysis Section */}
-      <div>
+      <div style={getTestSectionStyles('fecalysis')}>
+        <DisabledOverlay category="fecalysis" testName="Fecalysis" />
+        
         <h4 style={{ color: '#495057', marginBottom: '15px' }}>Fecalysis</h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
           <div>
@@ -1568,7 +1842,9 @@ function MedTechDashboard({ currentUser, onLogout }) {
       </div>
 
       {/* Pregnancy Test Section */}
-      <div>
+      <div style={getTestSectionStyles('pregnancy_test')}>
+        <DisabledOverlay category="pregnancy_test" testName="Pregnancy Test" />
+        
         <h4 style={{ color: '#495057', marginBottom: '15px' }}>Pregnancy Test</h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
           <div>
@@ -1604,7 +1880,14 @@ function MedTechDashboard({ currentUser, onLogout }) {
       </h3>
       
       {/* Blood Typing Section */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+        gap: '20px', 
+        marginBottom: '30px',
+        ...getTestSectionStyles('blood_typing')
+      }}>
+        <DisabledOverlay category="blood_typing" testName="Blood Typing" />
         <div>
           <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>Blood Type</label>
           <select 
@@ -1649,7 +1932,11 @@ function MedTechDashboard({ currentUser, onLogout }) {
       </div>
 
       {/* Serology Tests Section */}
-      <div style={{ marginBottom: '30px' }}>
+      <div style={{ 
+        marginBottom: '30px',
+        ...getTestSectionStyles('immunology')
+      }}>
+        <DisabledOverlay category="immunology" testName="Serology Tests" />
         <h4 style={{ color: '#495057', marginBottom: '15px' }}>Serology Tests</h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
           
@@ -1715,8 +2002,11 @@ function MedTechDashboard({ currentUser, onLogout }) {
         borderRadius: '8px', 
         padding: '20px', 
         backgroundColor: '#f8fcfc',
-        marginTop: '20px' 
+        marginTop: '20px',
+        ...getTestSectionStyles('thyroid')
       }}>
+        <DisabledOverlay category="thyroid" testName="Thyroid Function Tests" />
+        
         <h4 style={{ 
           marginTop: '0', 
           marginBottom: '20px', 
@@ -1782,29 +2072,512 @@ function MedTechDashboard({ currentUser, onLogout }) {
   };
 
   // Handle saving results (draft)
-  const handleSaveResults = () => {
+  const handleSaveResults = async () => {
     if (!selectedAppointment) {
       alert('No appointment selected');
       return;
     }
 
     try {
-      // Add technician info
-      const resultsWithMeta = {
-        ...resultForm,
-        technician: currentUser?.name || 'Unknown Technician',
+      setLoading(true);
+      
+      // Get the service ID for the test type
+      let serviceId = null;
+      if (selectedAppointment.service && selectedAppointment.service._id) {
+        serviceId = selectedAppointment.service._id;
+      } else {
+        // If service is not populated, try to find it by name
+        console.log('Service lookup needed for:', selectedAppointment.serviceName);
+        const servicesResponse = await servicesAPI.getServices({ limit: 100 });
+        if (servicesResponse.success) {
+          console.log('Available services:', servicesResponse.data.map(s => s.serviceName));
+          
+          // Try multiple matching strategies
+          let service = servicesResponse.data.find(s => 
+            selectedAppointment.serviceName.includes(s.serviceName)
+          );
+          
+          // If not found with includes, try exact match on each service in the appointment
+          if (!service) {
+            const appointmentServices = selectedAppointment.serviceName.split(',').map(s => s.trim());
+            console.log('Appointment services array:', appointmentServices);
+            
+            for (const appointmentService of appointmentServices) {
+              service = servicesResponse.data.find(s => 
+                s.serviceName === appointmentService ||
+                appointmentService.includes(s.serviceName) ||
+                s.serviceName.includes(appointmentService)
+              );
+              if (service) {
+                console.log('Found matching service:', service.serviceName);
+                break;
+              }
+            }
+          }
+          
+          serviceId = service?._id;
+          console.log('Selected serviceId:', serviceId);
+        }
+      }
+
+      if (!serviceId) {
+        console.error('Service lookup failed for:', selectedAppointment.serviceName);
+        alert('Unable to find service information. Please try again.');
+        return;
+      }
+
+        // Debug and validate patient information
+        console.log('Selected appointment structure:', selectedAppointment);
+        console.log('Patient data:', selectedAppointment.patient);
+        
+        let patientId = null;
+        if (selectedAppointment.patient) {
+          if (typeof selectedAppointment.patient === 'string') {
+            patientId = selectedAppointment.patient;
+          } else if (selectedAppointment.patient._id) {
+            patientId = selectedAppointment.patient._id;
+          }
+        }
+        
+        // If no patient ID but we have patientName, use the appointment's patient field or create a placeholder
+        if (!patientId && selectedAppointment.patientName) {
+          console.warn('No patient ID found, but patient name exists. Using appointment patient field or patient name as ID');
+          patientId = selectedAppointment.patient || selectedAppointment.patientName;
+        }
+        
+        if (!patientId) {
+          console.error('No valid patient ID found in appointment:', selectedAppointment);
+          alert('Unable to find patient information. Please try selecting the appointment again.');
+          return;
+        }      // Prepare test result data
+      const testResultData = {
+        patientId: patientId,
         appointmentId: selectedAppointment._id,
-        patientName: selectedAppointment.patientName,
-        serviceRequested: selectedAppointment.serviceName,
-        status: 'draft'
+        serviceId: serviceId,
+        testType: selectedAppointment.serviceName,
+        results: { ...resultForm },
+        status: 'in-progress',
+        medTechNotes: resultForm.remarks || '',
+        sampleDate: new Date().toISOString()
       };
 
-      console.log('Saving results as draft:', resultsWithMeta);
-      alert('Results saved as draft successfully!');
+      console.log('Saving results as draft:', testResultData);
+      console.log('Patient ID type:', typeof testResultData.patientId, testResultData.patientId);
+      console.log('Appointment ID type:', typeof testResultData.appointmentId, testResultData.appointmentId);
+      console.log('Service ID type:', typeof testResultData.serviceId, testResultData.serviceId);
+
+      // Debug authentication
+      const token = sessionStorage.getItem('token');
+      const user = sessionStorage.getItem('user');
+      console.log('Auth debug - Token exists:', !!token);
+      console.log('Auth debug - User exists:', !!user);
+      console.log('Auth debug - Token preview:', token ? token.substring(0, 20) + '...' : 'NO TOKEN');
+      if (user) {
+        try {
+          const parsedUser = JSON.parse(user);
+          console.log('Auth debug - User role:', parsedUser.role);
+          console.log('Auth debug - User ID:', parsedUser._id);
+        } catch (e) {
+          console.log('Auth debug - User parse error:', e.message);
+        }
+      }
+
+      // Try to save to database - first check if a test result already exists
+      let response;
+      try {
+        // Try to create new test result
+        response = await testResultsAPI.createTestResult(testResultData);
+        console.log('Create response:', response);
+      } catch (createError) {
+        console.log('Create failed, might already exist. Trying to find existing...', createError);
+        
+        // If create failed, try to find existing test result and update it
+        try {
+          const existingResults = await testResultsAPI.getTestResults({
+            appointmentId: selectedAppointment._id,
+            limit: 1
+          });
+          
+          if (existingResults.success && existingResults.data.length > 0) {
+            const existingResult = existingResults.data[0];
+            console.log('Found existing test result, updating...', existingResult._id);
+            
+            // Update existing test result
+            response = await testResultsAPI.updateTestResult(existingResult._id, {
+              results: { ...resultForm },
+              status: 'in-progress',
+              medTechNotes: resultForm.remarks || ''
+            });
+          } else {
+            // No existing result found, re-throw the original create error
+            throw createError;
+          }
+        } catch (updateError) {
+          console.error('Both create and update failed:', { createError, updateError });
+          throw createError; // Throw the original create error
+        }
+      }
+      
+      if (response.success) {
+        // Save draft locally for quick access
+        setSavedDrafts(prev => new Map(prev.set(selectedAppointment._id, { ...resultForm })));
+        setLastSavedForm({ ...resultForm });
+        setHasUnsavedChanges(false);
+        
+        alert('Results saved as draft successfully!');
+      } else {
+        console.error('API response error:', response);
+        throw new Error(response.message || 'Failed to save results');
+      }
     } catch (error) {
       console.error('Error saving results:', error);
-      alert('Failed to save results. Please try again.');
+      console.error('Error details:', error.message);
+      alert(`Failed to save results: ${error.message}. Please try again.`);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  // Handle navigation with unsaved changes protection
+  const handleNavigateAway = async (targetSection) => {
+    if (hasUnsavedChanges && selectedAppointment) {
+      const confirmed = window.confirm(
+        'You have unsaved changes. Would you like to save them as a draft before leaving?'
+      );
+      if (confirmed) {
+        // Auto-save as draft before navigating
+        try {
+          console.log('🔄 Auto-saving draft before navigation...');
+          await handleSaveResults();
+          console.log('✅ Draft auto-saved successfully');
+        } catch (error) {
+          console.error('❌ Failed to auto-save draft:', error);
+          const proceedAnyway = window.confirm(
+            'Failed to save draft. Do you want to leave anyway? Your changes will be lost.'
+          );
+          if (!proceedAnyway) {
+            return false;
+          }
+        }
+      } else {
+        // User chose not to save, confirm they want to lose changes
+        const confirmLose = window.confirm(
+          'Are you sure you want to leave without saving? Your changes will be lost.'
+        );
+        if (!confirmLose) {
+          return false;
+        }
+      }
+      // Clear unsaved changes since we've handled them
+      setHasUnsavedChanges(false);
+    }
+    return true;
+  };
+
+  // Load saved draft for an appointment
+  // Check for existing test results for all appointments (to show draft indicators)
+  const checkExistingDrafts = async (appointments) => {
+    try {
+      console.log('Checking existing drafts for', appointments.length, 'appointments');
+      
+      // Get all test results for this medtech
+      const response = await fetch('/api/test-results?limit=100', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('All test results:', data);
+        
+        const testResults = data.data || data.testResults || [];
+        const draftsMap = new Map();
+        
+        console.log('Found', testResults.length, 'test results in database');
+        console.log('First few test results:', testResults.slice(0, 3));
+        console.log('Checking against', appointments.length, 'appointments');
+        console.log('First few appointments:', appointments.slice(0, 3).map(a => ({ id: a._id, name: a.patientName })));
+        
+        // For each appointment, check if there's a saved test result
+        appointments.forEach(appointment => {
+          console.log('Checking appointment:', appointment._id, 'for patient:', appointment.patientName);
+          const existingResult = testResults.find(result => {
+            // Handle both cases: appointment as object or as string ID
+            const resultAppointmentId = typeof result.appointment === 'object' 
+              ? result.appointment?._id 
+              : result.appointment;
+            
+            console.log('Comparing appointment IDs:', resultAppointmentId, 'vs', appointment._id);
+            return resultAppointmentId === appointment._id;
+          });
+          if (existingResult) {
+            console.log('✅ Found existing result for appointment:', appointment._id, 'patient:', appointment.patientName);
+            // Mark this appointment as having a saved draft
+            draftsMap.set(appointment._id, { hasSavedResult: true });
+          } else {
+            console.log('❌ No existing result found for appointment:', appointment._id, 'patient:', appointment.patientName);
+          }
+        });
+        
+        // Update the saved drafts map
+        setSavedDrafts(prev => {
+          const newMap = new Map(prev);
+          draftsMap.forEach((value, key) => {
+            newMap.set(key, value);
+          });
+          return newMap;
+        });
+        
+        console.log('Updated savedDrafts map with', draftsMap.size, 'entries');
+      }
+    } catch (error) {
+      console.error('Error checking existing drafts:', error);
+    }
+  };
+
+  const loadSavedDraft = async (appointmentId) => {
+    console.log('📋 LOAD SAVED DRAFT CALLED for appointment:', appointmentId);
+    
+    // First check local drafts
+    const savedDraft = savedDrafts.get(appointmentId);
+    console.log('📋 Local draft check result:', savedDraft ? 'Found local draft' : 'No local draft');
+    
+    if (savedDraft && savedDraft.hasSavedResult !== true) {
+      // Only use local draft if it contains actual form data, not just the indicator flag
+      console.log('📋 Using local draft with form data:', savedDraft);
+      setResultForm({ ...savedDraft });
+      setLastSavedForm({ ...savedDraft });
+      setHasUnsavedChanges(false);
+      return true;
+    } else if (savedDraft && savedDraft.hasSavedResult === true) {
+      console.log('📋 Found indicator flag, need to fetch actual data from database');
+    }
+    
+    // If no local draft, check if there's a saved test result in the database
+    try {
+      const response = await fetch(`/api/test-results?appointmentId=${appointmentId}&limit=1`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('API response for appointmentId', appointmentId, ':', data);
+        
+        // Look for test result with matching appointment ID
+        const existingResult = data.data?.find(result => {
+          const resultAppointmentId = typeof result.appointment === 'object' 
+            ? result.appointment?._id 
+            : result.appointment;
+          return resultAppointmentId === appointmentId;
+        }) || data.testResults?.find(result => {
+          const resultAppointmentId = typeof result.appointment === 'object' 
+            ? result.appointment?._id 
+            : result.appointment;
+          return resultAppointmentId === appointmentId;
+        });
+        
+        if (existingResult) {
+          console.log('Found existing test result for appointment:', appointmentId, existingResult);
+          console.log('Existing result structure:', JSON.stringify(existingResult, null, 2));
+          
+          // Handle results field - it might be a Map, Object, or other format
+          let results = existingResult.results || {};
+          console.log('Raw results field type and content:', typeof results, results);
+          
+          // If results is a Map or has special structure, convert it to a plain object
+          if (results && typeof results === 'object') {
+            // Handle case where results might be a Map-like object with entries
+            if (results.constructor && results.constructor.name === 'Map') {
+              console.log('Results is a Map, converting to object');
+              results = Object.fromEntries(results);
+            } else if (results._bsontype || results.toObject) {
+              console.log('Results is a MongoDB document, converting to object');
+              results = results.toObject ? results.toObject() : results;
+            }
+          }
+          
+          console.log('Converted results:', results);
+          console.log('Sample field values:', {
+            fbs: results.fbs,
+            hemoglobin: results.hemoglobin,
+            wbc: results.wbc
+          });
+          
+          // Convert the existing result back to form format
+          const formData = {
+            fbs: results.fbs || '',
+            bua: results.bua || '',
+            bun: results.bun || '',
+            creatinine: results.creatinine || '',
+            cholesterol: results.cholesterol || '',
+            triglyceride: results.triglyceride || '',
+            hdl: results.hdl || '',
+            ldl: results.ldl || '',
+            ast_sgot: results.ast_sgot || '',
+            alt_sgpt: results.alt_sgpt || '',
+            sodium: results.sodium || '',
+            potassium: results.potassium || '',
+            chloride: results.chloride || '',
+            magnesium: results.magnesium || '',
+            phosphorus: results.phosphorus || '',
+            wbc: results.wbc || '',
+            rbc: results.rbc || '',
+            hemoglobin: results.hemoglobin || '',
+            hematocrit: results.hematocrit || '',
+            platelets: results.platelets || '',
+            esr: results.esr || '',
+            mcv: results.mcv || '',
+            mch: results.mch || '',
+            mchc: results.mchc || '',
+            lymphocytes: results.lymphocytes || '',
+            neutrophils: results.neutrophils || '',
+            monocytes: results.monocytes || '',
+            eosinophils: results.eosinophils || '',
+            basophils: results.basophils || '',
+            urine_color: results.urine_color || '',
+            urine_transparency: results.urine_transparency || '',
+            urine_specific_gravity: results.urine_specific_gravity || '',
+            urine_ph: results.urine_ph || '',
+            urine_protein: results.urine_protein || '',
+            urine_glucose: results.urine_glucose || '',
+            urine_ketones: results.urine_ketones || '',
+            urine_blood: results.urine_blood || '',
+            urine_leukocytes: results.urine_leukocytes || '',
+            urine_nitrites: results.urine_nitrites || '',
+            urobilinogen: results.urobilinogen || '',
+            bilirubin: results.bilirubin || '',
+            urine_rbc: results.urine_rbc || '',
+            urine_wbc: results.urine_wbc || '',
+            urine_epithelial: results.urine_epithelial || '',
+            urine_bacteria: results.urine_bacteria || '',
+            urine_crystals: results.urine_crystals || '',
+            urine_casts: results.urine_casts || '',
+            mucus_thread: results.mucus_thread || '',
+            amorphous_urates: results.amorphous_urates || '',
+            urine_others: results.urine_others || '',
+            fecal_color: results.fecal_color || '',
+            fecal_consistency: results.fecal_consistency || '',
+            fecal_occult_blood: results.fecal_occult_blood || '',
+            fecal_rbc: results.fecal_rbc || '',
+            fecal_wbc: results.fecal_wbc || '',
+            fecal_bacteria: results.fecal_bacteria || '',
+            fecal_parasite_ova: results.fecal_parasite_ova || '',
+            pregnancy_test: results.pregnancy_test || '',
+            blood_type: results.blood_type || '',
+            rh_factor: results.rh_factor || '',
+            hepatitis_b: results.hepatitis_b || '',
+            hepatitis_c: results.hepatitis_c || '',
+            hiv: results.hiv || '',
+            vdrl: results.vdrl || '',
+            dengue_duo: results.dengue_duo || '',
+            salmonella: results.salmonella || '',
+            tsh: results.tsh || '',
+            ft3: results.ft3 || '',
+            ft4: results.ft4 || '',
+            t3: results.t3 || '',
+            t4: results.t4 || '',
+            remarks: existingResult.notes || '',
+            technician: existingResult.medTech?.name || existingResult.medTechNotes || '',
+            datePerformed: existingResult.sampleDate ? existingResult.sampleDate.split('T')[0] : new Date().toISOString().split('T')[0],
+            timePerformed: existingResult.sampleDate ? new Date(existingResult.sampleDate).toTimeString().split(' ')[0].substring(0, 5) : new Date().toTimeString().split(' ')[0].substring(0, 5)
+          };
+          
+          console.log('Generated formData object:', formData);
+          console.log('Sample formData values:', {
+            fbs: formData.fbs,
+            hemoglobin: formData.hemoglobin,
+            wbc: formData.wbc,
+            pregnancy_test: formData.pregnancy_test,
+            remarks: formData.remarks
+          });
+          
+          console.log('📋 About to call setResultForm with formData...');
+          setResultForm(formData);
+          console.log('📋 setResultForm called - checking if form state updated...');
+          
+          // Add a small delay to check if the state actually updated
+          setTimeout(() => {
+            console.log('📋 Form state after setResultForm (current resultForm):', {
+              fbs: resultForm.fbs,
+              hemoglobin: resultForm.hemoglobin,
+              wbc: resultForm.wbc,
+              pregnancy_test: resultForm.pregnancy_test,
+              remarks: resultForm.remarks
+            });
+          }, 100);
+          
+          setLastSavedForm({ ...formData });
+          setHasUnsavedChanges(false);
+          
+          // Also save to local drafts for faster access
+          savedDrafts.set(appointmentId, formData);
+          console.log('📋 Draft saved to local cache for appointment:', appointmentId);
+          
+          return true;
+        } else {
+          console.log('No existing test result found for appointment:', appointmentId);
+          console.log('Available test results:', data.data || data.testResults);
+        }
+      } else {
+        console.error('Failed to fetch test results. Response status:', response.status);
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+      }
+    } catch (error) {
+      console.error('Error loading existing test result:', error);
+    }
+    
+    return false;
+  };
+
+  // Handle going back to queue
+  const handleBackToQueue = async () => {
+    // Always show confirmation dialog when going back to queue
+    const confirmed = window.confirm('Are you sure you want to go back to the testing queue?');
+    if (!confirmed) {
+      return;
+    }
+    
+    const canNavigate = await handleNavigateAway('testing-queue');
+    if (canNavigate) {
+      setSelectedAppointment(null);
+      setActiveSection('testing-queue');
+      
+      // Reset form only if no saved draft exists
+      if (!selectedAppointment || !savedDrafts.has(selectedAppointment._id)) {
+        resetResultForm();
+      }
+    }
+  };
+
+  // Reset result form to initial state
+  const resetResultForm = () => {
+    setResultForm({
+      fbs: '', bua: '', bun: '', creatinine: '', cholesterol: '', triglyceride: '',
+      hdl: '', ldl: '', ast_sgot: '', alt_sgpt: '', sodium: '', potassium: '', chloride: '',
+      magnesium: '', phosphorus: '', wbc: '', rbc: '', hemoglobin: '',
+      hematocrit: '', platelets: '', esr: '', mcv: '', mch: '', mchc: '', lymphocytes: '', neutrophils: '', monocytes: '',
+      eosinophils: '', basophils: '', urine_color: '', urine_transparency: '',
+      urine_specific_gravity: '', urine_ph: '', urine_protein: '', urine_glucose: '',
+      urine_ketones: '', urine_blood: '', urine_leukocytes: '', urine_nitrites: '',
+      urobilinogen: '', bilirubin: '', urine_rbc: '', urine_wbc: '', urine_epithelial: '', urine_bacteria: '',
+      urine_crystals: '', urine_casts: '', mucus_thread: '', amorphous_urates: '', urine_others: '', fecal_color: '', fecal_consistency: '',
+      fecal_occult_blood: '', fecal_rbc: '', fecal_wbc: '', fecal_bacteria: '', fecal_parasite_ova: '', pregnancy_test: '', blood_type: '', rh_factor: '', hepatitis_b: '', hepatitis_c: '',
+      hiv: '', vdrl: '', dengue_duo: '', salmonella: '', 
+      tsh: '', ft3: '', ft4: '', t3: '', t4: '',
+      remarks: '', technician: '',
+      datePerformed: new Date().toISOString().split('T')[0],
+      timePerformed: new Date().toTimeString().split(' ')[0].substring(0, 5)
+    });
+    setLastSavedForm(null);
+    setHasUnsavedChanges(false);
   };
 
   // Handle completing and submitting results
@@ -1815,28 +2588,71 @@ function MedTechDashboard({ currentUser, onLogout }) {
     }
 
     try {
-      // Add technician info and completion timestamp
-      const finalResults = {
-        ...resultForm,
-        technician: currentUser?.name || 'Unknown Technician',
+      setLoading(true);
+      
+      // Get the service ID for the test type
+      let serviceId = null;
+      if (selectedAppointment.service && selectedAppointment.service._id) {
+        serviceId = selectedAppointment.service._id;
+      } else {
+        // If service is not populated, try to find it by name
+        const servicesResponse = await servicesAPI.getServices({ limit: 100 });
+        if (servicesResponse.success) {
+          const service = servicesResponse.data.find(s => 
+            selectedAppointment.serviceName.includes(s.serviceName)
+          );
+          serviceId = service?._id;
+        }
+      }
+
+      if (!serviceId) {
+        alert('Unable to find service information. Please try again.');
+        return;
+      }
+
+      // Prepare test result data
+      const testResultData = {
+        patientId: selectedAppointment.patient._id || selectedAppointment.patient,
         appointmentId: selectedAppointment._id,
-        patientName: selectedAppointment.patientName,
-        serviceRequested: selectedAppointment.serviceName,
+        serviceId: serviceId,
+        testType: selectedAppointment.serviceName,
+        results: { ...resultForm },
         status: 'completed',
-        completedAt: new Date().toISOString(),
-        completedBy: currentUser?._id
+        medTechNotes: resultForm.remarks || '',
+        sampleDate: new Date().toISOString()
       };
 
-      console.log('Completing test with results:', finalResults);
+      console.log('Completing test with results:', testResultData);
+
+      // Save test results to database
+      const testResultResponse = await testResultsAPI.createTestResult(testResultData);
+      
+      if (!testResultResponse.success) {
+        throw new Error(testResultResponse.message || 'Failed to save test results');
+      }
 
       // Update appointment status to completed
       if (selectedAppointment._id) {
-        // TODO: Add API call to save test results and update appointment
-        // await testResultAPI.createTestResult(finalResults);
-        // await appointmentAPI.updateAppointment(selectedAppointment._id, { status: 'completed' });
+        const appointmentResponse = await appointmentAPI.updateAppointment(
+          selectedAppointment._id, 
+          { status: 'completed' }
+        );
+        
+        if (!appointmentResponse.success) {
+          console.warn('Test results saved but failed to update appointment status');
+        }
       }
 
       alert(`Test completed successfully for ${selectedAppointment.patientName}!`);
+      
+      // Clear saved draft since test is completed
+      if (selectedAppointment._id && savedDrafts.has(selectedAppointment._id)) {
+        setSavedDrafts(prev => {
+          const newDrafts = new Map(prev);
+          newDrafts.delete(selectedAppointment._id);
+          return newDrafts;
+        });
+      }
       
       // Reset form and go back to queue
       setResultForm({
@@ -1848,7 +2664,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
         urine_specific_gravity: '', urine_ph: '', urine_protein: '', urine_glucose: '',
         urine_ketones: '', urine_blood: '', urine_leukocytes: '', urine_nitrites: '',
         urobilinogen: '', bilirubin: '', urine_rbc: '', urine_wbc: '', urine_epithelial: '', urine_bacteria: '',
-        urine_crystals: '', urine_casts: '', mucus_thread: '', amorphous_urates: '', fecal_color: '', fecal_consistency: '',
+        urine_crystals: '', urine_casts: '', mucus_thread: '', amorphous_urates: '', urine_others: '', fecal_color: '', fecal_consistency: '',
         fecal_occult_blood: '', fecal_rbc: '', fecal_wbc: '', fecal_bacteria: '', fecal_parasite_ova: '', pregnancy_test: '', blood_type: '', rh_factor: '', hepatitis_b: '', hepatitis_c: '',
         hiv: '', vdrl: '', dengue_duo: '', salmonella: '', 
         tsh: '', ft3: '', ft4: '', t3: '', t4: '',
@@ -1857,6 +2673,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
         timePerformed: new Date().toTimeString().split(' ')[0].substring(0, 5)
       });
       
+      setLastSavedForm(null);
+      setHasUnsavedChanges(false);
       setSelectedAppointment(null);
       setActiveSection('testing-queue');
       
@@ -1866,6 +2684,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
     } catch (error) {
       console.error('Error completing test:', error);
       alert('Failed to complete test. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1873,28 +2693,112 @@ function MedTechDashboard({ currentUser, onLogout }) {
 
 
     // Handle saving results (draft)
-    const handleSaveResults = () => {
+    const handleSaveResults = async () => {
       if (!selectedAppointment) {
         alert('No appointment selected');
         return;
       }
 
       try {
-        // Add technician info
-        const resultsWithMeta = {
-          ...resultForm,
-          technician: currentUser?.name || 'Unknown Technician',
+        setLoading(true);
+        
+        // Get the service ID for the test type
+        let serviceId = null;
+        if (selectedAppointment.service && selectedAppointment.service._id) {
+          serviceId = selectedAppointment.service._id;
+        } else {
+          // If service is not populated, try to find it by name
+          console.log('Service lookup needed for:', selectedAppointment.serviceName);
+          const servicesResponse = await servicesAPI.getServices({ limit: 100 });
+          if (servicesResponse.success) {
+            console.log('Available services:', servicesResponse.data.map(s => s.serviceName));
+            
+            // Try multiple matching strategies
+            let service = servicesResponse.data.find(s => 
+              selectedAppointment.serviceName.includes(s.serviceName)
+            );
+            
+            // If not found with includes, try exact match on each service in the appointment
+            if (!service) {
+              const appointmentServices = selectedAppointment.serviceName.split(',').map(s => s.trim());
+              console.log('Appointment services array:', appointmentServices);
+              
+              for (const appointmentService of appointmentServices) {
+                service = servicesResponse.data.find(s => 
+                  s.serviceName === appointmentService ||
+                  appointmentService.includes(s.serviceName) ||
+                  s.serviceName.includes(appointmentService)
+                );
+                if (service) {
+                  console.log('Found matching service:', service.serviceName);
+                  break;
+                }
+              }
+            }
+            
+            serviceId = service?._id;
+            console.log('Selected serviceId:', serviceId);
+          }
+        }
+
+        if (!serviceId) {
+          console.error('Service lookup failed for:', selectedAppointment.serviceName);
+          alert('Unable to find service information. Please try again.');
+          return;
+        }
+
+        // Debug and validate patient information
+        console.log('Selected appointment structure:', selectedAppointment);
+        console.log('Patient data:', selectedAppointment.patient);
+        
+        let patientId = null;
+        if (selectedAppointment.patient) {
+          if (typeof selectedAppointment.patient === 'string') {
+            patientId = selectedAppointment.patient;
+          } else if (selectedAppointment.patient._id) {
+            patientId = selectedAppointment.patient._id;
+          }
+        }
+        
+        // If no patient ID but we have patientName, use the appointment's patient field or create a placeholder
+        if (!patientId && selectedAppointment.patientName) {
+          console.warn('No patient ID found, but patient name exists. Using appointment patient field or patient name as ID');
+          patientId = selectedAppointment.patient || selectedAppointment.patientName;
+        }
+        
+        if (!patientId) {
+          console.error('No valid patient ID found in appointment:', selectedAppointment);
+          alert('Unable to find patient information. Please try selecting the appointment again.');
+          return;
+        }
+
+        // Prepare test result data
+        const testResultData = {
+          patientId: patientId,
           appointmentId: selectedAppointment._id,
-          patientName: selectedAppointment.patientName,
-          serviceRequested: selectedAppointment.serviceName,
-          status: 'draft'
+          serviceId: serviceId,
+          testType: selectedAppointment.serviceName,
+          results: { ...resultForm },
+          status: 'in-progress',
+          medTechNotes: resultForm.remarks || '',
+          sampleDate: new Date().toISOString()
         };
 
-        console.log('Saving results as draft:', resultsWithMeta);
-        alert('Results saved as draft successfully!');
+        console.log('Saving results as draft:', testResultData);
+
+        // Save to database
+        const response = await testResultsAPI.createTestResult(testResultData);
+        
+        if (response.success) {
+          alert('Results saved as draft successfully!');
+        } else {
+          throw new Error(response.message || 'Failed to save results');
+        }
       } catch (error) {
         console.error('Error saving results:', error);
         alert('Failed to save results. Please try again.');
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -1906,25 +2810,59 @@ function MedTechDashboard({ currentUser, onLogout }) {
       }
 
       try {
-        // Add technician info and completion timestamp
-        const finalResults = {
-          ...resultForm,
-          technician: currentUser?.name || 'Unknown Technician',
+        setLoading(true);
+        
+        // Get the service ID for the test type
+        let serviceId = null;
+        if (selectedAppointment.service && selectedAppointment.service._id) {
+          serviceId = selectedAppointment.service._id;
+        } else {
+          // If service is not populated, try to find it by name
+          const servicesResponse = await servicesAPI.getServices({ limit: 100 });
+          if (servicesResponse.success) {
+            const service = servicesResponse.data.find(s => 
+              selectedAppointment.serviceName.includes(s.serviceName)
+            );
+            serviceId = service?._id;
+          }
+        }
+
+        if (!serviceId) {
+          alert('Unable to find service information. Please try again.');
+          return;
+        }
+
+        // Prepare test result data
+        const testResultData = {
+          patientId: selectedAppointment.patient._id || selectedAppointment.patient,
           appointmentId: selectedAppointment._id,
-          patientName: selectedAppointment.patientName,
-          serviceRequested: selectedAppointment.serviceName,
+          serviceId: serviceId,
+          testType: selectedAppointment.serviceName,
+          results: { ...resultForm },
           status: 'completed',
-          completedAt: new Date().toISOString(),
-          completedBy: currentUser?._id
+          medTechNotes: resultForm.remarks || '',
+          sampleDate: new Date().toISOString()
         };
 
-        console.log('Completing test with results:', finalResults);
+        console.log('Completing test with results:', testResultData);
+
+        // Save test results to database
+        const testResultResponse = await testResultsAPI.createTestResult(testResultData);
+        
+        if (!testResultResponse.success) {
+          throw new Error(testResultResponse.message || 'Failed to save test results');
+        }
 
         // Update appointment status to completed
         if (selectedAppointment._id) {
-          // TODO: Add API call to save test results and update appointment
-          // await testResultAPI.createTestResult(finalResults);
-          // await appointmentAPI.updateAppointment(selectedAppointment._id, { status: 'completed' });
+          const appointmentResponse = await appointmentAPI.updateAppointment(
+            selectedAppointment._id, 
+            { status: 'completed' }
+          );
+          
+          if (!appointmentResponse.success) {
+            console.warn('Test results saved but failed to update appointment status');
+          }
         }
 
         alert(`Test completed successfully for ${selectedAppointment.patientName}!`);
@@ -1939,7 +2877,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
           urine_specific_gravity: '', urine_ph: '', urine_protein: '', urine_glucose: '',
           urine_ketones: '', urine_blood: '', urine_leukocytes: '', urine_nitrites: '',
           urobilinogen: '', bilirubin: '', urine_rbc: '', urine_wbc: '', urine_epithelial: '', urine_bacteria: '',
-          urine_crystals: '', urine_casts: '', mucus_thread: '', amorphous_urates: '', fecal_color: '', fecal_consistency: '',
+          urine_crystals: '', urine_casts: '', mucus_thread: '', amorphous_urates: '', urine_others: '', fecal_color: '', fecal_consistency: '',
           fecal_occult_blood: '', fecal_rbc: '', fecal_wbc: '', fecal_bacteria: '', fecal_parasite_ova: '', pregnancy_test: '', blood_type: '', rh_factor: '', hepatitis_b: '', hepatitis_c: '',
           hiv: '', vdrl: '', dengue_duo: '', salmonella: '', 
           tsh: '', ft3: '', ft4: '', t3: '', t4: '',
@@ -1957,6 +2895,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
       } catch (error) {
         console.error('Error completing test:', error);
         alert('Failed to complete test. Please try again.');
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -2249,10 +3189,34 @@ function MedTechDashboard({ currentUser, onLogout }) {
     const readyForTesting = testingQueue.filter(apt => apt.status === 'checked-in');
     const inProgress = testingQueue.filter(apt => apt.status === 'in-progress');
 
-    const handleInputResults = (appointmentId) => {
-      // Go directly to results input without changing status to in-progress
+    const handleInputResults = async (appointmentId) => {
+      // Check for unsaved changes before navigating
+      const canNavigate = await handleNavigateAway('enter-results');
+      if (!canNavigate) {
+        return;
+      }
+      
+      // Find and select the appointment
       const appointment = testingQueue.find(apt => apt._id === appointmentId);
       setSelectedAppointment(appointment);
+      
+      // Try to load saved draft for this appointment
+      try {
+        console.log('🔄 Attempting to load draft for appointment:', appointmentId);
+        const hasDraft = await loadSavedDraft(appointmentId);
+        console.log('🔄 Load draft result:', hasDraft);
+        if (!hasDraft) {
+          // No saved draft, start with clean form
+          console.log('🔄 No draft found, resetting form');
+          resetResultForm();
+        } else {
+          console.log('🔄 Draft loaded successfully');
+        }
+      } catch (error) {
+        console.error('Error loading draft:', error);
+        resetResultForm();
+      }
+      
       setActiveSection('enter-results');
     };
 
@@ -2324,6 +3288,19 @@ function MedTechDashboard({ currentUser, onLogout }) {
                       <h4 style={{ margin: '0 0 8px 0', color: '#333' }}>
                         {appointment.patientName}
                         {appointment.isUrgent && <span style={{ color: '#dc3545', marginLeft: '10px' }}>URGENT</span>}
+                        {savedDrafts.has(appointment._id) && (
+                          <span style={{ 
+                            color: '#28a745', 
+                            marginLeft: '10px', 
+                            fontSize: '12px',
+                            background: '#d4edda',
+                            padding: '2px 6px',
+                            borderRadius: '3px',
+                            border: '1px solid #c3e6cb'
+                          }}>
+                            💾 DRAFT SAVED
+                          </span>
+                        )}
                       </h4>
                       <div style={{ color: '#666', fontSize: '14px' }}>
                         <div>Service: {appointment.serviceName}</div>
@@ -2339,7 +3316,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
                     <button
                       onClick={() => handleInputResults(appointment._id)}
                       style={{
-                        background: '#21AEA8',
+                        background: savedDrafts.has(appointment._id) ? '#28a745' : '#21AEA8',
                         color: 'white',
                         border: 'none',
                         padding: '12px 20px',
@@ -2348,7 +3325,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
                         fontWeight: 'bold'
                       }}
                     >
-                      Input Results
+                      {savedDrafts.has(appointment._id) ? 'Continue Draft' : 'Input Results'}
                     </button>
                   </div>
                 </div>
@@ -2432,7 +3409,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
           <h3>No Patient Selected</h3>
           <p>Please select a patient from the testing queue to enter results.</p>
           <button
-            onClick={() => setActiveSection('testing-queue')}
+            onClick={handleBackToQueue}
             style={{
               background: '#21AEA8',
               color: 'white',
@@ -2472,6 +3449,42 @@ function MedTechDashboard({ currentUser, onLogout }) {
             <div>Time: {resultForm.timePerformed}</div>
           </div>
         </div>
+
+        {/* Unsaved Changes Warning */}
+        {hasUnsavedChanges && (
+          <div style={{
+            background: '#fff3cd',
+            border: '1px solid #ffeaa7',
+            color: '#856404',
+            padding: '12px 16px',
+            borderRadius: '6px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <span style={{ fontSize: '18px' }}>⚠️</span>
+            <span>You have unsaved changes. Remember to save your work before leaving.</span>
+          </div>
+        )}
+
+        {/* Draft Status Indicator */}
+        {selectedAppointment && savedDrafts.has(selectedAppointment._id) && !hasUnsavedChanges && (
+          <div style={{
+            background: '#d1ecf1',
+            border: '1px solid #b3d4fc',
+            color: '#0c5460',
+            padding: '12px 16px',
+            borderRadius: '6px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <span style={{ fontSize: '18px' }}>💾</span>
+            <span>Draft loaded - you can continue working on this test.</span>
+          </div>
+        )}
 
         {/* Test Categories Tabs */}
         <div style={{ 
@@ -2542,7 +3555,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
           marginTop: '30px' 
         }}>
           <button
-            onClick={() => setActiveSection('testing-queue')}
+            onClick={handleBackToQueue}
             style={{
               background: '#6c757d',
               color: 'white',
@@ -2558,33 +3571,35 @@ function MedTechDashboard({ currentUser, onLogout }) {
           </button>
           <button
             onClick={handleSaveResults}
+            disabled={loading}
             style={{
-              background: '#28a745',
+              background: loading ? '#ccc' : '#28a745',
               color: 'white',
               border: 'none',
               padding: '15px 30px',
               borderRadius: '6px',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               fontSize: '16px',
               fontWeight: 'bold'
             }}
           >
-            Save Results
+            {loading ? 'Saving...' : 'Save Results'}
           </button>
           <button
             onClick={handleCompleteTest}
+            disabled={loading}
             style={{
-              background: '#21AEA8',
+              background: loading ? '#ccc' : '#21AEA8',
               color: 'white',
               border: 'none',
               padding: '15px 30px',
               borderRadius: '6px',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               fontSize: '16px',
               fontWeight: 'bold'
             }}
           >
-            Complete & Submit
+            {loading ? 'Completing...' : 'Complete & Submit'}
           </button>
         </div>
       </div>

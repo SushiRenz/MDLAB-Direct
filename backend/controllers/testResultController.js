@@ -25,6 +25,7 @@ const getTestResults = asyncHandler(async (req, res) => {
     testType,
     patientId,
     patientName,
+    appointmentId,
     sampleId,
     fromDate,
     toDate,
@@ -39,6 +40,9 @@ const getTestResults = asyncHandler(async (req, res) => {
 
   // Build query object
   let query = { isDeleted: false };
+  console.log('🔍 Initial query:', query);
+  console.log('🔍 User role:', req.user.role);
+  console.log('🔍 Request params:', { patientId, appointmentId, status, testType });
 
   // Role-based filtering
   if (req.user.role === 'patient') {
@@ -46,11 +50,15 @@ const getTestResults = asyncHandler(async (req, res) => {
     query.patient = req.user._id;
   } else if (req.user.role === 'medtech') {
     // MedTechs can see results they're assigned to or unassigned ones
-    if (!patientId) {
+    // BUT if filtering by appointmentId, allow access to any results for that appointment
+    if (!patientId && !appointmentId) {
       query.$or = [
         { medTech: req.user._id },
         { medTech: null }
       ];
+      console.log('🔍 Applied medtech role restriction (no patientId/appointmentId)');
+    } else {
+      console.log('🔍 Skipping medtech role restriction (patientId or appointmentId provided)');
     }
   }
   // Admin, receptionist, pathologist can see all results
@@ -70,6 +78,29 @@ const getTestResults = asyncHandler(async (req, res) => {
 
   if (patientId) {
     query.patient = patientId;
+  }
+
+  if (appointmentId) {
+    // Try both string and ObjectId versions
+    const mongoose = require('mongoose');
+    const appointmentIdAsObjectId = mongoose.Types.ObjectId.isValid(appointmentId) 
+      ? new mongoose.Types.ObjectId(appointmentId) 
+      : appointmentId;
+    
+    query.$or = [
+      { appointment: appointmentId }, // String version
+      { appointment: appointmentIdAsObjectId } // ObjectId version
+    ];
+    console.log('🔍 Added appointmentId filter with both string and ObjectId:', { appointmentId, appointmentIdAsObjectId });
+    console.log('🔍 Checking what field name exists in database...');
+    
+    // Debug: Check both possible field names and data types
+    const testByAppointmentString = await TestResult.findOne({ appointment: appointmentId });
+    const testByAppointmentObjectId = await TestResult.findOne({ appointment: appointmentIdAsObjectId });
+    const testByAppointmentIdField = await TestResult.findOne({ appointmentId: appointmentId });
+    console.log('🔍 Found by appointment field (string):', testByAppointmentString ? 'YES' : 'NO');
+    console.log('🔍 Found by appointment field (ObjectId):', testByAppointmentObjectId ? 'YES' : 'NO');
+    console.log('🔍 Found by appointmentId field:', testByAppointmentIdField ? 'YES' : 'NO');
   }
 
   if (sampleId) {
@@ -164,7 +195,20 @@ const getTestResults = asyncHandler(async (req, res) => {
   );
 
   // Execute aggregation
+  console.log('🔍 Final query before execution:', JSON.stringify(query, null, 2));
+  console.log('🔍 Pipeline before execution:', JSON.stringify(pipeline, null, 2));
+  
+  // Debug: Check total test results in database first
+  const totalTestResults = await TestResult.countDocuments();
+  console.log('🔍 TOTAL test results in database:', totalTestResults);
+  
+  // Debug: Check test results with any appointment field
+  const testResultsWithAppointment = await TestResult.countDocuments({ appointment: { $exists: true, $ne: null } });
+  console.log('🔍 Test results with appointment field:', testResultsWithAppointment);
+  
   let testResults = await TestResult.aggregate(pipeline);
+  console.log('🔍 Query results count:', testResults.length);
+  console.log('🔍 First result (if any):', testResults[0] ? JSON.stringify(testResults[0], null, 2) : 'No results');
 
   // If we didn't use patient name search, do regular population
   if (!patientName) {
@@ -283,13 +327,41 @@ const createTestResult = asyncHandler(async (req, res) => {
     pathologistNotes
   } = req.body;
 
-  // Validate patient exists
-  const patient = await User.findById(patientId);
-  if (!patient || patient.role !== 'patient') {
-    return res.status(404).json({
-      success: false,
-      message: 'Patient not found'
-    });
+  // Validate patient exists (or is a walk-in patient)
+  let patient = null;
+  let isWalkInPatient = false;
+  
+  // Check if patientId is a valid MongoDB ObjectId
+  if (patientId && patientId.match(/^[0-9a-fA-F]{24}$/)) {
+    patient = await User.findById(patientId);
+    if (!patient || patient.role !== 'patient') {
+      return res.status(404).json({
+        success: false,
+        message: 'Registered patient not found'
+      });
+    }
+  } else {
+    // Handle walk-in patients (patientId might be a name or other identifier)
+    console.log('Processing walk-in patient:', patientId);
+    isWalkInPatient = true;
+    
+    // For walk-in patients, we'll store the patientId as-is (could be a name)
+    // The appointment should have the patient details
+    if (appointmentId) {
+      const appointment = await Appointment.findById(appointmentId);
+      if (!appointment) {
+        return res.status(404).json({
+          success: false,
+          message: 'Appointment not found for walk-in patient'
+        });
+      }
+      // Use appointment data for walk-in patient validation
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Walk-in patients must have an associated appointment'
+      });
+    }
   }
 
   // Validate service exists
@@ -317,8 +389,8 @@ const createTestResult = asyncHandler(async (req, res) => {
   const referenceRanges = TestResult.getDefaultReferenceRanges(testType);
 
   // Create test result
-  const testResult = new TestResult({
-    patient: patientId,
+  const testResultData = {
+    patient: isWalkInPatient ? patientId : patientId, // Store ID/name for walk-ins, ObjectId for registered
     appointment: appointmentId,
     service: serviceId,
     testType,
@@ -330,8 +402,26 @@ const createTestResult = asyncHandler(async (req, res) => {
     medTechNotes,
     pathologistNotes,
     createdBy: req.user._id,
-    medTech: req.user.role === 'medtech' ? req.user._id : null
-  });
+    isWalkInPatient: isWalkInPatient
+  };
+
+  // If walk-in patient, extract patient info from appointment
+  if (isWalkInPatient && appointment) {
+    testResultData.patientInfo = {
+      name: appointment.patientName,
+      age: appointment.patientAge,
+      gender: appointment.patientGender,
+      contactNumber: appointment.patientPhone,
+      address: appointment.patientAddress
+    };
+  }
+
+  const testResult = new TestResult(testResultData);
+
+  // Add medTech assignment if current user is medtech
+  if (req.user.role === 'medtech') {
+    testResult.medTech = req.user._id;
+  }
 
   await testResult.save();
 
