@@ -4,43 +4,21 @@ import { appointmentAPI, testResultsAPI, servicesAPI } from '../services/api';
 
 function MedTechDashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('testing-queue');
-  const [sampleManagementOpen, setSampleManagementOpen] = useState(false);
-  const [testingOpen, setTestingOpen] = useState(false);
   
   // Loading and error states
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Sample Management State
-  const [samples, setSamples] = useState([]);
-  const [sampleStats, setSampleStats] = useState({
-    totalSamples: 45,
-    inProgress: 23,
-    completed: 67,
-    urgent: 8
-  });
-  const [selectedSample, setSelectedSample] = useState(null);
-
   // Testing Queue State - now fetches real checked-in appointments
   const [testingQueue, setTestingQueue] = useState([]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
 
-  // Test Results State
-  const [testResults, setTestResults] = useState([]);
-  const [selectedResult, setSelectedResult] = useState(null);
+  // Review State
+  const [completedTests, setCompletedTests] = useState([]);
+  const [reviewLoading, setReviewLoading] = useState(false);
 
-  // Form States
-  const [sampleForm, setSampleForm] = useState({
-    patientId: '',
-    patientName: '',
-    dateOfBirth: '',
-    gender: '',
-    sampleId: '',
-    sampleType: '',
-    collectionTime: '',
-    priority: 'routine',
-    testRequests: []
-  });
+  // View mode state for completed tests
+  const [isViewOnlyMode, setIsViewOnlyMode] = useState(false);
 
   // Result form state - comprehensive laboratory test results
   const [resultForm, setResultForm] = useState({
@@ -395,16 +373,38 @@ function MedTechDashboard({ currentUser, onLogout }) {
     }
   };
 
+  // Fetch completed test results for review
+  const fetchCompletedTests = async () => {
+    try {
+      setReviewLoading(true);
+      const response = await fetch('/api/test-results?status=completed&limit=50', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCompletedTests(data.data || []);
+      } else {
+        console.error('Failed to fetch completed tests');
+      }
+    } catch (error) {
+      console.error('Error fetching completed tests:', error);
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
   // Effect to fetch data when section changes
   useEffect(() => {
-    if (['sample-collection', 'sample-tracking'].includes(activeSection)) {
-      fetchSamples();
-    }
-    if (activeSection === 'result-entry') {
-      fetchTestResults();
-    }
     if (activeSection === 'testing-queue') {
       fetchTestingQueue();
+    }
+    if (activeSection === 'review') {
+      fetchCompletedTests();
     }
   }, [activeSection]);
 
@@ -430,14 +430,6 @@ function MedTechDashboard({ currentUser, onLogout }) {
     setActiveSection(section);
   };
 
-  const toggleSampleManagement = () => {
-    setSampleManagementOpen(!sampleManagementOpen);
-  };
-
-  const toggleTesting = () => {
-    setTestingOpen(!testingOpen);
-  };
-
   const handleLogout = async () => {
     try {
       sessionStorage.removeItem('token');
@@ -461,15 +453,10 @@ function MedTechDashboard({ currentUser, onLogout }) {
 
   const renderContent = () => {
     switch (activeSection) {
-      case 'dashboard': return renderDashboardHome();
       case 'testing-queue': return renderTestingQueue();
       case 'enter-results': return renderEnterResults();
       case 'review': return renderReview();
-      case 'sample-collection': return renderSampleCollection();
-      case 'sample-tracking': return renderSampleTracking();
-      case 'result-entry': return renderResultEntry();
-      case 'quality-control': return renderQualityControl();
-      default: return renderDashboardHome();
+      default: return renderTestingQueue(); // Default to testing queue
     }
   };
 
@@ -1276,14 +1263,16 @@ function MedTechDashboard({ currentUser, onLogout }) {
               type="number" 
               step="0.01"
               placeholder={`Enter ${test.label.toLowerCase()}`}
+              disabled={isViewOnlyMode}
               style={{ 
                 width: '100%', 
                 padding: '10px', 
                 border: '1px solid #ddd', 
                 borderRadius: '4px', 
                 fontSize: '14px',
-                backgroundColor: '#fff',
-                color: '#333'
+                backgroundColor: isViewOnlyMode ? '#f8f9fa' : '#fff',
+                color: isViewOnlyMode ? '#6c757d' : '#333',
+                cursor: isViewOnlyMode ? 'not-allowed' : 'text'
               }}
               value={resultForm[test.key]}
               onChange={(e) => handleResultChange(test.key, e.target.value)}
@@ -1377,14 +1366,16 @@ function MedTechDashboard({ currentUser, onLogout }) {
               type="number" 
               step="0.01"
               placeholder={`Enter ${test.label.toLowerCase()}`}
+              disabled={isViewOnlyMode}
               style={{ 
                 width: '100%', 
                 padding: '10px', 
                 border: '1px solid #ddd', 
                 borderRadius: '4px', 
                 fontSize: '14px',
-                backgroundColor: '#fff',
-                color: '#333'
+                backgroundColor: isViewOnlyMode ? '#f8f9fa' : '#fff',
+                color: isViewOnlyMode ? '#6c757d' : '#333',
+                cursor: isViewOnlyMode ? 'not-allowed' : 'text'
               }}
               value={resultForm[test.key]}
               onChange={(e) => handleResultChange(test.key, e.target.value)}
@@ -2139,17 +2130,21 @@ function MedTechDashboard({ currentUser, onLogout }) {
           }
         }
         
-        // If no patient ID but we have patientName, use the appointment's patient field or create a placeholder
+        // If no patient ID but we have patientName, use the patient name for walk-in
         if (!patientId && selectedAppointment.patientName) {
-          console.warn('No patient ID found, but patient name exists. Using appointment patient field or patient name as ID');
-          patientId = selectedAppointment.patient || selectedAppointment.patientName;
+          console.warn('No patient ID found, but patient name exists. Using patient name as ID for walk-in');
+          patientId = selectedAppointment.patientName;
         }
         
         if (!patientId) {
           console.error('No valid patient ID found in appointment:', selectedAppointment);
           alert('Unable to find patient information. Please try selecting the appointment again.');
           return;
-        }      // Prepare test result data
+        }
+
+        console.log('🔍 Final extracted patient ID:', patientId, 'Type:', typeof patientId);
+        
+      // Prepare test result data
       const testResultData = {
         patientId: patientId,
         appointmentId: selectedAppointment._id,
@@ -2314,9 +2309,22 @@ function MedTechDashboard({ currentUser, onLogout }) {
             return resultAppointmentId === appointment._id;
           });
           if (existingResult) {
-            console.log('✅ Found existing result for appointment:', appointment._id, 'patient:', appointment.patientName);
-            // Mark this appointment as having a saved draft
-            draftsMap.set(appointment._id, { hasSavedResult: true });
+            console.log('✅ Found existing result for appointment:', appointment._id, 'patient:', appointment.patientName, 'status:', existingResult.status);
+            // Mark this appointment based on the test result status
+            if (existingResult.status === 'completed') {
+              draftsMap.set(appointment._id, { 
+                hasSavedResult: true, 
+                isCompleted: true,
+                testResultData: existingResult 
+              });
+            } else {
+              // Draft or other status
+              draftsMap.set(appointment._id, { 
+                hasSavedResult: true, 
+                isCompleted: false,
+                testResultData: existingResult 
+              });
+            }
           } else {
             console.log('❌ No existing result found for appointment:', appointment._id, 'patient:', appointment.patientName);
           }
@@ -2549,6 +2557,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
     if (canNavigate) {
       setSelectedAppointment(null);
       setActiveSection('testing-queue');
+      setIsViewOnlyMode(false); // Reset view-only mode
       
       // Reset form only if no saved draft exists
       if (!selectedAppointment || !savedDrafts.has(selectedAppointment._id)) {
@@ -2610,16 +2619,54 @@ function MedTechDashboard({ currentUser, onLogout }) {
         return;
       }
 
-      // Prepare test result data
+      // Extract patient ID properly for completion
+      let patientId = null;
+      if (selectedAppointment.patient) {
+        if (typeof selectedAppointment.patient === 'string') {
+          patientId = selectedAppointment.patient;
+        } else if (selectedAppointment.patient._id) {
+          patientId = selectedAppointment.patient._id;
+        } else if (typeof selectedAppointment.patient === 'object') {
+          // If patient is an object but no _id, use email or name for walk-in
+          console.warn('Patient is object without _id for completion, might be walk-in patient data:', selectedAppointment.patient);
+          patientId = selectedAppointment.patient.email || selectedAppointment.patient.fullName || selectedAppointment.patientName;
+        }
+      }
+      
+      // Fallback to patient name for walk-ins
+      if (!patientId && selectedAppointment.patientName) {
+        console.warn('No patient ID found for completion, using patient name as ID for walk-in');
+        patientId = selectedAppointment.patientName;
+      }
+      
+      if (!patientId) {
+        console.error('No valid patient ID found in appointment for completion:', selectedAppointment);
+        alert('Unable to find patient information. Please try selecting the appointment again.');
+        return;
+      }
+
+      console.log('🔍 Final extracted patient ID for completion:', patientId, 'Type:', typeof patientId);
+
+      // Prepare test result data for completion
       const testResultData = {
-        patientId: selectedAppointment.patient._id || selectedAppointment.patient,
+        patientId: patientId,
         appointmentId: selectedAppointment._id,
         serviceId: serviceId,
-        testType: selectedAppointment.serviceName,
+        testType: selectedAppointment.serviceName || selectedAppointment.services?.[0]?.serviceName,
         results: { ...resultForm },
-        status: 'completed',
+        status: 'completed', // Mark as completed for review
         medTechNotes: resultForm.remarks || '',
-        sampleDate: new Date().toISOString()
+        sampleDate: new Date().toISOString(),
+        completedDate: new Date().toISOString(),
+        isWalkInPatient: !selectedAppointment.patient?._id,
+        patientInfo: selectedAppointment.patient?._id ? undefined : {
+          name: selectedAppointment.patientName,
+          age: selectedAppointment.age,
+          gender: selectedAppointment.gender || selectedAppointment.sex,
+          sex: selectedAppointment.sex,
+          contactNumber: selectedAppointment.contactNumber,
+          email: selectedAppointment.email
+        }
       };
 
       console.log('Completing test with results:', testResultData);
@@ -2763,7 +2810,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
         // If no patient ID but we have patientName, use the appointment's patient field or create a placeholder
         if (!patientId && selectedAppointment.patientName) {
           console.warn('No patient ID found, but patient name exists. Using appointment patient field or patient name as ID');
-          patientId = selectedAppointment.patient || selectedAppointment.patientName;
+          patientId = selectedAppointment.patientName;
         }
         
         if (!patientId) {
@@ -2832,9 +2879,37 @@ function MedTechDashboard({ currentUser, onLogout }) {
           return;
         }
 
+        // Extract patient ID properly for test completion
+        let patientId = null;
+        if (selectedAppointment.patient) {
+          if (typeof selectedAppointment.patient === 'string') {
+            patientId = selectedAppointment.patient;
+          } else if (selectedAppointment.patient._id) {
+            patientId = selectedAppointment.patient._id;
+          } else if (typeof selectedAppointment.patient === 'object') {
+            // If patient is an object but no _id, use email or name for walk-in
+            console.warn('Patient is object without _id, might be walk-in patient data:', selectedAppointment.patient);
+            patientId = selectedAppointment.patient.email || selectedAppointment.patient.fullName || selectedAppointment.patientName;
+          }
+        }
+        
+        // Fallback to patient name for walk-ins
+        if (!patientId && selectedAppointment.patientName) {
+          console.warn('No patient ID found, using patient name as ID for walk-in');
+          patientId = selectedAppointment.patientName;
+        }
+        
+        if (!patientId) {
+          console.error('No valid patient ID found in appointment:', selectedAppointment);
+          alert('Unable to find patient information. Please try selecting the appointment again.');
+          return;
+        }
+
+        console.log('🔍 Final extracted patient ID for second completion:', patientId, 'Type:', typeof patientId);
+
         // Prepare test result data
         const testResultData = {
-          patientId: selectedAppointment.patient._id || selectedAppointment.patient,
+          patientId: patientId,
           appointmentId: selectedAppointment._id,
           serviceId: serviceId,
           testType: selectedAppointment.serviceName,
@@ -3200,21 +3275,44 @@ function MedTechDashboard({ currentUser, onLogout }) {
       const appointment = testingQueue.find(apt => apt._id === appointmentId);
       setSelectedAppointment(appointment);
       
-      // Try to load saved draft for this appointment
-      try {
-        console.log('🔄 Attempting to load draft for appointment:', appointmentId);
-        const hasDraft = await loadSavedDraft(appointmentId);
-        console.log('🔄 Load draft result:', hasDraft);
-        if (!hasDraft) {
-          // No saved draft, start with clean form
-          console.log('🔄 No draft found, resetting form');
-          resetResultForm();
-        } else {
-          console.log('🔄 Draft loaded successfully');
+      // Check if this test is completed
+      const savedData = savedDrafts.get(appointmentId);
+      const isCompleted = savedData?.isCompleted;
+      
+      if (isCompleted) {
+        // For completed tests, load the results in view-only mode
+        console.log('🔍 Loading completed test results for viewing');
+        setIsViewOnlyMode(true);
+        const completedTestData = savedData.testResultData;
+        
+        if (completedTestData && completedTestData.results) {
+          // Convert Map back to object if needed
+          const resultsData = completedTestData.results instanceof Map 
+            ? Object.fromEntries(completedTestData.results)
+            : completedTestData.results;
+          
+          setResultForm(resultsData);
+          console.log('📋 Loaded completed test data:', resultsData);
         }
-      } catch (error) {
-        console.error('Error loading draft:', error);
-        resetResultForm();
+      } else {
+        // For draft tests, enable editing mode
+        setIsViewOnlyMode(false);
+        // Try to load saved draft for this appointment
+        try {
+          console.log('🔄 Attempting to load draft for appointment:', appointmentId);
+          const hasDraft = await loadSavedDraft(appointmentId);
+          console.log('🔄 Load draft result:', hasDraft);
+          if (!hasDraft) {
+            // No saved draft, start with clean form
+            console.log('🔄 No draft found, resetting form');
+            resetResultForm();
+          } else {
+            console.log('🔄 Draft loaded successfully');
+          }
+        } catch (error) {
+          console.error('Error loading draft:', error);
+          resetResultForm();
+        }
       }
       
       setActiveSection('enter-results');
@@ -3289,23 +3387,41 @@ function MedTechDashboard({ currentUser, onLogout }) {
                         {appointment.patientName}
                         {appointment.isUrgent && <span style={{ color: '#dc3545', marginLeft: '10px' }}>URGENT</span>}
                         {savedDrafts.has(appointment._id) && (
-                          <span style={{ 
-                            color: '#28a745', 
-                            marginLeft: '10px', 
-                            fontSize: '12px',
-                            background: '#d4edda',
-                            padding: '2px 6px',
-                            borderRadius: '3px',
-                            border: '1px solid #c3e6cb'
-                          }}>
-                            💾 DRAFT SAVED
-                          </span>
+                          <>
+                            {savedDrafts.get(appointment._id)?.isCompleted ? (
+                              <span style={{ 
+                                color: '#17a2b8', 
+                                marginLeft: '10px', 
+                                fontSize: '12px',
+                                background: '#d1ecf1',
+                                padding: '2px 6px',
+                                borderRadius: '3px',
+                                border: '1px solid #bee5eb'
+                              }}>
+                                ✅ COMPLETED
+                              </span>
+                            ) : (
+                              <span style={{ 
+                                color: '#28a745', 
+                                marginLeft: '10px', 
+                                fontSize: '12px',
+                                background: '#d4edda',
+                                padding: '2px 6px',
+                                borderRadius: '3px',
+                                border: '1px solid #c3e6cb'
+                              }}>
+                                💾 DRAFT SAVED
+                              </span>
+                            )}
+                          </>
                         )}
                       </h4>
                       <div style={{ color: '#666', fontSize: '14px' }}>
                         <div>Service: {appointment.serviceName}</div>
                         <div>Phone: {appointment.contactNumber}</div>
                         <div>Email: {appointment.email}</div>
+                        {appointment.age && <div>Age: {appointment.age} years old</div>}
+                        {appointment.sex && <div>Sex: {appointment.sex}</div>}
                       </div>
                     </div>
                     <div style={{ fontSize: '14px', color: '#666' }}>
@@ -3316,7 +3432,11 @@ function MedTechDashboard({ currentUser, onLogout }) {
                     <button
                       onClick={() => handleInputResults(appointment._id)}
                       style={{
-                        background: savedDrafts.has(appointment._id) ? '#28a745' : '#21AEA8',
+                        background: savedDrafts.has(appointment._id) && savedDrafts.get(appointment._id)?.isCompleted 
+                          ? '#17a2b8' 
+                          : savedDrafts.has(appointment._id) 
+                            ? '#28a745' 
+                            : '#21AEA8',
                         color: 'white',
                         border: 'none',
                         padding: '12px 20px',
@@ -3325,7 +3445,11 @@ function MedTechDashboard({ currentUser, onLogout }) {
                         fontWeight: 'bold'
                       }}
                     >
-                      {savedDrafts.has(appointment._id) ? 'Continue Draft' : 'Input Results'}
+                      {savedDrafts.has(appointment._id) && savedDrafts.get(appointment._id)?.isCompleted 
+                        ? 'View Results' 
+                        : savedDrafts.has(appointment._id) 
+                          ? 'Continue Draft' 
+                          : 'Input Results'}
                     </button>
                   </div>
                 </div>
@@ -3362,6 +3486,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
                           new Date(appointment.testStartTime).toLocaleString() : 
                           'Just now'
                         }</div>
+                        {appointment.age && <div>Age: {appointment.age} years old</div>}
+                        {appointment.sex && <div>Sex: {appointment.sex}</div>}
                       </div>
                     </div>
                     <div style={{ fontSize: '14px', color: '#666' }}>
@@ -3441,7 +3567,11 @@ function MedTechDashboard({ currentUser, onLogout }) {
           <div>
             <h2 style={{ margin: '0 0 10px 0' }}>Laboratory Test Results</h2>
             <p style={{ margin: 0, opacity: 0.9 }}>
-              Patient: {selectedAppointment.patientName} | Service: {selectedAppointment.serviceName}
+              Patient: {selectedAppointment.patientName}
+              {selectedAppointment.age && ` | Age: ${selectedAppointment.age} years`}
+              {selectedAppointment.sex && ` | Sex: ${selectedAppointment.sex}`}
+              <br />
+              Service: {selectedAppointment.serviceName}
             </p>
           </div>
           <div style={{ textAlign: 'right', fontSize: '14px' }}>
@@ -3530,6 +3660,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
             </label>
             <textarea
               placeholder="Enter any additional remarks or observations..."
+              disabled={isViewOnlyMode}
               style={{ 
                 width: '100%', 
                 padding: '12px', 
@@ -3538,8 +3669,9 @@ function MedTechDashboard({ currentUser, onLogout }) {
                 fontSize: '14px',
                 minHeight: '80px',
                 resize: 'vertical',
-                backgroundColor: '#fff',
-                color: '#333'
+                backgroundColor: isViewOnlyMode ? '#f8f9fa' : '#fff',
+                color: isViewOnlyMode ? '#6c757d' : '#333',
+                cursor: isViewOnlyMode ? 'not-allowed' : 'text'
               }}
               value={resultForm.remarks}
               onChange={(e) => handleResultChange('remarks', e.target.value)}
@@ -3569,284 +3701,424 @@ function MedTechDashboard({ currentUser, onLogout }) {
           >
             Back to Queue
           </button>
-          <button
-            onClick={handleSaveResults}
-            disabled={loading}
-            style={{
-              background: loading ? '#ccc' : '#28a745',
-              color: 'white',
-              border: 'none',
+          
+          {!isViewOnlyMode ? (
+            <>
+              <button
+                onClick={handleSaveResults}
+                disabled={loading}
+                style={{
+                  background: loading ? '#ccc' : '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  padding: '15px 30px',
+                  borderRadius: '6px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '16px',
+                  fontWeight: 'bold'
+                }}
+              >
+                {loading ? 'Saving...' : 'Save Results'}
+              </button>
+              <button
+                onClick={handleCompleteTest}
+                disabled={loading}
+                style={{
+                  background: loading ? '#ccc' : '#21AEA8',
+                  color: 'white',
+                  border: 'none',
+                  padding: '15px 30px',
+                  borderRadius: '6px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '16px',
+                  fontWeight: 'bold'
+                }}
+              >
+                {loading ? 'Completing...' : 'Complete & Submit'}
+              </button>
+            </>
+          ) : (
+            <div style={{
               padding: '15px 30px',
+              background: '#d1ecf1',
+              border: '1px solid #bee5eb',
               borderRadius: '6px',
-              cursor: loading ? 'not-allowed' : 'pointer',
+              color: '#0c5460',
               fontSize: '16px',
               fontWeight: 'bold'
-            }}
-          >
-            {loading ? 'Saving...' : 'Save Results'}
-          </button>
-          <button
-            onClick={handleCompleteTest}
-            disabled={loading}
-            style={{
-              background: loading ? '#ccc' : '#21AEA8',
-              color: 'white',
-              border: 'none',
-              padding: '15px 30px',
-              borderRadius: '6px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: '16px',
-              fontWeight: 'bold'
-            }}
-          >
-            {loading ? 'Completing...' : 'Complete & Submit'}
-          </button>
+            }}>
+              ✅ Test Completed - View Only
+            </div>
+          )}
         </div>
       </div>
     );
   };
 
   const renderReview = () => {
-    // Mock data for completed test results awaiting review
-    const pendingReviews = [
-      {
-        _id: 'result_1',
-        patientInfo: { firstName: 'Carlos', lastName: 'Rodriguez', age: 38, gender: 'Male' },
-        testDate: '2025-10-09T14:30:00Z',
-        services: ['Complete Blood Count (CBC)', 'Blood Chemistry Panel'],
-        status: 'pending-review',
-        isUrgent: false,
-        enteredBy: 'MedTech A. Cruz',
-        enteredAt: '2025-10-09T16:45:00Z'
-      },
-      {
-        _id: 'result_2',
-        patientInfo: { firstName: 'Elena', lastName: 'Gonzalez', age: 29, gender: 'Female' },
-        testDate: '2025-10-09T11:15:00Z',
-        services: ['Urinalysis', 'Pregnancy Test'],
-        status: 'pending-review',
-        isUrgent: true,
-        enteredBy: 'MedTech B. Silva',
-        enteredAt: '2025-10-09T13:20:00Z'
-      },
-      {
-        _id: 'result_3',
-        patientInfo: { firstName: 'Miguel', lastName: 'Torres', age: 52, gender: 'Male' },
-        testDate: '2025-10-09T09:00:00Z',
-        services: ['Lipid Profile', 'HbA1c'],
-        status: 'reviewed',
-        isUrgent: false,
-        enteredBy: 'MedTech C. Mendoza',
-        enteredAt: '2025-10-09T11:30:00Z',
-        reviewedBy: 'Pathologist Dr. Reyes',
-        reviewedAt: '2025-10-09T15:10:00Z'
-      }
-    ];
+    const formatDate = (dateString) => {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    };
 
-    const pendingCount = pendingReviews.filter(r => r.status === 'pending-review').length;
-    const reviewedCount = pendingReviews.filter(r => r.status === 'reviewed').length;
+    const getPatientName = (testResult) => {
+      if (testResult.patientInfo?.name) {
+        return testResult.patientInfo.name;
+      }
+      if (testResult.patient?.firstName && testResult.patient?.lastName) {
+        return `${testResult.patient.firstName} ${testResult.patient.lastName}`;
+      }
+      return testResult.patient || 'Unknown Patient';
+    };
+
+    const getPatientInfo = (testResult) => {
+      if (testResult.patientInfo) {
+        return {
+          name: testResult.patientInfo.name || 'Unknown',
+          age: testResult.patientInfo.age || 'N/A',
+          gender: testResult.patientInfo.gender || 'N/A'
+        };
+      }
+      return {
+        name: getPatientName(testResult),
+        age: 'N/A',
+        gender: 'N/A'
+      };
+    };
+
+    const handleApprove = async (testResult) => {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/test-results/${testResult._id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            status: 'approved',
+            reviewedDate: new Date().toISOString(),
+            reviewedBy: currentUser._id
+          })
+        });
+
+        if (response.ok) {
+          alert('Test result approved successfully!');
+          fetchCompletedTests();
+        } else {
+          throw new Error('Failed to approve test result');
+        }
+      } catch (error) {
+        console.error('Error approving test:', error);
+        alert('Failed to approve test result. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleReject = async (testResult) => {
+      const reason = prompt('Please provide a reason for rejecting this test result:');
+      if (!reason) return;
+
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/test-results/${testResult._id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            status: 'draft',
+            rejectionReason: reason,
+            rejectedDate: new Date().toISOString(),
+            rejectedBy: currentUser._id
+          })
+        });
+
+        if (response.ok && testResult.appointment) {
+          await fetch(`/api/appointments/${testResult.appointment}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: 'checked-in' })
+          });
+          
+          alert('Test result rejected and sent back to testing queue!');
+          fetchCompletedTests();
+        } else {
+          throw new Error('Failed to reject test result');
+        }
+      } catch (error) {
+        console.error('Error rejecting test:', error);
+        alert('Failed to reject test result. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const renderLabReportView = (testResult) => {
+      const patientInfo = getPatientInfo(testResult);
+      const results = testResult.results || {};
+      const testData = results instanceof Map ? Object.fromEntries(results) : results;
+
+      return (
+        <div style={{
+          background: 'white',
+          border: '1px solid #ddd',
+          borderRadius: '8px',
+          marginBottom: '20px',
+          overflow: 'hidden',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          {/* Header */}
+          <div style={{
+            background: 'linear-gradient(135deg, #21AEA8 0%, #1A8A85 100%)',
+            color: 'white',
+            padding: '20px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: '0 0 5px 0', fontSize: '18px' }}>MDLAB Diagnostic Laboratory</h3>
+                <p style={{ margin: '0', fontSize: '12px', opacity: 0.9 }}>
+                  DOH License: 02-93-25-CL-2 | Contact: 0927 850 7775
+                </p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ margin: '0', fontSize: '14px' }}>Lab Report</p>
+                <p style={{ margin: '0', fontSize: '12px', opacity: 0.9 }}>
+                  Date: {formatDate(testResult.completedDate || testResult.sampleDate)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Patient Info */}
+          <div style={{
+            padding: '15px 20px',
+            borderBottom: '2px solid #21AEA8',
+            background: '#f8f9fa'
+          }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+              <div><strong>Name:</strong> {patientInfo.name.toUpperCase()}</div>
+              <div><strong>Age:</strong> {patientInfo.age}</div>
+              <div><strong>Sex:</strong> {patientInfo.gender}</div>
+            </div>
+          </div>
+
+          {/* Test Results Content */}
+          <div style={{ padding: '20px' }}>
+            {/* Hematology */}
+            {(testData.hemoglobin || testData.hematocrit || testData.wbc || testData.rbc || testData.platelets) && (
+              <div style={{ marginBottom: '25px' }}>
+                <div style={{ background: '#21AEA8', color: 'white', padding: '8px 15px', fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>
+                  HEMATOLOGY
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: '#f1f3f4' }}>
+                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Test</th>
+                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>Result</th>
+                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>Normal Range</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {testData.hemoglobin && (
+                      <tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Hemoglobin</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.hemoglobin}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>110-160 g/L</td></tr>
+                    )}
+                    {testData.hematocrit && (
+                      <tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Hematocrit</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.hematocrit}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>37-54%</td></tr>
+                    )}
+                    {testData.rbc && (
+                      <tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>RBC</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.rbc}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>3.50-5.50 x10⁶/L</td></tr>
+                    )}
+                    {testData.platelets && (
+                      <tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Platelet count</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.platelets}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>150-450 x10³/L</td></tr>
+                    )}
+                    {testData.wbc && (
+                      <tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>WBC</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.wbc}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>4.0-10.0 x10³/L</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Blood Chemistry */}
+            {(testData.fbs || testData.cholesterol || testData.triglyceride || testData.bua || testData.bun || testData.creatinine) && (
+              <div style={{ marginBottom: '25px' }}>
+                <div style={{ background: '#21AEA8', color: 'white', padding: '8px 15px', fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>
+                  BLOOD CHEMISTRY/IMMUNOLOGY
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: '#f1f3f4' }}>
+                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Test</th>
+                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>Result</th>
+                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>Range</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {testData.fbs && (<tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Glucose</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.fbs}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>3.89-5.83 mmol/L</td></tr>)}
+                    {testData.cholesterol && (<tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Cholesterol</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.cholesterol}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>3.5-5.2 mmol/L</td></tr>)}
+                    {testData.triglyceride && (<tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Triglyceride</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.triglyceride}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>&lt;2.26 mmol/L</td></tr>)}
+                    {testData.bua && (<tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Uric acid</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.bua}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>156-360 umol/L</td></tr>)}
+                    {testData.bun && (<tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>BUN</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.bun}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>1.7-8.3 mmol/L</td></tr>)}
+                    {testData.creatinine && (<tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Creatinine</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.creatinine}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>53-97 umol/L</td></tr>)}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Urinalysis */}
+            {(testData.urine_color || testData.urine_transparency || testData.urine_ph || testData.urine_specific_gravity) && (
+              <div style={{ marginBottom: '25px' }}>
+                <div style={{ background: '#21AEA8', color: 'white', padding: '8px 15px', fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>
+                  URINALYSIS
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: '#f1f3f4' }}>
+                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Test</th>
+                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>Result</th>
+                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Test</th>
+                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>Result</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>Color</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.urine_color || 'Yellow'}</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>Protein</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.urine_protein || 'Negative'}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>Transparency</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.urine_transparency || 'Clear'}</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>Glucose</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.urine_glucose || 'Negative'}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>pH</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.urine_ph || '6.0'}</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>WBC</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>15-20/hpf</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pregnancy Test */}
+            {testData.pregnancy_test && (
+              <div style={{ marginBottom: '25px' }}>
+                <div style={{ background: '#FFD700', color: '#333', padding: '8px 15px', fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>
+                  CLINICAL MICROSCOPY
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ border: '1px solid #ddd', padding: '8px', fontWeight: 'bold' }}>PREGNANCY TESTS</td>
+                      <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{testData.pregnancy_test}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Remarks */}
+            {testData.remarks && (
+              <div style={{ marginBottom: '20px' }}>
+                <strong>Others:</strong>
+                <p style={{ margin: '5px 0', padding: '10px', background: '#f8f9fa', borderRadius: '4px' }}>
+                  {testData.remarks}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{
+            background: '#f8f9fa',
+            padding: '15px 20px',
+            borderTop: '1px solid #ddd',
+            display: 'flex',
+            gap: '15px',
+            justifyContent: 'flex-end'
+          }}>
+            <button
+              onClick={() => handleReject(testResult)}
+              disabled={loading}
+              style={{
+                background: '#dc3545',
+                color: 'white',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '4px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontWeight: 'bold'
+              }}
+            >
+              {loading ? 'Processing...' : 'Reject & Return to Queue'}
+            </button>
+            <button
+              onClick={() => handleApprove(testResult)}
+              disabled={loading}
+              style={{
+                background: '#28a745',
+                color: 'white',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '4px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontWeight: 'bold'
+              }}
+            >
+              {loading ? 'Processing...' : 'Approve Result'}
+            </button>
+          </div>
+        </div>
+      );
+    };
 
     return (
       <div style={{ padding: '20px' }}>
-        <div style={{ marginBottom: '30px' }}>
-          <h2 style={{ color: '#21AEA8', marginBottom: '10px' }}>Review Test Results</h2>
-          <p style={{ color: '#666', marginBottom: '20px' }}>
-            Review and validate test results before final approval
+        <div style={{ marginBottom: '20px' }}>
+          <h2 style={{ margin: '0 0 10px 0' }}>Review Completed Tests</h2>
+          <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>
+            Review test results completed by medical technologists and approve or reject them
           </p>
-          
-          {/* Review Stats */}
-          <div style={{ display: 'flex', gap: '20px', marginBottom: '30px' }}>
-            <div style={{ 
-              background: '#FFF3CD', 
-              border: '1px solid #FFEAA7', 
-              borderRadius: '8px', 
-              padding: '15px', 
-              flex: 1 
-            }}>
-              <h4 style={{ margin: '0 0 5px 0', color: '#856404' }}>Pending Review</h4>
-              <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#856404' }}>
-                {pendingCount}
-              </p>
-            </div>
-            <div style={{ 
-              background: '#D4EDDA', 
-              border: '1px solid #C3E6CB', 
-              borderRadius: '8px', 
-              padding: '15px', 
-              flex: 1 
-            }}>
-              <h4 style={{ margin: '0 0 5px 0', color: '#155724' }}>Reviewed Today</h4>
-              <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#155724' }}>
-                {reviewedCount}
-              </p>
-            </div>
+        </div>
+
+        {reviewLoading ? (
+          <div style={{ textAlign: 'center', padding: '40px' }}>
+            <p>Loading completed tests...</p>
           </div>
-        </div>
-
-        {/* Pending Reviews Section */}
-        <div style={{ marginBottom: '40px' }}>
-          <h3 style={{ color: '#21AEA8', marginBottom: '20px', borderBottom: '2px solid #21AEA8', paddingBottom: '10px' }}>
-            Pending Reviews ({pendingCount})
-          </h3>
-          
-          {pendingReviews.filter(r => r.status === 'pending-review').length === 0 ? (
-            <p style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
-              No test results pending review
-            </p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              {pendingReviews.filter(r => r.status === 'pending-review').map(result => (
-                <div key={result._id} style={{
-                  border: `2px solid ${result.isUrgent ? '#DC3545' : '#DEE2E6'}`,
-                  borderRadius: '8px',
-                  padding: '20px',
-                  background: result.isUrgent ? '#FFF5F5' : 'white'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
-                    <div>
-                      <h4 style={{ margin: '0 0 5px 0', color: '#333' }}>
-                        {result.patientInfo.firstName} {result.patientInfo.lastName}
-                        {result.isUrgent && <span style={{ color: '#DC3545', marginLeft: '10px', fontSize: '12px', fontWeight: 'bold' }}>URGENT</span>}
-                      </h4>
-                      <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>
-                        {result.patientInfo.age} years old, {result.patientInfo.gender}
-                      </p>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ margin: '0', fontSize: '12px', color: '#666' }}>
-                        Test Date: {new Date(result.testDate).toLocaleDateString()}
-                      </p>
-                      <p style={{ margin: '0', fontSize: '12px', color: '#666' }}>
-                        Entered by: {result.enteredBy}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div style={{ marginBottom: '15px' }}>
-                    <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#333' }}>Tests:</p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                      {result.services.map((service, index) => (
-                        <span key={index} style={{
-                          background: '#E3F2FD',
-                          color: '#1976D2',
-                          padding: '4px 12px',
-                          borderRadius: '20px',
-                          fontSize: '12px'
-                        }}>
-                          {service}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                    <button style={{
-                      background: '#6C757D',
-                      color: 'white',
-                      border: 'none',
-                      padding: '8px 16px',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '14px'
-                    }}>
-                      View Results
-                    </button>
-                    <button style={{
-                      background: '#DC3545',
-                      color: 'white',
-                      border: 'none',
-                      padding: '8px 16px',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '14px'
-                    }}>
-                      Request Revision
-                    </button>
-                    <button style={{
-                      background: '#21AEA8',
-                      color: 'white',
-                      border: 'none',
-                      padding: '8px 16px',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '14px'
-                    }}>
-                      Approve
-                    </button>
-                  </div>
-                </div>
-              ))}
+        ) : completedTests.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+            <p>No completed tests awaiting review</p>
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom: '20px' }}>
+              <span style={{ color: '#666', fontSize: '14px' }}>
+                {completedTests.length} test result{completedTests.length !== 1 ? 's' : ''} ready for review
+              </span>
             </div>
-          )}
-        </div>
 
-        {/* Reviewed Results Section */}
-        <div>
-          <h3 style={{ color: '#21AEA8', marginBottom: '20px', borderBottom: '2px solid #21AEA8', paddingBottom: '10px' }}>
-            Recently Reviewed ({reviewedCount})
-          </h3>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            {pendingReviews.filter(r => r.status === 'reviewed').map(result => (
-              <div key={result._id} style={{
-                border: '1px solid #28A745',
-                borderRadius: '8px',
-                padding: '20px',
-                background: '#F8FFF9'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
-                  <div>
-                    <h4 style={{ margin: '0 0 5px 0', color: '#333' }}>
-                      {result.patientInfo.firstName} {result.patientInfo.lastName}
-                      <span style={{ color: '#28A745', marginLeft: '10px', fontSize: '12px', fontWeight: 'bold' }}>✓ APPROVED</span>
-                    </h4>
-                    <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>
-                      {result.patientInfo.age} years old, {result.patientInfo.gender}
-                    </p>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <p style={{ margin: '0', fontSize: '12px', color: '#666' }}>
-                      Reviewed by: {result.reviewedBy}
-                    </p>
-                    <p style={{ margin: '0', fontSize: '12px', color: '#666' }}>
-                      Reviewed: {new Date(result.reviewedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-                
-                <div style={{ marginBottom: '15px' }}>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {result.services.map((service, index) => (
-                      <span key={index} style={{
-                        background: '#E8F5E8',
-                        color: '#28A745',
-                        padding: '4px 12px',
-                        borderRadius: '20px',
-                        fontSize: '12px'
-                      }}>
-                        {service}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                  <button style={{
-                    background: '#6C757D',
-                    color: 'white',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}>
-                    View Report
-                  </button>
-                </div>
+            {/* Remove duplicates by using a Set based on patient name and test type */}
+            {[...new Map(completedTests.map(test => [`${getPatientName(test)}-${test.testType}`, test])).values()]
+              .map((testResult) => (
+              <div key={testResult._id}>
+                {renderLabReportView(testResult)}
               </div>
             ))}
-          </div>
-        </div>
+          </>
+        )}
       </div>
     );
   };
@@ -3861,13 +4133,6 @@ function MedTechDashboard({ currentUser, onLogout }) {
         </div>
         
         <nav className="dashboard-sidebar-nav">
-          <div 
-            className={`dashboard-nav-item ${activeSection === 'dashboard' ? 'active' : ''}`}
-            onClick={() => handleSectionClick('dashboard')}
-          >
-            <span className="dashboard-nav-text">Dashboard</span>
-          </div>
-
           <div 
             className={`dashboard-nav-item ${activeSection === 'testing-queue' ? 'active' : ''}`}
             onClick={() => handleSectionClick('testing-queue')}
@@ -3887,56 +4152,6 @@ function MedTechDashboard({ currentUser, onLogout }) {
             onClick={() => handleSectionClick('review')}
           >
             <span className="dashboard-nav-text">Review</span>
-          </div>
-
-          <div className="dashboard-dropdown">
-            <div className="dashboard-nav-item-header" onClick={toggleSampleManagement}>
-              <div className="dashboard-nav-item-main">
-                <span className="dashboard-nav-text">Sample Management</span>
-              </div>
-              <span className={`dashboard-dropdown-arrow ${sampleManagementOpen ? 'open' : ''}`}>▼</span>
-            </div>
-            {sampleManagementOpen && (
-              <div className="dashboard-nav-submenu">
-                <div 
-                  className={`dashboard-nav-subitem ${activeSection === 'sample-collection' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('sample-collection')}
-                >
-                  Sample Collection
-                </div>
-                <div 
-                  className={`dashboard-nav-subitem ${activeSection === 'sample-tracking' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('sample-tracking')}
-                >
-                  Sample Tracking
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="dashboard-dropdown">
-            <div className="dashboard-nav-item-header" onClick={toggleTesting}>
-              <div className="dashboard-nav-item-main">
-                <span className="dashboard-nav-text">Testing & Results</span>
-              </div>
-              <span className={`dashboard-dropdown-arrow ${testingOpen ? 'open' : ''}`}>▼</span>
-            </div>
-            {testingOpen && (
-              <div className="dashboard-nav-submenu">
-                <div 
-                  className={`dashboard-nav-subitem ${activeSection === 'result-entry' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('result-entry')}
-                >
-                  Result Entry
-                </div>
-                <div 
-                  className={`dashboard-nav-subitem ${activeSection === 'quality-control' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('quality-control')}
-                >
-                  Quality Control
-                </div>
-              </div>
-            )}
           </div>
         </nav>
 
