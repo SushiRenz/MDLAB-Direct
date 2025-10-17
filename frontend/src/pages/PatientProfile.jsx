@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
+import { calculateAge, formatAge, formatDate } from '../utils/dateUtils';
 import '../design/PatientDashboard.css';
 
 function PatientProfile({ user, onProfileUpdate }) {
@@ -286,6 +287,10 @@ function PatientProfile({ user, onProfileUpdate }) {
               <div className="field-value">{`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Not provided'}</div>
             </div>
             <div className="field-item">
+              <label>Patient ID</label>
+              <div className="field-value patient-id">{user?.patientId || 'Not assigned'}</div>
+            </div>
+            <div className="field-item">
               <label>Email Address</label>
               <div className="field-value">{user?.email || 'Not provided'}</div>
             </div>
@@ -320,9 +325,24 @@ function PatientProfile({ user, onProfileUpdate }) {
                 />
               ) : (
                 <div className="field-value">
-                  {profileData.dateOfBirth || 'Not provided'}
+                  {profileData.dateOfBirth ? formatDate(profileData.dateOfBirth) : 'Not provided'}
                 </div>
               )}
+            </div>
+          </div>
+
+          <div className="field-group">
+            <div className="field-item">
+              <label>Age</label>
+              <div className="field-value">
+                {(() => {
+                  // Try to use age from user object first, then calculate from dateOfBirth
+                  const age = user?.age !== null && user?.age !== undefined 
+                    ? user.age 
+                    : calculateAge(user?.dateOfBirth);
+                  return formatAge(age);
+                })()}
+              </div>
             </div>
           </div>
 

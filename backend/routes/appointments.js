@@ -64,6 +64,11 @@ router.post('/',
       .withMessage('Please provide a valid email address')
       .normalizeEmail(),
     
+    body('address')
+      .optional()
+      .isLength({ max: 200 })
+      .withMessage('Address cannot exceed 200 characters'),
+    
     body('age')
       .optional()
       .custom((value) => {

@@ -104,14 +104,14 @@ const getAppointments = asyncHandler(async (req, res) => {
 
     // Execute query with population
     const appointments = await Appointment.find(query)
-      .populate('patient', 'name email phone')
+      .populate('patient', 'firstName lastName email phone address dateOfBirth gender')
       .populate('service', 'serviceName price category')
       .populate('services', 'serviceName price category')
-      .populate('createdBy', 'name role')
-      .populate('checkedInBy', 'name role')
-      .populate('checkedOutBy', 'name role')
-      .populate('assignedMedTech', 'name')
-      .populate('assignedPathologist', 'name')
+      .populate('createdBy', 'firstName lastName role')
+      .populate('checkedInBy', 'firstName lastName role')
+      .populate('checkedOutBy', 'firstName lastName role')
+      .populate('assignedMedTech', 'firstName lastName')
+      .populate('assignedPathologist', 'firstName lastName')
       .sort(sort)
       .skip(skip)
       .limit(limitNum);
@@ -153,14 +153,14 @@ const getAppointments = asyncHandler(async (req, res) => {
 const getAppointment = asyncHandler(async (req, res) => {
   try {
     const appointment = await Appointment.findById(req.params.id)
-      .populate('patient', 'name email phone address dateOfBirth gender')
+      .populate('patient', 'firstName lastName email phone address dateOfBirth gender')
       .populate('service', 'serviceName price category description')
       .populate('services', 'serviceName price category description')
-      .populate('createdBy', 'name role')
-      .populate('checkedInBy', 'name role')
-      .populate('checkedOutBy', 'name role')
-      .populate('assignedMedTech', 'name email')
-      .populate('assignedPathologist', 'name email')
+      .populate('createdBy', 'firstName lastName role')
+      .populate('checkedInBy', 'firstName lastName role')
+      .populate('checkedOutBy', 'firstName lastName role')
+      .populate('assignedMedTech', 'firstName lastName email')
+      .populate('assignedPathologist', 'firstName lastName email')
       .populate('billId');
 
     if (!appointment) {
@@ -197,21 +197,35 @@ const getAppointment = asyncHandler(async (req, res) => {
 // @route   POST /api/appointments
 // @access  Private (Admin, Receptionist, Patient)
 const createAppointment = asyncHandler(async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    console.log('❌ Validation errors:', JSON.stringify(errors.array(), null, 2));
-    console.log('📦 Request body keys:', Object.keys(req.body));
-    console.log('📦 Request body serviceIds:', req.body.serviceIds);
-    console.log('📦 ServiceIds type:', typeof req.body.serviceIds);
-    console.log('� ServiceIds isArray:', Array.isArray(req.body.serviceIds));
-    if (req.body.serviceIds) {
-      console.log('📦 ServiceIds length:', req.body.serviceIds.length);
-      console.log('📦 First few serviceIds:', req.body.serviceIds.slice(0, 3));
+  try {
+    console.log('🚀 APPOINTMENT CREATION STARTED');
+    console.log('   User:', req.user ? `${req.user.firstName} ${req.user.lastName} (${req.user.role})` : 'No user');
+    console.log('   Request method:', req.method);
+    console.log('   Request URL:', req.originalUrl);
+    
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      console.log('❌ Validation errors:', JSON.stringify(errors.array(), null, 2));
+      console.log('📦 Request body keys:', Object.keys(req.body));
+      console.log('📦 Request body serviceIds:', req.body.serviceIds);
+      console.log('📦 ServiceIds type:', typeof req.body.serviceIds);
+      console.log('📦 ServiceIds isArray:', Array.isArray(req.body.serviceIds));
+      if (req.body.serviceIds) {
+        console.log('📦 ServiceIds length:', req.body.serviceIds.length);
+        console.log('📦 First few serviceIds:', req.body.serviceIds.slice(0, 3));
+      }
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
     }
-    return res.status(400).json({
+  } catch (preValidationError) {
+    console.error('❌ PRE-VALIDATION ERROR:', preValidationError);
+    return res.status(500).json({
       success: false,
-      message: 'Validation failed',
-      errors: errors.array()
+      message: 'Internal server error during validation',
+      error: process.env.NODE_ENV === 'development' ? preValidationError.message : 'Server error'
     });
   }
 
@@ -220,6 +234,7 @@ const createAppointment = asyncHandler(async (req, res) => {
     patientName,
     contactNumber,
     email,
+    address,
     age,
     sex,
     serviceId,
@@ -233,6 +248,19 @@ const createAppointment = asyncHandler(async (req, res) => {
     reasonForVisit,
     totalPrice // New field for total price
   } = req.body;
+
+  // Debug logging for patient appointments
+  if (req.user && req.user.role === 'patient') {
+    console.log('🧑‍⚕️ PATIENT APPOINTMENT DEBUG:');
+    console.log('   User ID:', req.user._id);
+    console.log('   User role:', req.user.role);
+    console.log('   Request body keys:', Object.keys(req.body));
+    console.log('   Patient ID in request:', patientId);
+    console.log('   Patient name:', patientName);
+    console.log('   Age:', age, '(type:', typeof age, ')');
+    console.log('   Sex:', sex, '(type:', typeof sex, ')');
+    console.log('   Address:', address, '(type:', typeof address, ')');
+  }
 
   try {
     // Handle both single service (backward compatibility) and multiple services
@@ -274,11 +302,21 @@ const createAppointment = asyncHandler(async (req, res) => {
     // Verify patient exists if patientId provided
     let patient = null;
     if (patientId) {
-      patient = await User.findById(patientId);
-      if (!patient) {
-        return res.status(404).json({
+      try {
+        patient = await User.findById(patientId);
+        if (!patient) {
+          console.log('❌ Patient not found with ID:', patientId);
+          return res.status(404).json({
+            success: false,
+            message: 'Patient not found'
+          });
+        }
+        console.log('✅ Patient found:', patient.firstName, patient.lastName);
+      } catch (patientError) {
+        console.error('❌ Error finding patient:', patientError);
+        return res.status(400).json({
           success: false,
-          message: 'Patient not found'
+          message: 'Invalid patient ID format'
         });
       }
     }
@@ -315,14 +353,18 @@ const createAppointment = asyncHandler(async (req, res) => {
     // For multiple services or walk-in patients, allow all appointments
     // Medical labs can handle multiple appointments per day
 
-    // Create appointment
+    // Create appointment with improved data handling
     const appointmentData = {
       patient: patientId || null,
-      patientName: patientName || patient?.name,
-      contactNumber: contactNumber || patient?.phone,
-      email: email || patient?.email,
-      age: age ? parseInt(age) : null,
-      sex: sex || null,
+      patientName: patientName || (patient ? `${patient.firstName} ${patient.lastName}` : ''),
+      contactNumber: contactNumber || patient?.phone || '',
+      email: email || patient?.email || '',
+      address: address || (patient?.address ? 
+        (typeof patient.address === 'string' ? patient.address : 
+         [patient.address.street, patient.address.city, patient.address.province, patient.address.zipCode]
+         .filter(Boolean).join(', ')) : ''),
+      age: age ? parseInt(age) : (patient?.age || null),
+      sex: sex || (patient?.gender ? patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1).toLowerCase() : null),
       serviceName: combinedServiceName,
       appointmentDate: appointmentDateOnly, // Use the properly formatted date
       appointmentTime,
@@ -336,6 +378,18 @@ const createAppointment = asyncHandler(async (req, res) => {
       createdByName: `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.username || 'System',
       status: type === 'walk-in' ? 'walk-in' : 'pending'
     };
+
+    // Enhanced debugging for appointment data
+    console.log('📝 APPOINTMENT DATA CONSTRUCTION:');
+    console.log('   Raw age from request:', age, 'Type:', typeof age);
+    console.log('   Patient age (calculated):', patient?.age);
+    console.log('   Final age:', appointmentData.age);
+    console.log('   Raw sex from request:', sex);
+    console.log('   Patient gender:', patient?.gender);
+    console.log('   Final sex:', appointmentData.sex);
+    console.log('   Raw address from request:', address);
+    console.log('   Patient address:', patient?.address);
+    console.log('   Final address:', appointmentData.address);
 
     // Add services (support both single and multiple)
     if (services.length === 1) {
@@ -357,7 +411,7 @@ const createAppointment = asyncHandler(async (req, res) => {
     const populatedAppointment = await Appointment.findById(appointment._id)
       .populate('service', 'serviceName price category')
       .populate('services', 'serviceName price category')
-      .populate('createdBy', 'name role');
+      .populate('createdBy', 'firstName lastName role');
 
     res.status(201).json({
       success: true,
@@ -365,7 +419,12 @@ const createAppointment = asyncHandler(async (req, res) => {
       data: populatedAppointment
     });
   } catch (error) {
-    console.error('Create appointment error:', error);
+    console.error('❌ APPOINTMENT CREATION ERROR:');
+    console.error('   Error message:', error.message);
+    console.error('   Error stack:', error.stack);
+    console.error('   Request body:', JSON.stringify(req.body, null, 2));
+    console.error('   User info:', req.user ? `${req.user.firstName} ${req.user.lastName} (${req.user.role})` : 'No user');
+    
     res.status(500).json({
       success: false,
       message: 'Failed to create appointment',

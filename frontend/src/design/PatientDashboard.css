@@ -1387,6 +1387,19 @@
   border-bottom: 1px solid #f0f0f0;
 }
 
+.field-value.patient-id {
+  background: linear-gradient(135deg, #21AEA8 0%, #179e93 100%);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  letter-spacing: 1px;
+  border-bottom: none;
+  display: inline-block;
+  box-shadow: 0 2px 8px rgba(33, 174, 168, 0.3);
+}
+
 /* Profile Form Input Styles */
 .field-item input,
 .field-item select {

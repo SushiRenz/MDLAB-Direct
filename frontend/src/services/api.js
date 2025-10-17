@@ -1,12 +1,31 @@
 import axios from 'axios';
 
-// Create axios instance with base configuration
+// Dynamic API base URL configuration for network access
+const getApiBaseUrl = () => {
+  const hostname = window.location.hostname;
+  
+  // If accessing via IP address (network access), use that IP for API
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    return `http://${hostname}:5000/api`;
+  }
+  
+  // Default to localhost for local development
+  return 'http://localhost:5000/api';
+};
+
+// Create axios instance with dynamic base configuration
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: getApiBaseUrl(),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// Log the API configuration for debugging
+console.log('🌐 API Service Configuration:', {
+  hostname: window.location.hostname,
+  baseURL: getApiBaseUrl()
 });
 
 // Request interceptor to add auth token

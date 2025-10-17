@@ -148,6 +148,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     patientName: '',
     contactNumber: '',
     email: '',
+    address: '',
     age: '',
     sex: ''
   });
@@ -483,6 +484,11 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
         
         alert(`${appointmentType === 'scheduled' ? 'Scheduled' : appointmentType === 'follow-up' ? 'Follow-up' : 'Emergency'} appointment scheduled successfully for ${response.data.patientName}!`);
         
+        // Refresh appointments list to show new appointment immediately
+        if (typeof fetchAppointments === 'function') {
+          fetchAppointments();
+        }
+        
         // Update dashboard stats
         fetchReceptionistDashboardData();
       } else {
@@ -645,6 +651,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
         patientName: patientData.patientName,
         contactNumber: patientData.contactNumber,
         email: patientData.email,
+        address: patientData.address,
         age: patientData.age ? parseInt(patientData.age) : null,
         sex: patientData.sex,
         serviceIds: serviceIds, 
@@ -712,6 +719,11 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
           sex: ''
         });
         
+        // Refresh appointments list to ensure data is up-to-date
+        if (typeof fetchAppointments === 'function') {
+          fetchAppointments();
+        }
+        
         alert(`Appointment scheduled successfully!\n\nPatient: ${patientData.patientName}\nTests: ${serviceNames.join(', ')}\nAppointment ID: ${newAppointment.appointmentId}\nTotal: ₱${totalPrice}`);
       } else {
         console.error('❌ Appointment creation failed:', response.message);
@@ -765,6 +777,11 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
         });
         
         alert(`Appointment scheduled successfully for ${response.data.patientName}!`);
+        
+        // Refresh appointments list to show new appointment immediately
+        if (typeof fetchAppointments === 'function') {
+          fetchAppointments();
+        }
         
         // Update dashboard stats
         fetchReceptionistDashboardData();
@@ -1285,11 +1302,20 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                     placeholder="patient@email.com"
                   />
                 </div>
+                <div className="receptionist-form-group">
+                  <label>Address</label>
+                  <input
+                    type="text"
+                    value={patientData.address}
+                    onChange={(e) => setPatientData({...patientData, address: e.target.value})}
+                    placeholder="Patient address"
+                  />
+                </div>
               </div>
               
               <div className="receptionist-form-row">
                 <div className="receptionist-form-group">
-                  <label>Age *</label>
+                  <label>Age</label>
                   <input
                     type="number"
                     value={patientData.age}
@@ -1305,7 +1331,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                   />
                 </div>
                 <div className="receptionist-form-group">
-                  <label>Sex *</label>
+                  <label>Sex</label>
                   <select
                     value={patientData.sex}
                     onChange={(e) => setPatientData({...patientData, sex: e.target.value})}
@@ -1336,8 +1362,8 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                 <button 
                   className="receptionist-btn-primary"
                   onClick={() => {
-                    if (!patientData.patientName || !patientData.contactNumber || !patientData.email || !patientData.age || !patientData.sex) {
-                      alert('Please fill in all patient information fields.');
+                    if (!patientData.patientName || !patientData.contactNumber || !patientData.email) {
+                      alert('Please fill in all required patient information (name, contact, email) before scheduling appointments.');
                       return;
                     }
                     // Patient info is collected, now proceed to appointment booking
@@ -1358,7 +1384,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
         onClose={() => {
           setShowScheduleModal(false);
           setShowAppointmentBooking(false);
-          setPatientData({ patientName: '', contactNumber: '', email: '', age: '', sex: '' });
+          setPatientData({ patientName: '', contactNumber: '', email: '', address: '', age: '', sex: '' });
         }}
         onSubmit={handleReceptionistAppointmentSubmit}
         availableServices={services}
@@ -1384,7 +1410,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                     <p><strong>Contact:</strong> {selectedAppointmentDetails.contactNumber}</p>
                     <p><strong>Email:</strong> {selectedAppointmentDetails.email || 'Not provided'}</p>
                     <p><strong>Age:</strong> {selectedAppointmentDetails.age || 'Not provided'}</p>
-                    <p><strong>Gender:</strong> {selectedAppointmentDetails.gender || 'Not provided'}</p>
+                    <p><strong>Gender:</strong> {selectedAppointmentDetails.sex || 'Not provided'}</p>
                     <p><strong>Address:</strong> {selectedAppointmentDetails.address || 'Not provided'}</p>
                   </div>
                 </div>

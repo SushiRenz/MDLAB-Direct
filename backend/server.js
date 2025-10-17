@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const os = require('os');
 require('dotenv').config();
 
 // Import routes
@@ -22,6 +23,21 @@ const errorHandler = require('./middleware/errorHandler');
 
 // Import models for session management
 const User = require('./models/User');
+
+// Get local IP address for display and MongoDB connection
+const getLocalIP = () => {
+  const interfaces = os.networkInterfaces();
+  for (const devName in interfaces) {
+    const iface = interfaces[devName];
+    for (let i = 0; i < iface.length; i++) {
+      const alias = iface[i];
+      if (alias.family === 'IPv4' && alias.address !== '127.0.0.1' && !alias.internal) {
+        return alias.address;
+      }
+    }
+  }
+  return 'localhost';
+};
 
 const app = express();
 
@@ -189,9 +205,28 @@ app.use('*', (req, res) => {
 // Error handling middleware
 app.use(errorHandler);
 
-// MongoDB connection with better error handling and reconnection
-const mongoURI = process.env.MONGODB_URI;
-console.log('MONGODB_URI:', process.env.MONGODB_URI);
+// MongoDB connection with better error handling and network support
+const getMongoURI = () => {
+  const baseURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/MDLAB_DIRECT';
+  
+  // If we're running in network mode (backend accessible from network IP), 
+  // we need to ensure MongoDB URI uses the correct address
+  const localIP = getLocalIP();
+  
+  // If the backend is accessed via network IP, try to use that for MongoDB too
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`🔍 Network IP detected: ${localIP}`);
+    console.log(`📝 Original MongoDB URI: ${baseURI}`);
+    
+    // For network access, we'll try multiple URIs if needed
+    return baseURI;
+  }
+  
+  return baseURI;
+};
+
+const mongoURI = getMongoURI();
+console.log('🔗 Using MongoDB URI:', mongoURI);
 
 // Enhanced MongoDB connection options
 const mongoOptions = {
@@ -203,23 +238,46 @@ const mongoOptions = {
   family: 4 // Use IPv4, skip trying IPv6
 };
 
-mongoose.connect(mongoURI, mongoOptions)
-  .then(() => {
+// Smart MongoDB connection with fallback
+const connectMongoDB = async () => {
+  try {
+    await mongoose.connect(mongoURI, mongoOptions);
     console.log('✅ MongoDB connected successfully');
-  })
-  .catch(err => {
+  } catch (err) {
     console.error('❌ MongoDB connection failed:', err);
-    console.log('🔄 Retrying MongoDB connection in 5 seconds...');
     
-    // Don't exit in development, try to reconnect
+    // In development, try alternative connection approaches
     if (process.env.NODE_ENV === 'development') {
+      console.log('🔄 Trying alternative MongoDB connection methods...');
+      
+      // Try with network IP if available
+      const localIP = getLocalIP();
+      if (localIP && localIP !== 'localhost' && mongoURI.includes('localhost')) {
+        const networkURI = mongoURI.replace('localhost', localIP);
+        console.log(`🌐 Attempting network URI: ${networkURI}`);
+        
+        try {
+          await mongoose.connect(networkURI, mongoOptions);
+          console.log('✅ MongoDB connected via network URI');
+          return;
+        } catch (networkErr) {
+          console.error('❌ Network URI connection failed:', networkErr.message);
+        }
+      }
+      
+      // Retry with original URI
+      console.log('🔄 Retrying original MongoDB connection in 5 seconds...');
       setTimeout(() => {
-        mongoose.connect(mongoURI, mongoOptions);
+        connectMongoDB();
       }, 5000);
     } else {
       process.exit(1);
     }
-  });
+  }
+};
+
+// Initial connection attempt
+connectMongoDB();
 
 // MongoDB connection event handlers
 mongoose.connection.on('connected', () => {
@@ -309,16 +367,25 @@ process.on('uncaughtException', (err) => {
 });
 
 const PORT = process.env.PORT || 5000;
+const HOST = process.env.HOST || '0.0.0.0'; // Listen on all network interfaces
+
+const localIP = getLocalIP();
 
 // Enhanced server configuration
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`
 🚀 MDLAB Direct Backend Server is running!
 📍 Environment: ${process.env.NODE_ENV || 'development'}
-🌐 Port: ${PORT}
-🔗 API Base URL: http://localhost:${PORT}/api
-📊 Health Check: http://localhost:${PORT}/api/health
+🌐 Host: ${HOST} (Listening on all network interfaces)
+🔌 Port: ${PORT}
+�️  Local Access: http://localhost:${PORT}/api
+🌍 Network Access: http://${localIP}:${PORT}/api
+📊 Health Check: http://${localIP}:${PORT}/api/health
 💾 MongoDB: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Connecting...'}
+
+📱 Access from other devices on your network:
+   Frontend: http://${localIP}:5173
+   Backend API: http://${localIP}:${PORT}/api
   `);
 });
 

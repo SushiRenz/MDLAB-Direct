@@ -431,6 +431,15 @@ function PatientDashboard(props) {
         patientName: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.name || 'Patient',
         contactNumber: currentUser.phone || currentUser.contactNumber || '09123456789',
         email: currentUser.email || '',
+        address: currentUser.address?.street || currentUser.address || '',
+        age: currentUser.age || null,
+        sex: (() => {
+          const userGender = currentUser.gender || currentUser.sex || null;
+          if (!userGender) return null;
+          
+          // Capitalize first letter to match validation requirements
+          return userGender.charAt(0).toUpperCase() + userGender.slice(1).toLowerCase();
+        })(),
         serviceIds: testIds, // Array of service IDs
         serviceName: testNames, // Combined service names
         appointmentDate: localDateString,
@@ -442,6 +451,12 @@ function PatientDashboard(props) {
         reasonForVisit: `Multiple tests - Patient self-booking (${selectedTests.length} tests)`
       };
 
+      console.log('🧑‍⚕️ PATIENT APPOINTMENT DEBUG - Frontend:');
+      console.log('   Current user data:', currentUser);
+      console.log('   User age:', currentUser.age);
+      console.log('   User gender/sex (raw):', currentUser.gender, currentUser.sex);
+      console.log('   User gender/sex (processed):', apiAppointmentData.sex);
+      console.log('   User address:', currentUser.address);
       console.log('Creating single appointment with data:', apiAppointmentData);
       
       const response = await appointmentAPI.createAppointment(apiAppointmentData);
@@ -467,6 +482,11 @@ function PatientDashboard(props) {
         // Add new appointment to the state
         setAppointments([...appointments, newAppointment]);
         setIsBookingModalOpen(false);
+        
+        // Refresh appointments list to ensure data is up-to-date
+        if (typeof fetchAppointments === 'function') {
+          fetchAppointments();
+        }
         
         alert(`Appointment booked successfully! Your appointment ID is: ${newAppointment.appointmentId}. Services: ${testNames}`);
       } else {

@@ -24,6 +24,21 @@ const appointmentSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  address: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  age: {
+    type: Number,
+    min: 1,
+    max: 120
+  },
+  sex: {
+    type: String,
+    enum: ['Male', 'Female'],
+    trim: true
+  },
   service: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Service',

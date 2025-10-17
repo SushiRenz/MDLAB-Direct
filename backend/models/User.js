@@ -47,7 +47,19 @@ const userSchema = new mongoose.Schema({
     trim: true,
     maxlength: [50, 'Last name cannot exceed 50 characters']
   },
-    profilePic: {
+  patientId: {
+    type: String,
+    unique: true,
+    sparse: true, // Only enforce uniqueness for non-null values (patients only)
+    default: function() {
+      // Only generate patient ID for patients
+      if (this.role === 'patient') {
+        return 'P' + Date.now().toString().slice(-6) + Math.random().toString(36).substr(2, 3).toUpperCase();
+      }
+      return null;
+    }
+  },
+  profilePic: {
     type: String,  
     default: null
   },
@@ -106,6 +118,7 @@ const userSchema = new mongoose.Schema({
 }, {
   timestamps: true,
   toJSON: {
+    virtuals: true,
     transform: function(doc, ret) {
       ret.id = ret._id;
       delete ret._id;
@@ -131,6 +144,22 @@ userSchema.virtual('fullName').get(function() {
   return `${this.firstName} ${this.lastName}`;
 });
 
+// Virtual for age calculation
+userSchema.virtual('age').get(function() {
+  if (!this.dateOfBirth) return null;
+  
+  const today = new Date();
+  const birthDate = new Date(this.dateOfBirth);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  
+  return age;
+});
+
 // Virtual for account lock status
 userSchema.virtual('isLocked').get(function() {
   // Never lock accounts in development
@@ -140,12 +169,35 @@ userSchema.virtual('isLocked').get(function() {
   return !!(this.lockUntil && this.lockUntil > Date.now());
 });
 
-// Pre-save middleware to hash password
+// Pre-save middleware to hash password and generate patient ID
 userSchema.pre('save', async function(next) {
-  // Only hash the password if it has been modified (or is new)
-  if (!this.isModified('passwordHash')) return next();
-
   try {
+    // Generate patient ID for patients if not exists
+    if (this.role === 'patient' && !this.patientId) {
+      let patientId;
+      let isUnique = false;
+      let attempts = 0;
+      
+      // Generate unique patient ID
+      while (!isUnique && attempts < 10) {
+        patientId = 'P' + Date.now().toString().slice(-6) + Math.random().toString(36).substr(2, 3).toUpperCase();
+        const existingUser = await this.constructor.findOne({ patientId });
+        if (!existingUser) {
+          isUnique = true;
+        }
+        attempts++;
+      }
+      
+      if (isUnique) {
+        this.patientId = patientId;
+      } else {
+        throw new Error('Unable to generate unique patient ID');
+      }
+    }
+
+    // Only hash the password if it has been modified (or is new)
+    if (!this.isModified('passwordHash')) return next();
+
     // Hash password with cost of 12
     const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12);
     this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
