@@ -210,31 +210,33 @@ const getTestResults = asyncHandler(async (req, res) => {
   console.log('🔍 Query results count:', testResults.length);
   console.log('🔍 First result (if any):', testResults[0] ? JSON.stringify(testResults[0], null, 2) : 'No results');
 
-  // If we didn't use patient name search, do regular population
-  if (!patientName) {
-    testResults = await TestResult.populate(testResults, [
-      {
-        path: 'patient',
-        select: 'firstName lastName email phone'
-      },
-      {
-        path: 'service',
-        select: 'serviceName category price'
-      },
-      {
-        path: 'medTech',
-        select: 'firstName lastName'
-      },
-      {
-        path: 'pathologist',
-        select: 'firstName lastName'
-      },
-      {
-        path: 'appointment',
-        select: 'appointmentId appointmentDate appointmentTime'
+  // Always do comprehensive population to get all required data
+  testResults = await TestResult.populate(testResults, [
+    {
+      path: 'patient',
+      select: 'firstName lastName email phone address age gender sex dateOfBirth'
+    },
+    {
+      path: 'service',
+      select: 'serviceName category price description'
+    },
+    {
+      path: 'medTech',
+      select: 'firstName lastName email'
+    },
+    {
+      path: 'pathologist',
+      select: 'firstName lastName email'
+    },
+    {
+      path: 'appointment',
+      select: 'appointmentId appointmentDate appointmentTime patientName age sex address contactNumber email status serviceName services',
+      populate: {
+        path: 'services',
+        select: 'serviceName category description'
       }
-    ]);
-  }
+    }
+  ]);
 
   // Calculate pagination
   const totalPages = Math.ceil(total / parseInt(limit));
@@ -264,11 +266,18 @@ const getTestResult = asyncHandler(async (req, res) => {
     _id: req.params.id,
     isDeleted: false
   })
-    .populate('patient', 'firstName lastName email phone address dateOfBirth gender')
+    .populate('patient', 'firstName lastName email phone address dateOfBirth gender sex age')
     .populate('service', 'serviceName category price description')
     .populate('medTech', 'firstName lastName email')
     .populate('pathologist', 'firstName lastName email')
-    .populate('appointment', 'appointmentId appointmentDate appointmentTime')
+    .populate('appointment', 'appointmentId appointmentDate appointmentTime patientName age sex address contactNumber email status serviceName services')
+    .populate({
+      path: 'appointment',
+      populate: {
+        path: 'services',
+        select: 'serviceName category description'
+      }
+    })
     .populate('createdBy', 'firstName lastName');
 
   if (!testResult) {
@@ -794,9 +803,133 @@ const getTestResultStats = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Get all test results for a specific appointment
+// @route   GET /api/test-results/appointment/:appointmentId
+// @access  Private (MedTech, Pathologist, Admin)
+const getTestResultsByAppointment = asyncHandler(async (req, res) => {
+  const { appointmentId } = req.params;
+
+  // First find the appointment by appointmentId string
+  const appointment = await Appointment.findOne({ appointmentId: appointmentId });
+  
+  if (!appointment) {
+    return res.status(404).json({
+      success: false,
+      message: 'Appointment not found'
+    });
+  }
+
+  // Find all test results for this appointment using the ObjectId
+  const testResults = await TestResult.find({
+    appointment: appointment._id,
+    isDeleted: false
+  })
+    .populate('patient', 'firstName lastName email phone address dateOfBirth gender sex age')
+    .populate('service', 'serviceName category price description')
+    .populate('medTech', 'firstName lastName email')
+    .populate('pathologist', 'firstName lastName email')
+    .populate({
+      path: 'appointment',
+      select: 'appointmentId appointmentDate appointmentTime patientName age sex address contactNumber email status serviceName services',
+      populate: {
+        path: 'services',
+        select: 'serviceName category description'
+      }
+    })
+    .populate('createdBy', 'firstName lastName')
+    .sort({ createdAt: -1 });
+
+  if (!testResults || testResults.length === 0) {
+    return res.status(404).json({
+      success: false,
+      message: 'No test results found for this appointment'
+    });
+  }
+
+  // Group test results by category based on the selected services
+  const groupedResults = {};
+  const appointmentData = testResults[0]?.appointment || appointment;
+  
+  if (appointmentData && appointmentData.services) {
+    // Group by service categories
+    appointmentData.services.forEach(service => {
+      const category = service.category || 'general';
+      if (!groupedResults[category]) {
+        groupedResults[category] = {
+          categoryName: category,
+          services: [],
+          testResults: []
+        };
+      }
+      groupedResults[category].services.push(service);
+    });
+
+    // Assign test results to categories
+    testResults.forEach(testResult => {
+      const testType = testResult.testType.toLowerCase();
+      let assigned = false;
+
+      // Try to match test result to appropriate category
+      Object.keys(groupedResults).forEach(category => {
+        const categoryServices = groupedResults[category].services;
+        const matchingService = categoryServices.find(service => 
+          testType.includes(service.serviceName.toLowerCase()) ||
+          service.serviceName.toLowerCase().includes(testType)
+        );
+
+        if (matchingService && !assigned) {
+          groupedResults[category].testResults.push(testResult);
+          assigned = true;
+        }
+      });
+
+      // If no category match found, create a general category
+      if (!assigned) {
+        if (!groupedResults['general']) {
+          groupedResults['general'] = {
+            categoryName: 'general',
+            services: [],
+            testResults: []
+          };
+        }
+        groupedResults['general'].testResults.push(testResult);
+      }
+    });
+  }
+
+  // Use the appointment data we fetched earlier (with populated services)
+  await appointment.populate('services', 'serviceName category description');
+
+  // Return the most recent completed test result, or if none completed, the most recent one
+  const completedTestResults = testResults.filter(tr => tr.status === 'completed');
+  const selectedTestResult = completedTestResults.length > 0 
+    ? completedTestResults[0] // Most recent completed
+    : testResults[0]; // Most recent regardless of status
+
+  console.log(`📊 Found ${testResults.length} test results, ${completedTestResults.length} completed. Using:`, {
+    id: selectedTestResult?._id,
+    status: selectedTestResult?.status,
+    sampleId: selectedTestResult?.sampleId
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Test results retrieved successfully',
+    testResults: selectedTestResult,
+    services: appointment.services || [],
+    data: {
+      appointment: appointment,
+      testResults: testResults,
+      groupedResults: groupedResults,
+      totalResults: testResults.length
+    }
+  });
+});
+
 module.exports = {
   getTestResults,
   getTestResult,
+  getTestResultsByAppointment,
   createTestResult,
   updateTestResult,
   deleteTestResult,

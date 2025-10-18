@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator');
 const Appointment = require('../models/Appointment');
 const Service = require('../models/Service');
 const User = require('../models/User');
+const TestResult = require('../models/TestResult');
 const asyncHandler = require('../utils/asyncHandler');
 
 // @desc    Get all appointments with filtering and pagination
@@ -668,6 +669,11 @@ const checkOutPatient = asyncHandler(async (req, res) => {
     .populate('service', 'serviceName')
     .populate('checkedOutBy', 'name role');
 
+    // If the appointment is completed, automatically create a test result record
+    if (status === 'completed') {
+      await createTestResultForAppointment(updatedAppointment, req.user);
+    }
+
     res.status(200).json({
       success: true,
       message: `Patient ${status === 'completed' ? 'checked out' : 'marked as no-show'} successfully`,
@@ -931,6 +937,199 @@ const deleteAppointment = asyncHandler(async (req, res) => {
     });
   }
 });
+
+// Helper function to automatically create test result when appointment is completed
+async function createTestResultForAppointment(appointment, currentUser) {
+  try {
+    console.log(`🔬 Auto-creating test result for appointment: ${appointment.appointmentId}`);
+
+    // Check if test result already exists for this appointment
+    const existingResult = await TestResult.findOne({ 
+      appointment: appointment._id 
+    });
+
+    if (existingResult) {
+      console.log(`⚠️ Test result already exists for appointment ${appointment.appointmentId}`);
+      return existingResult;
+    }
+
+    // Get the actual selected services for this appointment
+    const appointmentWithServices = await Appointment.findById(appointment._id).populate('services');
+    const selectedServices = appointmentWithServices.services || [];
+
+    if (selectedServices.length === 0) {
+      console.log(`⚠️ No services found for appointment ${appointment.appointmentId}`);
+      return null;
+    }
+
+    // Group services by category to create appropriate test result sections
+    const servicesByCategory = {};
+    selectedServices.forEach(service => {
+      const category = service.category || 'general';
+      if (!servicesByCategory[category]) {
+        servicesByCategory[category] = [];
+      }
+      servicesByCategory[category].push(service);
+    });
+
+    console.log(`📊 Selected services grouped by category:`, Object.keys(servicesByCategory));
+
+    // Create test results based on selected services and categories
+    const results = new Map();
+    
+    // Add basic metadata
+    results.set('collection_date', new Date().toISOString());
+    results.set('collected_by', currentUser.firstName + ' ' + currentUser.lastName);
+    results.set('status', 'Sample collected - awaiting processing');
+
+    // Generate test fields based on selected service categories
+    Object.keys(servicesByCategory).forEach(category => {
+      const services = servicesByCategory[category];
+      
+      switch (category.toLowerCase()) {
+        case 'clinical_chemistry':
+        case 'chemistry':
+          // Add chemistry test fields only if chemistry tests were selected
+          services.forEach(service => {
+            const serviceName = service.serviceName.toLowerCase();
+            if (serviceName.includes('glucose') || serviceName.includes('fbs')) {
+              results.set('fbs', 'Pending');
+            }
+            if (serviceName.includes('bun')) {
+              results.set('bun', 'Pending');
+            }
+            if (serviceName.includes('creatinine')) {
+              results.set('creatinine', 'Pending');
+            }
+            if (serviceName.includes('cholesterol')) {
+              results.set('cholesterol', 'Pending');
+              results.set('hdl', 'Pending');
+              results.set('ldl', 'Pending');
+            }
+            if (serviceName.includes('triglyceride')) {
+              results.set('triglyceride', 'Pending');
+            }
+            if (serviceName.includes('alt') || serviceName.includes('sgpt')) {
+              results.set('alt_sgpt', 'Pending');
+            }
+            if (serviceName.includes('ast') || serviceName.includes('sgot')) {
+              results.set('ast_sgot', 'Pending');
+            }
+          });
+          break;
+
+        case 'hematology':
+        case 'blood_tests':
+          // Add hematology fields only if blood tests were selected
+          services.forEach(service => {
+            const serviceName = service.serviceName.toLowerCase();
+            if (serviceName.includes('cbc') || serviceName.includes('blood count')) {
+              results.set('wbc', 'Pending');
+              results.set('rbc', 'Pending');
+              results.set('hemoglobin', 'Pending');
+              results.set('hematocrit', 'Pending');
+              results.set('platelets', 'Pending');
+              results.set('lymphocytes', 'Pending');
+              results.set('neutrophils', 'Pending');
+            }
+          });
+          break;
+
+        case 'clinical_microscopy':
+        case 'urine_tests':
+          // Add urinalysis fields only if urine tests were selected
+          services.forEach(service => {
+            const serviceName = service.serviceName.toLowerCase();
+            if (serviceName.includes('urine') || serviceName.includes('urinalysis')) {
+              results.set('urine_color', 'Pending');
+              results.set('urine_transparency', 'Pending');
+              results.set('urine_specific_gravity', 'Pending');
+              results.set('urine_ph', 'Pending');
+              results.set('urine_protein', 'Pending');
+              results.set('urine_glucose', 'Pending');
+              results.set('urine_ketones', 'Pending');
+            }
+            if (serviceName.includes('pregnancy')) {
+              results.set('pregnancy_test', 'Pending');
+            }
+          });
+          break;
+
+        case 'serology_immunology':
+        case 'serology':
+          // Add serology fields only if serology tests were selected
+          services.forEach(service => {
+            const serviceName = service.serviceName.toLowerCase();
+            if (serviceName.includes('hepatitis') || serviceName.includes('hbsag')) {
+              results.set('hepatitis_b', 'Pending');
+            }
+            if (serviceName.includes('vdrl') || serviceName.includes('syphilis')) {
+              results.set('vdrl', 'Pending');
+            }
+            if (serviceName.includes('hiv')) {
+              results.set('hiv', 'Pending');
+            }
+            if (serviceName.includes('dengue')) {
+              results.set('dengue_ns1', 'Pending');
+              results.set('dengue_igg', 'Pending');
+              results.set('dengue_igm', 'Pending');
+            }
+            if (serviceName.includes('salmonella') || serviceName.includes('typhoid')) {
+              results.set('salmonella', 'Pending');
+            }
+          });
+          break;
+
+        default:
+          // For other categories, add basic fields
+          results.set(`${category}_result`, 'Pending');
+      }
+    });
+
+    // Prepare test result data
+    const testResultData = {
+      appointment: appointment._id,
+      service: selectedServices[0]._id, // Primary service
+      testType: appointment.serviceName, // Full service name as test type
+      sampleDate: new Date(),
+      status: 'pending', // Start as pending, medtech will update with actual results
+      createdBy: currentUser._id,
+      notes: `Auto-generated test result for completed appointment ${appointment.appointmentId}`,
+      results: results
+    };
+
+    // Handle patient data - registered vs walk-in
+    if (appointment.patient && typeof appointment.patient === 'object' && appointment.patient._id) {
+      // Registered patient
+      testResultData.patient = appointment.patient._id;
+      testResultData.isWalkInPatient = false;
+    } else {
+      // Walk-in patient or patient ID string
+      testResultData.patient = appointment.patient || `WALKIN-${appointment.patientName?.replace(/\s+/g, '-').toUpperCase()}-${Date.now()}`;
+      testResultData.isWalkInPatient = true;
+      testResultData.patientInfo = {
+        name: appointment.patientName,
+        age: appointment.age,
+        gender: appointment.sex,
+        address: appointment.address,
+        contactNumber: appointment.contactNumber
+      };
+    }
+
+    // Create the test result
+    const testResult = new TestResult(testResultData);
+    await testResult.save();
+
+    console.log(`✅ Created test result ${testResult.sampleId} for appointment ${appointment.appointmentId}`);
+    console.log(`📊 Test fields created: ${Array.from(results.keys()).join(', ')}`);
+    return testResult;
+
+  } catch (error) {
+    console.error('❌ Error creating test result for appointment:', error);
+    // Don't throw error to prevent checkout from failing
+    return null;
+  }
+}
 
 module.exports = {
   getAppointments,

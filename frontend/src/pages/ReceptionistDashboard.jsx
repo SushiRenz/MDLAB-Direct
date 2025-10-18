@@ -727,6 +727,26 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
         alert(`Appointment scheduled successfully!\n\nPatient: ${patientData.patientName}\nTests: ${serviceNames.join(', ')}\nAppointment ID: ${newAppointment.appointmentId}\nTotal: ₱${totalPrice}`);
       } else {
         console.error('❌ Appointment creation failed:', response.message);
+        
+        // Show detailed validation errors if available
+        if (response.errors && Array.isArray(response.errors)) {
+          console.error('🔍 VALIDATION ERRORS:');
+          response.errors.forEach((err, index) => {
+            console.error(`  ${index + 1}. Field: ${err.path || err.param || 'unknown'}`);
+            console.error(`     Value: ${JSON.stringify(err.value)}`);
+            console.error(`     Error: ${err.msg}`);
+          });
+          
+          // Create user-friendly error message
+          const fieldErrors = response.errors.map(err => 
+            `${err.path || err.param || 'Field'}: ${err.msg}`
+          ).join('\n');
+          
+          alert(`Appointment validation failed:\n\n${fieldErrors}`);
+        } else {
+          alert(`Failed to create appointment: ${response.message}`);
+        }
+        
         throw new Error(`Failed to create appointment: ${response.message}`);
       }
       

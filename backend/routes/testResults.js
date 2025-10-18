@@ -5,6 +5,7 @@ const auth = require('../middleware/auth');
 const {
   getTestResults,
   getTestResult,
+  getTestResultsByAppointment,
   createTestResult,
   updateTestResult,
   deleteTestResult,
@@ -223,6 +224,11 @@ router.get('/',
 // @desc    Get test result statistics
 // @access  Private (Staff only)
 router.get('/stats', auth.protect, auth.staffOnly, validateStatsQuery, getTestResultStats);
+
+// @route   GET /api/test-results/appointment/:appointmentId
+// @desc    Get all test results for a specific appointment
+// @access  Private (Staff only)
+router.get('/appointment/:appointmentId', auth.protect, auth.staffOnly, getTestResultsByAppointment);
 
 // @route   GET /api/test-results/:id
 // @desc    Get single test result by ID

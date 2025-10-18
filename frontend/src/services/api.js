@@ -748,6 +748,18 @@ export const appointmentAPI = {
       console.error('Error response data:', error.response?.data);
       console.error('Error response status:', error.response?.status);
       console.error('Error response headers:', error.response?.headers);
+      
+      // Enhanced debugging for validation errors
+      if (error.response?.status === 400 && error.response?.data?.errors) {
+        console.error('🔍 DETAILED VALIDATION ERRORS:');
+        error.response.data.errors.forEach((err, index) => {
+          console.error(`  ${index + 1}. Field: ${err.path || err.param || 'unknown'}`);
+          console.error(`     Value: ${err.value}`);
+          console.error(`     Error: ${err.msg}`);
+          console.error(`     Location: ${err.location || 'unknown'}`);
+        });
+      }
+      
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to create appointment',
@@ -1120,6 +1132,26 @@ export const testResultsAPI = {
         message: error.response?.data?.message || 'Failed to update test result',
         error: error.response?.data?.error,
         errors: error.response?.data?.errors
+      };
+    }
+  },
+
+  // Get test results by appointment ID
+  getTestResultsByAppointment: async (appointmentId) => {
+    try {
+      const response = await api.get(`/test-results/appointment/${appointmentId}`);
+      return {
+        success: true,
+        data: response.data.testResults,
+        services: response.data.services,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get test results by appointment error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch test results for appointment',
+        error: error.response?.data?.error
       };
     }
   },

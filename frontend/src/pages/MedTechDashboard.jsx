@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../design/Dashboard.css';
 import { appointmentAPI, testResultsAPI, servicesAPI } from '../services/api';
+import ReviewResults from './ReviewResults';
 
 function MedTechDashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('testing-queue');
@@ -13,12 +14,12 @@ function MedTechDashboard({ currentUser, onLogout }) {
   const [testingQueue, setTestingQueue] = useState([]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
 
-  // Review State
-  const [completedTests, setCompletedTests] = useState([]);
-  const [reviewLoading, setReviewLoading] = useState(false);
-
   // View mode state for completed tests
   const [isViewOnlyMode, setIsViewOnlyMode] = useState(false);
+  
+  // Rejection reason modal state
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [selectedRejectionData, setSelectedRejectionData] = useState(null);
 
   // Result form state - comprehensive laboratory test results
   const [resultForm, setResultForm] = useState({
@@ -373,28 +374,19 @@ function MedTechDashboard({ currentUser, onLogout }) {
     }
   };
 
-  // Fetch completed test results for review
-  const fetchCompletedTests = async () => {
-    try {
-      setReviewLoading(true);
-      const response = await fetch('/api/test-results?status=completed&limit=50', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
+  // Handle showing rejection reason
+  const handleShowRejectionReason = (appointment) => {
+    // Find the test result data that contains rejection info
+    const testData = savedDrafts.get(appointment._id);
+    if (testData && testData.rejectionReason) {
+      setSelectedRejectionData({
+        patientName: appointment.patientName,
+        serviceName: appointment.serviceName,
+        rejectionReason: testData.rejectionReason,
+        rejectedBy: testData.rejectedBy,
+        rejectedDate: testData.rejectedDate
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        setCompletedTests(data.data || []);
-      } else {
-        console.error('Failed to fetch completed tests');
-      }
-    } catch (error) {
-      console.error('Error fetching completed tests:', error);
-    } finally {
-      setReviewLoading(false);
+      setShowRejectionModal(true);
     }
   };
 
@@ -402,9 +394,6 @@ function MedTechDashboard({ currentUser, onLogout }) {
   useEffect(() => {
     if (activeSection === 'testing-queue') {
       fetchTestingQueue();
-    }
-    if (activeSection === 'review') {
-      fetchCompletedTests();
     }
   }, [activeSection]);
 
@@ -992,6 +981,11 @@ function MedTechDashboard({ currentUser, onLogout }) {
       eosinophils: '1-4%',
       basophils: '0.5-1%',
       
+      // Coagulation Studies
+      aptt: '25-35 seconds',
+      pt: '11-15 seconds',
+      inr: '0.8-1.2',
+      
       // Urinalysis
       urine_specific_gravity: '1.003-1.030',
       urine_ph: '4.6-8.0',
@@ -1026,7 +1020,18 @@ function MedTechDashboard({ currentUser, onLogout }) {
       ft3: '2.3-4.2 pg/mL',
       ft4: '0.8-1.8 ng/dL',
       t3: '80-200 ng/dL',
-      t4: '4.5-12.0 µg/dL'
+      t4: '4.5-12.0 µg/dL',
+      
+      // Tumor Markers & Inflammation
+      psa: '<4.0 ng/mL',
+      crp: '<3.0 mg/L',
+      
+      // OGTT Reference Ranges
+      ogtt_fasting: '70-100 mg/dL',
+      ogtt_30min: '<180 mg/dL',
+      ogtt_60min: '<180 mg/dL',
+      ogtt_90min: '<155 mg/dL',
+      ogtt_120min: '<140 mg/dL'
     };
     return ranges[test] || '';
   };
@@ -1065,13 +1070,18 @@ function MedTechDashboard({ currentUser, onLogout }) {
     
     serviceNames.forEach(serviceName => {
       const normalizedService = serviceName.toLowerCase().trim();
+      const initialSize = enabledCategories.size;
       
-      // Blood Chemistry mapping - expanded for more comprehensive coverage
-      if (normalizedService.includes('blood chemistry') || 
+      // Blood Chemistry mapping - Comprehensive coverage based on MDLAB system arrangement
+      if (normalizedService.includes('blood chemistry') || normalizedService.includes('clinical chemistry') ||
+          normalizedService.includes('chem 10') || normalizedService.includes('chemistry panel') ||
           normalizedService.includes('fbs') || normalizedService.includes('rbs') ||
           normalizedService.includes('glucose') || normalizedService.includes('blood sugar') ||
           normalizedService.includes('fasting blood sugar') ||
-          normalizedService.includes('cholesterol') ||
+          normalizedService.includes('cholesterol') || normalizedService.includes('total cholesterol') ||
+          normalizedService.includes('triglycerides') || normalizedService.includes('triglyceride') ||
+          normalizedService.includes('hdl') || normalizedService.includes('hdl cholesterol') ||
+          normalizedService.includes('ldl') || normalizedService.includes('ldl cholesterol') ||
           normalizedService.includes('lipid') || normalizedService.includes('lipid profile') ||
           normalizedService.includes('liver function') || normalizedService.includes('lft') ||
           normalizedService.includes('kidney function') || normalizedService.includes('kft') ||
@@ -1082,58 +1092,68 @@ function MedTechDashboard({ currentUser, onLogout }) {
           normalizedService.includes('ast') || normalizedService.includes('sgot') ||
           normalizedService.includes('alt') || normalizedService.includes('sgpt') ||
           normalizedService.includes('magnesium') || normalizedService.includes('phosphorus') ||
-          normalizedService.includes('electrolytes') ||
+          normalizedService.includes('electrolytes') || normalizedService.includes('sodium') || 
+          normalizedService.includes('potassium') || normalizedService.includes('chloride') ||
           normalizedService.includes('hba1c') || normalizedService.includes('glycated hemoglobin') ||
           normalizedService.includes('ogtt') || normalizedService.includes('oral glucose tolerance')) {
         enabledCategories.add('blood_chemistry');
         console.log(`  ✅ Matched blood_chemistry for: "${serviceName}"`);
       }
       
-      // Hematology/CBC mapping
+      // Hematology/CBC mapping (including coagulation studies)
       if (normalizedService.includes('cbc') || 
           normalizedService.includes('complete blood count') ||
           normalizedService.includes('hematology') ||
-          normalizedService.includes('blood count')) {
+          normalizedService.includes('blood count') ||
+          normalizedService.includes('esr') || normalizedService.includes('erythrocyte sedimentation') ||
+          normalizedService.includes('aptt') || normalizedService.includes('activated partial thromboplastin') ||
+          normalizedService.includes('pt') || normalizedService.includes('prothrombin') ||
+          normalizedService.includes('coagulation') || normalizedService.includes('bleeding time')) {
         enabledCategories.add('hematology');
         console.log(`  ✅ Matched hematology for: "${serviceName}"`);
       }
       
-      // Clinical Microscopy mapping
+      // Clinical Microscopy/Urinalysis mapping
       if (normalizedService.includes('urinalysis') || 
           normalizedService.includes('urine') ||
           normalizedService.includes('urine examination') ||
           normalizedService.includes('complete urine examination') ||
-          normalizedService.includes('clinical microscopy')) {
+          normalizedService.includes('clinical microscopy') ||
+          normalizedService.includes('pregnancy test (urine)')) {
         enabledCategories.add('urinalysis');
         console.log(`  ✅ Matched urinalysis for: "${serviceName}"`);
       }
       
+      // Fecalysis mapping
       if (normalizedService.includes('fecalysis') || 
           normalizedService.includes('stool') ||
           normalizedService.includes('stool examination') ||
-          normalizedService.includes('sputum')) {
+          normalizedService.includes('sputum') ||
+          normalizedService.includes('fobt') || normalizedService.includes('fecal occult blood')) {
         enabledCategories.add('fecalysis');
         console.log(`  ✅ Matched fecalysis for: "${serviceName}"`);
       }
       
+      // Pregnancy Test mapping
       if (normalizedService.includes('pregnancy test') || normalizedService.includes('serum pregnancy') ||
           normalizedService.includes('beta hcg') || normalizedService.includes('pregnancy')) {
         enabledCategories.add('pregnancy_test');
         console.log(`  ✅ Matched pregnancy_test for: "${serviceName}"`);
       }
       
-      // Immunology & Serology mapping - expanded for comprehensive coverage
+      // Blood Typing mapping
       if (normalizedService.includes('blood typing') || 
-          normalizedService.includes('blood type')) {
+          normalizedService.includes('blood type') || normalizedService.includes('abo rh')) {
         enabledCategories.add('blood_typing');
         console.log(`  ✅ Matched blood_typing for: "${serviceName}"`);
       }
       
+      // Serology/Immunology mapping - Following MDLAB system grouping
       if (normalizedService.includes('hepatitis') || normalizedService.includes('hbsag') ||
-          normalizedService.includes('hepatitis b surface antigen') ||
-          normalizedService.includes('hiv') || normalizedService.includes('anti hcv') ||
+          normalizedService.includes('hepatitis b surface antigen') || normalizedService.includes('hepatitis b antigen') ||
+          normalizedService.includes('hiv') || normalizedService.includes('anti hcv') || normalizedService.includes('hiv screening') ||
           normalizedService.includes('vdrl') || normalizedService.includes('syphilis') ||
-          normalizedService.includes('dengue') || normalizedService.includes('ns1') ||
+          normalizedService.includes('dengue') || normalizedService.includes('ns1') || normalizedService.includes('dengue duo') ||
           normalizedService.includes('salmonella') || normalizedService.includes('typhoid') ||
           normalizedService.includes('h. pylori') || normalizedService.includes('helicobacter') ||
           normalizedService.includes('rapid antigen') || normalizedService.includes('covid') ||
@@ -1144,7 +1164,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
         console.log(`  ✅ Matched immunology for: "${serviceName}"`);
       }
       
-      // Thyroid mapping - expanded
+      // Thyroid Function Tests mapping
       if (normalizedService.includes('thyroid') || 
           normalizedService.includes('thyroid function') || normalizedService.includes('tft') ||
           normalizedService.includes('tsh') || normalizedService.includes('thyroid stimulating') ||
@@ -1156,10 +1176,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
         console.log(`  ✅ Matched thyroid for: "${serviceName}"`);
       }
       
-      // Add a message if no category was matched
-      const beforeSize = enabledCategories.size;
-      const afterCheck = new Set(enabledCategories);
-      if (beforeSize === afterCheck.size) {
+      // Check if no category was matched for this service
+      if (enabledCategories.size === initialSize) {
         console.log(`  ❌ No category matched for: "${serviceName}"`);
       }
     });
@@ -1336,6 +1354,61 @@ function MedTechDashboard({ currentUser, onLogout }) {
           ))}
         </div>
       </div>
+
+      {/* OGTT Section - Grouped in a Box */}
+      <div style={{ 
+        border: '2px solid #3498db', 
+        borderRadius: '8px', 
+        padding: '20px', 
+        backgroundColor: '#f0f9ff',
+        marginTop: '20px',
+        ...getTestSectionStyles('blood_chemistry')
+      }}>
+        <h4 style={{ 
+          marginTop: '0', 
+          marginBottom: '20px', 
+          color: '#3498db', 
+          fontSize: '18px',
+          fontWeight: 'bold',
+          textAlign: 'center'
+        }}>
+          OGTT (Oral Glucose Tolerance Test)
+        </h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+          {[
+            { key: 'ogtt_fasting', label: 'Fasting', unit: 'mg/dL' },
+            { key: 'ogtt_30min', label: '30 minutes', unit: 'mg/dL' },
+            { key: 'ogtt_60min', label: '60 minutes', unit: 'mg/dL' },
+            { key: 'ogtt_90min', label: '90 minutes', unit: 'mg/dL' },
+            { key: 'ogtt_120min', label: '120 minutes', unit: 'mg/dL' }
+          ].map(test => (
+            <div key={test.key} style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>
+                {test.label} ({test.unit})
+              </label>
+              <input 
+                type="number" 
+                step="0.1"
+                placeholder={`Enter ${test.label.toLowerCase()}`}
+                style={{ 
+                  width: '100%', 
+                  padding: '10px', 
+                  border: '1px solid #3498db', 
+                  borderRadius: '4px', 
+                  fontSize: '14px',
+                  backgroundColor: '#fff',
+                  color: '#333'
+                }}
+                value={resultForm[test.key]}
+                onChange={(e) => handleResultChange(test.key, e.target.value)}
+              />
+              <span style={{ fontSize: '12px', color: '#3498db', fontStyle: 'italic', fontWeight: '500' }}>
+                Reference: {getReferenceRange(test.key)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 
@@ -1490,6 +1563,70 @@ function MedTechDashboard({ currentUser, onLogout }) {
               </span>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Coagulation Studies Section - New Addition */}
+      <div style={{ 
+        border: '2px solid #dc3545', 
+        borderRadius: '8px', 
+        padding: '20px', 
+        backgroundColor: '#fdf2f2',
+        marginTop: '20px' 
+      }}>
+        <h4 style={{ 
+          marginTop: '0', 
+          marginBottom: '20px', 
+          color: '#dc3545', 
+          fontSize: '18px',
+          fontWeight: 'bold',
+          textAlign: 'center'
+        }}>
+          Coagulation Studies
+        </h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+          {[
+            { key: 'aptt', label: 'APTT (Activated Partial Thromboplastin Time)', unit: 'seconds' },
+            { key: 'pt', label: 'PT (Prothrombin Time)', unit: 'seconds' },
+            { key: 'inr', label: 'INR (International Normalized Ratio)', unit: '' }
+          ].map(test => (
+            <div key={test.key} style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>
+                {test.label} {test.unit && `(${test.unit})`}
+              </label>
+              <input 
+                type="number" 
+                step="0.1"
+                placeholder={`Enter ${test.label.split('(')[0].trim()}`}
+                style={{ 
+                  width: '100%', 
+                  padding: '10px', 
+                  border: '1px solid #dc3545', 
+                  borderRadius: '4px', 
+                  fontSize: '14px',
+                  backgroundColor: '#fff',
+                  color: '#333'
+                }}
+                value={resultForm[test.key]}
+                onChange={(e) => handleResultChange(test.key, e.target.value)}
+              />
+              <span style={{ fontSize: '12px', color: '#dc3545', fontStyle: 'italic', fontWeight: '500' }}>
+                Reference: {getReferenceRange(test.key)}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div style={{ 
+          marginTop: '15px', 
+          padding: '10px', 
+          backgroundColor: '#fff3cd', 
+          border: '1px solid #ffeaa7',
+          borderRadius: '4px',
+          fontSize: '12px',
+          color: '#856404'
+        }}>
+          <strong>📝 Sample Collection Note:</strong> Coagulation tests require citrated plasma (Blue top tube). 
+          Patient should inform of any anticoagulant medications (Warfarin, Heparin, etc.).
         </div>
       </div>
     </div>
@@ -1936,8 +2073,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
             { key: 'hepatitis_b', label: 'Hepatitis B (HBsAg)' },
             { key: 'hepatitis_c', label: 'Hepatitis C' },
             { key: 'hiv', label: 'HIV' },
-            { key: 'vdrl', label: 'VDRL (Syphilis)' },
-            { key: 'salmonella', label: 'Salmonella Typhi' }
+            { key: 'vdrl', label: 'VDRL (Syphilis)' }
           ].map(test => (
             <div key={test.key}>
               <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>
@@ -1962,27 +2098,201 @@ function MedTechDashboard({ currentUser, onLogout }) {
             </div>
           ))}
 
-          {/* Dengue Duo with Positive/Negative options */}
+          {/* Salmonella with IgG and IgM sub-components */}
+          <div style={{ 
+            border: '2px solid #f39c12', 
+            borderRadius: '8px', 
+            padding: '15px', 
+            backgroundColor: '#fffbf0'
+          }}>
+            <h5 style={{ 
+              marginTop: '0', 
+              marginBottom: '15px', 
+              color: '#f39c12', 
+              fontSize: '16px',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}>
+              Salmonella Typhi
+            </h5>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px' }}>
+              {[
+                { key: 'salmonella_igg', label: 'IgG' },
+                { key: 'salmonella_igm', label: 'IgM' }
+              ].map(test => (
+                <div key={test.key}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50', fontSize: '14px' }}>
+                    {test.label}
+                  </label>
+                  <select 
+                    style={{ 
+                      width: '100%', 
+                      padding: '8px', 
+                      border: '1px solid #f39c12', 
+                      borderRadius: '4px',
+                      backgroundColor: '#fff',
+                      color: '#333',
+                      fontSize: '14px'
+                    }}
+                    value={resultForm[test.key]}
+                    onChange={(e) => handleResultChange(test.key, e.target.value)}
+                  >
+                    <option value="">Select result</option>
+                    <option value="Reactive">Reactive</option>
+                    <option value="Non-Reactive">Non-Reactive</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* H.pylori with Antigen and Antibody sub-components */}
+          <div style={{ 
+            border: '2px solid #9b59b6', 
+            borderRadius: '8px', 
+            padding: '15px', 
+            backgroundColor: '#faf5ff'
+          }}>
+            <h5 style={{ 
+              marginTop: '0', 
+              marginBottom: '15px', 
+              color: '#9b59b6', 
+              fontSize: '16px',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}>
+              H. pylori
+            </h5>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px' }}>
+              {[
+                { key: 'hpylori_antigen', label: 'Antigen' },
+                { key: 'hpylori_antibody', label: 'Antibody' }
+              ].map(test => (
+                <div key={test.key}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50', fontSize: '14px' }}>
+                    {test.label}
+                  </label>
+                  <select 
+                    style={{ 
+                      width: '100%', 
+                      padding: '8px', 
+                      border: '1px solid #9b59b6', 
+                      borderRadius: '4px',
+                      backgroundColor: '#fff',
+                      color: '#333',
+                      fontSize: '14px'
+                    }}
+                    value={resultForm[test.key]}
+                    onChange={(e) => handleResultChange(test.key, e.target.value)}
+                  >
+                    <option value="">Select result</option>
+                    <option value="Positive">Positive</option>
+                    <option value="Negative">Negative</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* PSA Test */}
           <div>
             <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>
-              Dengue Duo
+              PSA (Prostate Specific Antigen) (ng/mL)
             </label>
-            <select 
+            <input 
+              type="number" 
+              step="0.01"
+              placeholder="Enter PSA value"
               style={{ 
                 width: '100%', 
                 padding: '10px', 
-                border: '1px solid #ddd', 
-                borderRadius: '4px',
+                border: '1px solid #21AEA8', 
+                borderRadius: '4px', 
+                fontSize: '14px',
                 backgroundColor: '#fff',
                 color: '#333'
               }}
-              value={resultForm.dengue_duo}
-              onChange={(e) => handleResultChange('dengue_duo', e.target.value)}
-            >
-              <option value="">Select result</option>
-              <option value="Positive">Positive</option>
-              <option value="Negative">Negative</option>
-            </select>
+              value={resultForm.psa}
+              onChange={(e) => handleResultChange('psa', e.target.value)}
+            />
+            <span style={{ fontSize: '12px', color: '#21AEA8', fontStyle: 'italic', fontWeight: '500' }}>
+              Reference: {getReferenceRange('psa')}
+            </span>
+          </div>
+
+          {/* CRP Test */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>
+              CRP (C-Reactive Protein) (mg/L)
+            </label>
+            <input 
+              type="number" 
+              step="0.01"
+              placeholder="Enter CRP value"
+              style={{ 
+                width: '100%', 
+                padding: '10px', 
+                border: '1px solid #21AEA8', 
+                borderRadius: '4px', 
+                fontSize: '14px',
+                backgroundColor: '#fff',
+                color: '#333'
+              }}
+              value={resultForm.crp}
+              onChange={(e) => handleResultChange('crp', e.target.value)}
+            />
+            <span style={{ fontSize: '12px', color: '#21AEA8', fontStyle: 'italic', fontWeight: '500' }}>
+              Reference: {getReferenceRange('crp')}
+            </span>
+          </div>
+
+          {/* Dengue Duo with NS1, IgG, IgM sub-components */}
+          <div style={{ 
+            border: '2px solid #e74c3c', 
+            borderRadius: '8px', 
+            padding: '15px', 
+            backgroundColor: '#fff5f5'
+          }}>
+            <h5 style={{ 
+              marginTop: '0', 
+              marginBottom: '15px', 
+              color: '#e74c3c', 
+              fontSize: '16px',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}>
+              Dengue Duo
+            </h5>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
+              {[
+                { key: 'dengue_ns1', label: 'NS1 Antigen' },
+                { key: 'dengue_igg', label: 'IgG Antibody' },
+                { key: 'dengue_igm', label: 'IgM Antibody' }
+              ].map(test => (
+                <div key={test.key}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50', fontSize: '14px' }}>
+                    {test.label}
+                  </label>
+                  <select 
+                    style={{ 
+                      width: '100%', 
+                      padding: '8px', 
+                      border: '1px solid #e74c3c', 
+                      borderRadius: '4px',
+                      backgroundColor: '#fff',
+                      color: '#333',
+                      fontSize: '14px'
+                    }}
+                    value={resultForm[test.key]}
+                    onChange={(e) => handleResultChange(test.key, e.target.value)}
+                  >
+                    <option value="">Select result</option>
+                    <option value="Positive">Positive</option>
+                    <option value="Negative">Negative</option>
+                  </select>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -2310,15 +2620,29 @@ function MedTechDashboard({ currentUser, onLogout }) {
           });
           if (existingResult) {
             console.log('✅ Found existing result for appointment:', appointment._id, 'patient:', appointment.patientName, 'status:', existingResult.status);
-            // Mark this appointment based on the test result status
-            if (existingResult.status === 'completed') {
+            
+            // Check if this is a rejected test that needs complete re-entry
+            if (existingResult.status === 'pending' && (existingResult.rejectionReason || existingResult.isRejected)) {
+              // This is a rejected test - treat as fresh start but store rejection info
+              console.log('📋 Found rejected test - treating as fresh start');
+              draftsMap.set(appointment._id, {
+                hasSavedResult: false, // No saved draft - fresh start
+                isCompleted: false,
+                isRejected: true,
+                rejectionReason: existingResult.rejectionReason,
+                rejectedBy: existingResult.rejectedBy,
+                rejectedDate: existingResult.rejectedDate,
+                testResultData: existingResult
+              });
+            } else if (existingResult.status === 'completed') {
+              // Completed test
               draftsMap.set(appointment._id, { 
                 hasSavedResult: true, 
                 isCompleted: true,
                 testResultData: existingResult 
               });
             } else {
-              // Draft or other status
+              // Regular draft or other status
               draftsMap.set(appointment._id, { 
                 hasSavedResult: true, 
                 isCompleted: false,
@@ -2340,6 +2664,9 @@ function MedTechDashboard({ currentUser, onLogout }) {
         });
         
         console.log('Updated savedDrafts map with', draftsMap.size, 'entries');
+        
+        // Note: Rejection reason buttons only appear for tests that have been rejected from the Review section
+        console.log('💡 Note: Rejection buttons only show for tests rejected by reviewers with rejection reasons');
       }
     } catch (error) {
       console.error('Error checking existing drafts:', error);
@@ -2647,6 +2974,20 @@ function MedTechDashboard({ currentUser, onLogout }) {
 
       console.log('🔍 Final extracted patient ID for completion:', patientId, 'Type:', typeof patientId);
 
+      // First, try to find existing test result for this appointment
+      console.log('Looking for existing test result for appointment:', selectedAppointment.appointmentId);
+      
+      let existingTestResults = null;
+      try {
+        const existingResponse = await testResultsAPI.getTestResultsByAppointment(selectedAppointment.appointmentId);
+        if (existingResponse.success && existingResponse.data && existingResponse.data.length > 0) {
+          existingTestResults = existingResponse.data;
+          console.log('Found existing test results:', existingTestResults.length);
+        }
+      } catch (error) {
+        console.log('No existing test results found or error fetching:', error.message);
+      }
+
       // Prepare test result data for completion
       const testResultData = {
         patientId: patientId,
@@ -2671,8 +3012,25 @@ function MedTechDashboard({ currentUser, onLogout }) {
 
       console.log('Completing test with results:', testResultData);
 
-      // Save test results to database
-      const testResultResponse = await testResultsAPI.createTestResult(testResultData);
+      let testResultResponse;
+      
+      if (existingTestResults && existingTestResults.length > 0) {
+        // Update the existing test result (use the most recent one)
+        const existingTestResult = existingTestResults[0]; // Most recent due to sort
+        console.log('Updating existing test result:', existingTestResult._id);
+        
+        testResultResponse = await testResultsAPI.updateTestResult(existingTestResult._id, {
+          results: testResultData.results,
+          status: testResultData.status,
+          medTechNotes: testResultData.medTechNotes,
+          completedDate: testResultData.completedDate,
+          medTech: currentUser._id
+        });
+      } else {
+        // No existing test result, create a new one
+        console.log('No existing test result found, creating new one');
+        testResultResponse = await testResultsAPI.createTestResult(testResultData);
+      }
       
       if (!testResultResponse.success) {
         throw new Error(testResultResponse.message || 'Failed to save test results');
@@ -3400,7 +3758,19 @@ function MedTechDashboard({ currentUser, onLogout }) {
                               }}>
                                 ✅ COMPLETED
                               </span>
-                            ) : (
+                            ) : savedDrafts.get(appointment._id)?.isRejected ? (
+                              <span style={{ 
+                                color: '#dc3545', 
+                                marginLeft: '10px', 
+                                fontSize: '12px',
+                                background: '#f8d7da',
+                                padding: '2px 6px',
+                                borderRadius: '3px',
+                                border: '1px solid #f5c6cb'
+                              }}>
+                                ❌ REJECTED
+                              </span>
+                            ) : savedDrafts.get(appointment._id)?.hasSavedResult ? (
                               <span style={{ 
                                 color: '#28a745', 
                                 marginLeft: '10px', 
@@ -3412,7 +3782,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
                               }}>
                                 💾 DRAFT SAVED
                               </span>
-                            )}
+                            ) : null}
                           </>
                         )}
                       </h4>
@@ -3429,28 +3799,57 @@ function MedTechDashboard({ currentUser, onLogout }) {
                       <div><strong>Time:</strong> {appointment.appointmentTime}</div>
                       <div><strong>Status:</strong> {appointment.status}</div>
                     </div>
-                    <button
-                      onClick={() => handleInputResults(appointment._id)}
-                      style={{
-                        background: savedDrafts.has(appointment._id) && savedDrafts.get(appointment._id)?.isCompleted 
-                          ? '#17a2b8' 
-                          : savedDrafts.has(appointment._id) 
-                            ? '#28a745' 
-                            : '#21AEA8',
-                        color: 'white',
-                        border: 'none',
-                        padding: '12px 20px',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold'
-                      }}
-                    >
-                      {savedDrafts.has(appointment._id) && savedDrafts.get(appointment._id)?.isCompleted 
-                        ? 'View Results' 
-                        : savedDrafts.has(appointment._id) 
-                          ? 'Continue Draft' 
-                          : 'Input Results'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <button
+                        onClick={() => handleInputResults(appointment._id)}
+                        style={{
+                          background: savedDrafts.has(appointment._id) && savedDrafts.get(appointment._id)?.isCompleted 
+                            ? '#17a2b8' 
+                            : savedDrafts.has(appointment._id) && savedDrafts.get(appointment._id)?.hasSavedResult
+                              ? '#28a745' 
+                              : '#21AEA8',
+                          color: 'white',
+                          border: 'none',
+                          padding: '12px 20px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        {savedDrafts.has(appointment._id) && savedDrafts.get(appointment._id)?.isCompleted 
+                          ? 'View Results' 
+                          : savedDrafts.has(appointment._id) && savedDrafts.get(appointment._id)?.hasSavedResult
+                            ? 'Continue Draft' 
+                            : savedDrafts.has(appointment._id) && savedDrafts.get(appointment._id)?.isRejected
+                              ? 'Re-enter Results'
+                              : 'Input Results'}
+                      </button>
+                      
+                      {/* Rejection reason button - only show if test was rejected */}
+                      {savedDrafts.has(appointment._id) && 
+                       savedDrafts.get(appointment._id)?.isRejected && (
+                        <button
+                          onClick={() => handleShowRejectionReason(appointment)}
+                          style={{
+                            background: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            padding: '10px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            width: '40px',
+                            height: '40px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          title="View rejection reason"
+                        >
+                          ☰
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -3756,369 +4155,12 @@ function MedTechDashboard({ currentUser, onLogout }) {
   };
 
   const renderReview = () => {
-    const formatDate = (dateString) => {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    };
-
-    const getPatientName = (testResult) => {
-      if (testResult.patientInfo?.name) {
-        return testResult.patientInfo.name;
-      }
-      if (testResult.patient?.firstName && testResult.patient?.lastName) {
-        return `${testResult.patient.firstName} ${testResult.patient.lastName}`;
-      }
-      return testResult.patient || 'Unknown Patient';
-    };
-
-    const getPatientInfo = (testResult) => {
-      if (testResult.patientInfo) {
-        return {
-          name: testResult.patientInfo.name || 'Unknown',
-          age: testResult.patientInfo.age || 'N/A',
-          gender: testResult.patientInfo.gender || 'N/A'
-        };
-      }
-      return {
-        name: getPatientName(testResult),
-        age: 'N/A',
-        gender: 'N/A'
-      };
-    };
-
-    const handleApprove = async (testResult) => {
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/test-results/${testResult._id}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            status: 'approved',
-            reviewedDate: new Date().toISOString(),
-            reviewedBy: currentUser._id
-          })
-        });
-
-        if (response.ok) {
-          alert('Test result approved successfully!');
-          fetchCompletedTests();
-        } else {
-          throw new Error('Failed to approve test result');
-        }
-      } catch (error) {
-        console.error('Error approving test:', error);
-        alert('Failed to approve test result. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const handleReject = async (testResult) => {
-      const reason = prompt('Please provide a reason for rejecting this test result:');
-      if (!reason) return;
-
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/test-results/${testResult._id}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            status: 'draft',
-            rejectionReason: reason,
-            rejectedDate: new Date().toISOString(),
-            rejectedBy: currentUser._id
-          })
-        });
-
-        if (response.ok && testResult.appointment) {
-          await fetch(`/api/appointments/${testResult.appointment}`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ status: 'checked-in' })
-          });
-          
-          alert('Test result rejected and sent back to testing queue!');
-          fetchCompletedTests();
-        } else {
-          throw new Error('Failed to reject test result');
-        }
-      } catch (error) {
-        console.error('Error rejecting test:', error);
-        alert('Failed to reject test result. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const renderLabReportView = (testResult) => {
-      const patientInfo = getPatientInfo(testResult);
-      const results = testResult.results || {};
-      const testData = results instanceof Map ? Object.fromEntries(results) : results;
-
-      return (
-        <div style={{
-          background: 'white',
-          border: '1px solid #ddd',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          overflow: 'hidden',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-        }}>
-          {/* Header */}
-          <div style={{
-            background: 'linear-gradient(135deg, #21AEA8 0%, #1A8A85 100%)',
-            color: 'white',
-            padding: '20px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h3 style={{ margin: '0 0 5px 0', fontSize: '18px' }}>MDLAB Diagnostic Laboratory</h3>
-                <p style={{ margin: '0', fontSize: '12px', opacity: 0.9 }}>
-                  DOH License: 02-93-25-CL-2 | Contact: 0927 850 7775
-                </p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <p style={{ margin: '0', fontSize: '14px' }}>Lab Report</p>
-                <p style={{ margin: '0', fontSize: '12px', opacity: 0.9 }}>
-                  Date: {formatDate(testResult.completedDate || testResult.sampleDate)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Patient Info */}
-          <div style={{
-            padding: '15px 20px',
-            borderBottom: '2px solid #21AEA8',
-            background: '#f8f9fa'
-          }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
-              <div><strong>Name:</strong> {patientInfo.name.toUpperCase()}</div>
-              <div><strong>Age:</strong> {patientInfo.age}</div>
-              <div><strong>Sex:</strong> {patientInfo.gender}</div>
-            </div>
-          </div>
-
-          {/* Test Results Content */}
-          <div style={{ padding: '20px' }}>
-            {/* Hematology */}
-            {(testData.hemoglobin || testData.hematocrit || testData.wbc || testData.rbc || testData.platelets) && (
-              <div style={{ marginBottom: '25px' }}>
-                <div style={{ background: '#21AEA8', color: 'white', padding: '8px 15px', fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>
-                  HEMATOLOGY
-                </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                  <thead>
-                    <tr style={{ background: '#f1f3f4' }}>
-                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Test</th>
-                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>Result</th>
-                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>Normal Range</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {testData.hemoglobin && (
-                      <tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Hemoglobin</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.hemoglobin}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>110-160 g/L</td></tr>
-                    )}
-                    {testData.hematocrit && (
-                      <tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Hematocrit</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.hematocrit}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>37-54%</td></tr>
-                    )}
-                    {testData.rbc && (
-                      <tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>RBC</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.rbc}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>3.50-5.50 x10⁶/L</td></tr>
-                    )}
-                    {testData.platelets && (
-                      <tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Platelet count</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.platelets}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>150-450 x10³/L</td></tr>
-                    )}
-                    {testData.wbc && (
-                      <tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>WBC</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.wbc}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>4.0-10.0 x10³/L</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Blood Chemistry */}
-            {(testData.fbs || testData.cholesterol || testData.triglyceride || testData.bua || testData.bun || testData.creatinine) && (
-              <div style={{ marginBottom: '25px' }}>
-                <div style={{ background: '#21AEA8', color: 'white', padding: '8px 15px', fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>
-                  BLOOD CHEMISTRY/IMMUNOLOGY
-                </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                  <thead>
-                    <tr style={{ background: '#f1f3f4' }}>
-                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Test</th>
-                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>Result</th>
-                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>Range</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {testData.fbs && (<tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Glucose</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.fbs}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>3.89-5.83 mmol/L</td></tr>)}
-                    {testData.cholesterol && (<tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Cholesterol</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.cholesterol}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>3.5-5.2 mmol/L</td></tr>)}
-                    {testData.triglyceride && (<tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Triglyceride</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.triglyceride}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>&lt;2.26 mmol/L</td></tr>)}
-                    {testData.bua && (<tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Uric acid</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.bua}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>156-360 umol/L</td></tr>)}
-                    {testData.bun && (<tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>BUN</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.bun}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>1.7-8.3 mmol/L</td></tr>)}
-                    {testData.creatinine && (<tr><td style={{ border: '1px solid #ddd', padding: '8px' }}>Creatinine</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.creatinine}</td><td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>53-97 umol/L</td></tr>)}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Urinalysis */}
-            {(testData.urine_color || testData.urine_transparency || testData.urine_ph || testData.urine_specific_gravity) && (
-              <div style={{ marginBottom: '25px' }}>
-                <div style={{ background: '#21AEA8', color: 'white', padding: '8px 15px', fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>
-                  URINALYSIS
-                </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                  <thead>
-                    <tr style={{ background: '#f1f3f4' }}>
-                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Test</th>
-                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>Result</th>
-                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Test</th>
-                      <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>Result</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>Color</td>
-                      <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.urine_color || 'Yellow'}</td>
-                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>Protein</td>
-                      <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.urine_protein || 'Negative'}</td>
-                    </tr>
-                    <tr>
-                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>Transparency</td>
-                      <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.urine_transparency || 'Clear'}</td>
-                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>Glucose</td>
-                      <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.urine_glucose || 'Negative'}</td>
-                    </tr>
-                    <tr>
-                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>pH</td>
-                      <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>{testData.urine_ph || '6.0'}</td>
-                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>WBC</td>
-                      <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>15-20/hpf</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Pregnancy Test */}
-            {testData.pregnancy_test && (
-              <div style={{ marginBottom: '25px' }}>
-                <div style={{ background: '#FFD700', color: '#333', padding: '8px 15px', fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>
-                  CLINICAL MICROSCOPY
-                </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                  <tbody>
-                    <tr>
-                      <td style={{ border: '1px solid #ddd', padding: '8px', fontWeight: 'bold' }}>PREGNANCY TESTS</td>
-                      <td style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{testData.pregnancy_test}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Remarks */}
-            {testData.remarks && (
-              <div style={{ marginBottom: '20px' }}>
-                <strong>Others:</strong>
-                <p style={{ margin: '5px 0', padding: '10px', background: '#f8f9fa', borderRadius: '4px' }}>
-                  {testData.remarks}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div style={{
-            background: '#f8f9fa',
-            padding: '15px 20px',
-            borderTop: '1px solid #ddd',
-            display: 'flex',
-            gap: '15px',
-            justifyContent: 'flex-end'
-          }}>
-            <button
-              onClick={() => handleReject(testResult)}
-              disabled={loading}
-              style={{
-                background: '#dc3545',
-                color: 'white',
-                border: 'none',
-                padding: '10px 20px',
-                borderRadius: '4px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontWeight: 'bold'
-              }}
-            >
-              {loading ? 'Processing...' : 'Reject & Return to Queue'}
-            </button>
-            <button
-              onClick={() => handleApprove(testResult)}
-              disabled={loading}
-              style={{
-                background: '#28a745',
-                color: 'white',
-                border: 'none',
-                padding: '10px 20px',
-                borderRadius: '4px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontWeight: 'bold'
-              }}
-            >
-              {loading ? 'Processing...' : 'Approve Result'}
-            </button>
-          </div>
-        </div>
-      );
-    };
-
     return (
-      <div style={{ padding: '20px' }}>
-        <div style={{ marginBottom: '20px' }}>
-          <h2 style={{ margin: '0 0 10px 0' }}>Review Completed Tests</h2>
-          <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>
-            Review test results completed by medical technologists and approve or reject them
-          </p>
-        </div>
-
-        {reviewLoading ? (
-          <div style={{ textAlign: 'center', padding: '40px' }}>
-            <p>Loading completed tests...</p>
-          </div>
-        ) : completedTests.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-            <p>No completed tests awaiting review</p>
-          </div>
-        ) : (
-          <>
-            <div style={{ marginBottom: '20px' }}>
-              <span style={{ color: '#666', fontSize: '14px' }}>
-                {completedTests.length} test result{completedTests.length !== 1 ? 's' : ''} ready for review
-              </span>
-            </div>
-
-            {/* Remove duplicates by using a Set based on patient name and test type */}
-            {[...new Map(completedTests.map(test => [`${getPatientName(test)}-${test.testType}`, test])).values()]
-              .map((testResult) => (
-              <div key={testResult._id}>
-                {renderLabReportView(testResult)}
-              </div>
-            ))}
-          </>
-        )}
+      <div className="dashboard-content-area">
+        <ReviewResults 
+          currentUser={currentUser}
+          isViewOnly={false}
+        />
       </div>
     );
   };
@@ -4181,6 +4223,107 @@ function MedTechDashboard({ currentUser, onLogout }) {
           {renderContent()}
         </div>
       </div>
+
+      {/* Rejection Reason Modal */}
+      {showRejectionModal && selectedRejectionData && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            padding: '30px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+            position: 'relative'
+          }}>
+            <button
+              onClick={() => {
+                setShowRejectionModal(false);
+                setSelectedRejectionData(null);
+              }}
+              style={{
+                position: 'absolute',
+                top: '15px',
+                right: '15px',
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#999'
+              }}
+            >
+              ×
+            </button>
+            
+            <h3 style={{ 
+              color: '#dc3545', 
+              marginBottom: '20px',
+              borderBottom: '2px solid #dc3545',
+              paddingBottom: '10px'
+            }}>
+              Test Result Rejection Details
+            </h3>
+            
+            <div style={{ marginBottom: '15px' }}>
+              <strong>Patient:</strong> {selectedRejectionData.patientName}
+            </div>
+            
+            <div style={{ marginBottom: '15px' }}>
+              <strong>Service:</strong> {selectedRejectionData.serviceName}
+            </div>
+            
+            {selectedRejectionData.rejectedDate && (
+              <div style={{ marginBottom: '15px' }}>
+                <strong>Rejected Date:</strong> {new Date(selectedRejectionData.rejectedDate).toLocaleString()}
+              </div>
+            )}
+            
+            <div style={{ marginBottom: '20px' }}>
+              <strong>Rejection Reason:</strong>
+              <div style={{
+                backgroundColor: '#f8f9fa',
+                border: '1px solid #dee2e6',
+                borderRadius: '4px',
+                padding: '12px',
+                marginTop: '8px',
+                fontStyle: 'italic',
+                color: '#495057'
+              }}>
+                {selectedRejectionData.rejectionReason}
+              </div>
+            </div>
+            
+            <button
+              onClick={() => {
+                setShowRejectionModal(false);
+                setSelectedRejectionData(null);
+              }}
+              style={{
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                width: '100%'
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
