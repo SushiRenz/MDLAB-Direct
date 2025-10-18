@@ -230,11 +230,17 @@ const getTestResults = asyncHandler(async (req, res) => {
     },
     {
       path: 'appointment',
-      select: 'appointmentId appointmentDate appointmentTime patientName age sex address contactNumber email status serviceName services',
-      populate: {
-        path: 'services',
-        select: 'serviceName category description'
-      }
+      select: 'appointmentId appointmentDate appointmentTime patientName age sex address contactNumber email status serviceName services patient type',
+      populate: [
+        {
+          path: 'services',
+          select: 'serviceName category description'
+        },
+        {
+          path: 'patient',
+          select: 'firstName lastName email patientId role'
+        }
+      ]
     }
   ]);
 
@@ -270,13 +276,19 @@ const getTestResult = asyncHandler(async (req, res) => {
     .populate('service', 'serviceName category price description')
     .populate('medTech', 'firstName lastName email')
     .populate('pathologist', 'firstName lastName email')
-    .populate('appointment', 'appointmentId appointmentDate appointmentTime patientName age sex address contactNumber email status serviceName services')
     .populate({
       path: 'appointment',
-      populate: {
-        path: 'services',
-        select: 'serviceName category description'
-      }
+      select: 'appointmentId appointmentDate appointmentTime patientName age sex address contactNumber email status serviceName services patient type',
+      populate: [
+        {
+          path: 'services',
+          select: 'serviceName category description'
+        },
+        {
+          path: 'patient',
+          select: 'firstName lastName email patientId role'
+        }
+      ]
     })
     .populate('createdBy', 'firstName lastName');
 

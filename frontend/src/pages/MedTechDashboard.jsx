@@ -42,6 +42,13 @@ function MedTechDashboard({ currentUser, onLogout }) {
     magnesium: '',
     phosphorus: '',
     
+    // OGTT (Oral Glucose Tolerance Test)
+    ogtt_fasting: '',
+    ogtt_30min: '',
+    ogtt_60min: '',
+    ogtt_90min: '',
+    ogtt_120min: '',
+    
     // Hematology/CBC
     wbc: '',
     rbc: '',
@@ -61,6 +68,11 @@ function MedTechDashboard({ currentUser, onLogout }) {
     monocytes: '',
     eosinophils: '',
     basophils: '',
+    
+    // Coagulation Studies
+    aptt: '',
+    pt: '',
+    inr: '',
     
     // Clinical Microscopy - Urinalysis
     urine_color: '',
@@ -95,7 +107,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
     fecal_parasite_ova: '',
     
     // Pregnancy Test
-    pregnancy_test: '',
+    pregnancy_test_serum: '',
+    pregnancy_test_urine: '',
     
     // Immunology & Serology
     blood_type: '',
@@ -105,7 +118,16 @@ function MedTechDashboard({ currentUser, onLogout }) {
     hiv: '',
     vdrl: '',
     dengue_duo: '',
+    dengue_ns1: '',
+    dengue_igg: '',
+    dengue_igm: '',
     salmonella: '',
+    salmonella_igg: '',
+    salmonella_igm: '',
+    hpylori_antigen: '',
+    hpylori_antibody: '',
+    psa: '',
+    crp: '',
     
     // Thyroid Tests
     tsh: '',
@@ -1013,7 +1035,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
       fecal_parasite_ova: 'None seen',
       
       // Pregnancy Test
-      pregnancy_test: 'Negative',
+      pregnancy_test_serum: 'Negative',
+      pregnancy_test_urine: 'Negative',
       
       // Thyroid Tests
       tsh: '0.4-4.0 mIU/L',
@@ -1137,8 +1160,14 @@ function MedTechDashboard({ currentUser, onLogout }) {
       // Pregnancy Test mapping
       if (normalizedService.includes('pregnancy test') || normalizedService.includes('serum pregnancy') ||
           normalizedService.includes('beta hcg') || normalizedService.includes('pregnancy')) {
-        enabledCategories.add('pregnancy_test');
-        console.log(`  ✅ Matched pregnancy_test for: "${serviceName}"`);
+        // Check if it's specifically serum pregnancy test for immunology
+        if (normalizedService.includes('serum') || normalizedService.includes('beta hcg')) {
+          enabledCategories.add('immunology');
+          console.log(`  ✅ Matched immunology (serum pregnancy) for: "${serviceName}"`);
+        }
+        // Always enable urinalysis for pregnancy tests (includes urine pregnancy test)
+        enabledCategories.add('urinalysis');
+        console.log(`  ✅ Matched urinalysis (pregnancy test) for: "${serviceName}"`);
       }
       
       // Blood Typing mapping
@@ -1745,7 +1774,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
             {/* Chemical Tests with dropdown options */}
             {[
               'urine_protein', 'urine_glucose', 'urine_ketones', 'urine_blood', 
-              'urine_leukocytes', 'urine_nitrites', 'urobilinogen', 'bilirubin'
+              'urine_leukocytes', 'urine_nitrites', 'urine_urobilinogen', 'urine_bilirubin'
             ].map(test => (
               <div key={test}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>
@@ -1770,7 +1799,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
                   <option value="2+">2+</option>
                   <option value="3+">3+</option>
                   <option value="4+">4+</option>
-                  {test === 'urobilinogen' && <option value="Normal">Normal</option>}
+                  {test === 'urine_urobilinogen' && <option value="Normal">Normal</option>}
                 </select>
                 <span style={{ fontSize: '11px', color: '#6c757d' }}>Ref: {getReferenceRange(test)}</span>
               </div>
@@ -1813,8 +1842,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
               { key: 'urine_bacteria', label: 'Bacteria' },
               { key: 'urine_crystals', label: 'Crystals' },
               { key: 'urine_casts', label: 'Casts' },
-              { key: 'mucus_thread', label: 'Mucus Thread' },
-              { key: 'amorphous_urates', label: 'Amorphous Urates' }
+              { key: 'urine_mucus_thread', label: 'Mucus Thread' },
+              { key: 'urine_amorphous_urates', label: 'Amorphous Urates' }
             ].map(test => (
               <div key={test.key}>
                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>{test.label}</label>
@@ -1970,10 +1999,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
       </div>
 
       {/* Pregnancy Test Section */}
-      <div style={getTestSectionStyles('pregnancy_test')}>
-        <DisabledOverlay category="pregnancy_test" testName="Pregnancy Test" />
-        
-        <h4 style={{ color: '#495057', marginBottom: '15px' }}>Pregnancy Test</h4>
+      <div style={getTestSectionStyles('urinalysis')}>
+        <h4 style={{ color: '#495057', marginBottom: '15px' }}>Pregnancy Test (Urine)</h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
           <div>
             <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Result</label>
@@ -1986,14 +2013,14 @@ function MedTechDashboard({ currentUser, onLogout }) {
                 backgroundColor: '#fff',
                 color: '#333'
               }}
-              value={resultForm.pregnancy_test}
-              onChange={(e) => handleResultChange('pregnancy_test', e.target.value)}
+              value={resultForm.pregnancy_test_urine}
+              onChange={(e) => handleResultChange('pregnancy_test_urine', e.target.value)}
             >
               <option value="">Select result</option>
               <option value="Negative">Negative</option>
               <option value="Positive">Positive</option>
             </select>
-            <span style={{ fontSize: '11px', color: '#6c757d' }}>Ref: {getReferenceRange('pregnancy_test')}</span>
+            <span style={{ fontSize: '11px', color: '#6c757d' }}>Ref: {getReferenceRange('pregnancy_test_urine')}</span>
           </div>
         </div>
       </div>
@@ -2293,6 +2320,32 @@ function MedTechDashboard({ currentUser, onLogout }) {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Serum Pregnancy Test */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>
+              Pregnancy Test (Serum/β-HCG)
+            </label>
+            <select 
+              style={{ 
+                width: '100%', 
+                padding: '10px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px',
+                backgroundColor: '#fff',
+                color: '#333'
+              }}
+              value={resultForm.pregnancy_test_serum}
+              onChange={(e) => handleResultChange('pregnancy_test_serum', e.target.value)}
+            >
+              <option value="">Select result</option>
+              <option value="Positive">Positive</option>
+              <option value="Negative">Negative</option>
+            </select>
+            <span style={{ fontSize: '12px', color: '#6c757d', fontStyle: 'italic' }}>
+              Reference: {getReferenceRange('pregnancy_test_serum')}
+            </span>
           </div>
         </div>
       </div>
@@ -2762,6 +2815,11 @@ function MedTechDashboard({ currentUser, onLogout }) {
             chloride: results.chloride || '',
             magnesium: results.magnesium || '',
             phosphorus: results.phosphorus || '',
+            ogtt_fasting: results.ogtt_fasting || '',
+            ogtt_30min: results.ogtt_30min || '',
+            ogtt_60min: results.ogtt_60min || '',
+            ogtt_90min: results.ogtt_90min || '',
+            ogtt_120min: results.ogtt_120min || '',
             wbc: results.wbc || '',
             rbc: results.rbc || '',
             hemoglobin: results.hemoglobin || '',
@@ -2776,6 +2834,9 @@ function MedTechDashboard({ currentUser, onLogout }) {
             monocytes: results.monocytes || '',
             eosinophils: results.eosinophils || '',
             basophils: results.basophils || '',
+            aptt: results.aptt || '',
+            pt: results.pt || '',
+            inr: results.inr || '',
             urine_color: results.urine_color || '',
             urine_transparency: results.urine_transparency || '',
             urine_specific_gravity: results.urine_specific_gravity || '',
@@ -2786,16 +2847,16 @@ function MedTechDashboard({ currentUser, onLogout }) {
             urine_blood: results.urine_blood || '',
             urine_leukocytes: results.urine_leukocytes || '',
             urine_nitrites: results.urine_nitrites || '',
-            urobilinogen: results.urobilinogen || '',
-            bilirubin: results.bilirubin || '',
+            urine_urobilinogen: results.urine_urobilinogen || results.urobilinogen || '',
+            urine_bilirubin: results.urine_bilirubin || results.bilirubin || '',
             urine_rbc: results.urine_rbc || '',
             urine_wbc: results.urine_wbc || '',
             urine_epithelial: results.urine_epithelial || '',
             urine_bacteria: results.urine_bacteria || '',
             urine_crystals: results.urine_crystals || '',
             urine_casts: results.urine_casts || '',
-            mucus_thread: results.mucus_thread || '',
-            amorphous_urates: results.amorphous_urates || '',
+            urine_mucus_thread: results.urine_mucus_thread || results.mucus_thread || '',
+            urine_amorphous_urates: results.urine_amorphous_urates || results.amorphous_urates || '',
             urine_others: results.urine_others || '',
             fecal_color: results.fecal_color || '',
             fecal_consistency: results.fecal_consistency || '',
@@ -2804,7 +2865,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
             fecal_wbc: results.fecal_wbc || '',
             fecal_bacteria: results.fecal_bacteria || '',
             fecal_parasite_ova: results.fecal_parasite_ova || '',
-            pregnancy_test: results.pregnancy_test || '',
+            pregnancy_test_serum: results.pregnancy_test_serum || '',
+            pregnancy_test_urine: results.pregnancy_test_urine || results.pregnancy_test || '', // Backward compatibility
             blood_type: results.blood_type || '',
             rh_factor: results.rh_factor || '',
             hepatitis_b: results.hepatitis_b || '',
@@ -2812,7 +2874,16 @@ function MedTechDashboard({ currentUser, onLogout }) {
             hiv: results.hiv || '',
             vdrl: results.vdrl || '',
             dengue_duo: results.dengue_duo || '',
+            dengue_ns1: results.dengue_ns1 || '',
+            dengue_igg: results.dengue_igg || '',
+            dengue_igm: results.dengue_igm || '',
             salmonella: results.salmonella || '',
+            salmonella_igg: results.salmonella_igg || '',
+            salmonella_igm: results.salmonella_igm || '',
+            hpylori_antigen: results.hpylori_antigen || '',
+            hpylori_antibody: results.hpylori_antibody || '',
+            psa: results.psa || '',
+            crp: results.crp || '',
             tsh: results.tsh || '',
             ft3: results.ft3 || '',
             ft4: results.ft4 || '',
@@ -2829,7 +2900,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
             fbs: formData.fbs,
             hemoglobin: formData.hemoglobin,
             wbc: formData.wbc,
-            pregnancy_test: formData.pregnancy_test,
+            pregnancy_test_serum: formData.pregnancy_test_serum,
+            pregnancy_test_urine: formData.pregnancy_test_urine,
             remarks: formData.remarks
           });
           
@@ -2843,7 +2915,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
               fbs: resultForm.fbs,
               hemoglobin: resultForm.hemoglobin,
               wbc: resultForm.wbc,
-              pregnancy_test: resultForm.pregnancy_test,
+              pregnancy_test_serum: resultForm.pregnancy_test_serum,
+              pregnancy_test_urine: resultForm.pregnancy_test_urine,
               remarks: resultForm.remarks
             });
           }, 100);
@@ -2900,13 +2973,15 @@ function MedTechDashboard({ currentUser, onLogout }) {
       hdl: '', ldl: '', ast_sgot: '', alt_sgpt: '', sodium: '', potassium: '', chloride: '',
       magnesium: '', phosphorus: '', wbc: '', rbc: '', hemoglobin: '',
       hematocrit: '', platelets: '', esr: '', mcv: '', mch: '', mchc: '', lymphocytes: '', neutrophils: '', monocytes: '',
-      eosinophils: '', basophils: '', urine_color: '', urine_transparency: '',
+      eosinophils: '', basophils: '', aptt: '', pt: '', inr: '', ogtt_fasting: '', ogtt_30min: '', ogtt_60min: '', ogtt_90min: '', ogtt_120min: '', urine_color: '', urine_transparency: '',
       urine_specific_gravity: '', urine_ph: '', urine_protein: '', urine_glucose: '',
       urine_ketones: '', urine_blood: '', urine_leukocytes: '', urine_nitrites: '',
-      urobilinogen: '', bilirubin: '', urine_rbc: '', urine_wbc: '', urine_epithelial: '', urine_bacteria: '',
-      urine_crystals: '', urine_casts: '', mucus_thread: '', amorphous_urates: '', urine_others: '', fecal_color: '', fecal_consistency: '',
-      fecal_occult_blood: '', fecal_rbc: '', fecal_wbc: '', fecal_bacteria: '', fecal_parasite_ova: '', pregnancy_test: '', blood_type: '', rh_factor: '', hepatitis_b: '', hepatitis_c: '',
-      hiv: '', vdrl: '', dengue_duo: '', salmonella: '', 
+      urine_urobilinogen: '', urine_bilirubin: '', urine_rbc: '', urine_wbc: '', urine_epithelial: '', urine_bacteria: '',
+      urine_crystals: '', urine_casts: '', urine_mucus_thread: '', urine_amorphous_urates: '', urine_others: '', fecal_color: '', fecal_consistency: '',
+      fecal_occult_blood: '', fecal_rbc: '', fecal_wbc: '', fecal_bacteria: '', fecal_parasite_ova: '', 
+      pregnancy_test_serum: '', pregnancy_test_urine: '', blood_type: '', rh_factor: '', hepatitis_b: '', hepatitis_c: '',
+      hiv: '', vdrl: '', dengue_duo: '', dengue_ns1: '', dengue_igg: '', dengue_igm: '', 
+      salmonella: '', salmonella_igg: '', salmonella_igm: '', hpylori_antigen: '', hpylori_antibody: '', psa: '', crp: '', 
       tsh: '', ft3: '', ft4: '', t3: '', t4: '',
       remarks: '', technician: '',
       datePerformed: new Date().toISOString().split('T')[0],
@@ -3065,13 +3140,15 @@ function MedTechDashboard({ currentUser, onLogout }) {
         hdl: '', ldl: '', ast_sgot: '', alt_sgpt: '', sodium: '', potassium: '', chloride: '',
         magnesium: '', phosphorus: '', wbc: '', rbc: '', hemoglobin: '',
         hematocrit: '', platelets: '', esr: '', mcv: '', mch: '', mchc: '', lymphocytes: '', neutrophils: '', monocytes: '',
-        eosinophils: '', basophils: '', urine_color: '', urine_transparency: '',
+        eosinophils: '', basophils: '', aptt: '', pt: '', inr: '', ogtt_fasting: '', ogtt_30min: '', ogtt_60min: '', ogtt_90min: '', ogtt_120min: '', urine_color: '', urine_transparency: '',
         urine_specific_gravity: '', urine_ph: '', urine_protein: '', urine_glucose: '',
         urine_ketones: '', urine_blood: '', urine_leukocytes: '', urine_nitrites: '',
-        urobilinogen: '', bilirubin: '', urine_rbc: '', urine_wbc: '', urine_epithelial: '', urine_bacteria: '',
-        urine_crystals: '', urine_casts: '', mucus_thread: '', amorphous_urates: '', urine_others: '', fecal_color: '', fecal_consistency: '',
-        fecal_occult_blood: '', fecal_rbc: '', fecal_wbc: '', fecal_bacteria: '', fecal_parasite_ova: '', pregnancy_test: '', blood_type: '', rh_factor: '', hepatitis_b: '', hepatitis_c: '',
-        hiv: '', vdrl: '', dengue_duo: '', salmonella: '', 
+        urine_urobilinogen: '', urine_bilirubin: '', urine_rbc: '', urine_wbc: '', urine_epithelial: '', urine_bacteria: '',
+        urine_crystals: '', urine_casts: '', urine_mucus_thread: '', urine_amorphous_urates: '', urine_others: '', fecal_color: '', fecal_consistency: '',
+        fecal_occult_blood: '', fecal_rbc: '', fecal_wbc: '', fecal_bacteria: '', fecal_parasite_ova: '', 
+        pregnancy_test_serum: '', pregnancy_test_urine: '', blood_type: '', rh_factor: '', hepatitis_b: '', hepatitis_c: '',
+        hiv: '', vdrl: '', dengue_duo: '', dengue_ns1: '', dengue_igg: '', dengue_igm: '', 
+        salmonella: '', salmonella_igg: '', salmonella_igm: '', hpylori_antigen: '', hpylori_antibody: '', psa: '', crp: '', 
         tsh: '', ft3: '', ft4: '', t3: '', t4: '',
         remarks: '', technician: '',
         datePerformed: new Date().toISOString().split('T')[0],
@@ -3095,244 +3172,6 @@ function MedTechDashboard({ currentUser, onLogout }) {
   };
 
   const renderResultEntry = () => {
-
-
-    // Handle saving results (draft)
-    const handleSaveResults = async () => {
-      if (!selectedAppointment) {
-        alert('No appointment selected');
-        return;
-      }
-
-      try {
-        setLoading(true);
-        
-        // Get the service ID for the test type
-        let serviceId = null;
-        if (selectedAppointment.service && selectedAppointment.service._id) {
-          serviceId = selectedAppointment.service._id;
-        } else {
-          // If service is not populated, try to find it by name
-          console.log('Service lookup needed for:', selectedAppointment.serviceName);
-          const servicesResponse = await servicesAPI.getServices({ limit: 100 });
-          if (servicesResponse.success) {
-            console.log('Available services:', servicesResponse.data.map(s => s.serviceName));
-            
-            // Try multiple matching strategies
-            let service = servicesResponse.data.find(s => 
-              selectedAppointment.serviceName.includes(s.serviceName)
-            );
-            
-            // If not found with includes, try exact match on each service in the appointment
-            if (!service) {
-              const appointmentServices = selectedAppointment.serviceName.split(',').map(s => s.trim());
-              console.log('Appointment services array:', appointmentServices);
-              
-              for (const appointmentService of appointmentServices) {
-                service = servicesResponse.data.find(s => 
-                  s.serviceName === appointmentService ||
-                  appointmentService.includes(s.serviceName) ||
-                  s.serviceName.includes(appointmentService)
-                );
-                if (service) {
-                  console.log('Found matching service:', service.serviceName);
-                  break;
-                }
-              }
-            }
-            
-            serviceId = service?._id;
-            console.log('Selected serviceId:', serviceId);
-          }
-        }
-
-        if (!serviceId) {
-          console.error('Service lookup failed for:', selectedAppointment.serviceName);
-          alert('Unable to find service information. Please try again.');
-          return;
-        }
-
-        // Debug and validate patient information
-        console.log('Selected appointment structure:', selectedAppointment);
-        console.log('Patient data:', selectedAppointment.patient);
-        
-        let patientId = null;
-        if (selectedAppointment.patient) {
-          if (typeof selectedAppointment.patient === 'string') {
-            patientId = selectedAppointment.patient;
-          } else if (selectedAppointment.patient._id) {
-            patientId = selectedAppointment.patient._id;
-          }
-        }
-        
-        // If no patient ID but we have patientName, use the appointment's patient field or create a placeholder
-        if (!patientId && selectedAppointment.patientName) {
-          console.warn('No patient ID found, but patient name exists. Using appointment patient field or patient name as ID');
-          patientId = selectedAppointment.patientName;
-        }
-        
-        if (!patientId) {
-          console.error('No valid patient ID found in appointment:', selectedAppointment);
-          alert('Unable to find patient information. Please try selecting the appointment again.');
-          return;
-        }
-
-        // Prepare test result data
-        const testResultData = {
-          patientId: patientId,
-          appointmentId: selectedAppointment._id,
-          serviceId: serviceId,
-          testType: selectedAppointment.serviceName,
-          results: { ...resultForm },
-          status: 'in-progress',
-          medTechNotes: resultForm.remarks || '',
-          sampleDate: new Date().toISOString()
-        };
-
-        console.log('Saving results as draft:', testResultData);
-
-        // Save to database
-        const response = await testResultsAPI.createTestResult(testResultData);
-        
-        if (response.success) {
-          alert('Results saved as draft successfully!');
-        } else {
-          throw new Error(response.message || 'Failed to save results');
-        }
-      } catch (error) {
-        console.error('Error saving results:', error);
-        alert('Failed to save results. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    // Handle completing and submitting results
-    const handleCompleteTest = async () => {
-      if (!selectedAppointment) {
-        alert('No appointment selected');
-        return;
-      }
-
-      try {
-        setLoading(true);
-        
-        // Get the service ID for the test type
-        let serviceId = null;
-        if (selectedAppointment.service && selectedAppointment.service._id) {
-          serviceId = selectedAppointment.service._id;
-        } else {
-          // If service is not populated, try to find it by name
-          const servicesResponse = await servicesAPI.getServices({ limit: 100 });
-          if (servicesResponse.success) {
-            const service = servicesResponse.data.find(s => 
-              selectedAppointment.serviceName.includes(s.serviceName)
-            );
-            serviceId = service?._id;
-          }
-        }
-
-        if (!serviceId) {
-          alert('Unable to find service information. Please try again.');
-          return;
-        }
-
-        // Extract patient ID properly for test completion
-        let patientId = null;
-        if (selectedAppointment.patient) {
-          if (typeof selectedAppointment.patient === 'string') {
-            patientId = selectedAppointment.patient;
-          } else if (selectedAppointment.patient._id) {
-            patientId = selectedAppointment.patient._id;
-          } else if (typeof selectedAppointment.patient === 'object') {
-            // If patient is an object but no _id, use email or name for walk-in
-            console.warn('Patient is object without _id, might be walk-in patient data:', selectedAppointment.patient);
-            patientId = selectedAppointment.patient.email || selectedAppointment.patient.fullName || selectedAppointment.patientName;
-          }
-        }
-        
-        // Fallback to patient name for walk-ins
-        if (!patientId && selectedAppointment.patientName) {
-          console.warn('No patient ID found, using patient name as ID for walk-in');
-          patientId = selectedAppointment.patientName;
-        }
-        
-        if (!patientId) {
-          console.error('No valid patient ID found in appointment:', selectedAppointment);
-          alert('Unable to find patient information. Please try selecting the appointment again.');
-          return;
-        }
-
-        console.log('🔍 Final extracted patient ID for second completion:', patientId, 'Type:', typeof patientId);
-
-        // Prepare test result data
-        const testResultData = {
-          patientId: patientId,
-          appointmentId: selectedAppointment._id,
-          serviceId: serviceId,
-          testType: selectedAppointment.serviceName,
-          results: { ...resultForm },
-          status: 'completed',
-          medTechNotes: resultForm.remarks || '',
-          sampleDate: new Date().toISOString()
-        };
-
-        console.log('Completing test with results:', testResultData);
-
-        // Save test results to database
-        const testResultResponse = await testResultsAPI.createTestResult(testResultData);
-        
-        if (!testResultResponse.success) {
-          throw new Error(testResultResponse.message || 'Failed to save test results');
-        }
-
-        // Update appointment status to completed
-        if (selectedAppointment._id) {
-          const appointmentResponse = await appointmentAPI.updateAppointment(
-            selectedAppointment._id, 
-            { status: 'completed' }
-          );
-          
-          if (!appointmentResponse.success) {
-            console.warn('Test results saved but failed to update appointment status');
-          }
-        }
-
-        alert(`Test completed successfully for ${selectedAppointment.patientName}!`);
-        
-        // Reset form and go back to queue
-        setResultForm({
-          fbs: '', bua: '', bun: '', creatinine: '', cholesterol: '', triglyceride: '',
-          hdl: '', ldl: '', ast_sgot: '', alt_sgpt: '', sodium: '', potassium: '', chloride: '',
-          magnesium: '', phosphorus: '', wbc: '', rbc: '', hemoglobin: '',
-          hematocrit: '', platelets: '', esr: '', mcv: '', mch: '', mchc: '', lymphocytes: '', neutrophils: '', monocytes: '',
-          eosinophils: '', basophils: '', urine_color: '', urine_transparency: '',
-          urine_specific_gravity: '', urine_ph: '', urine_protein: '', urine_glucose: '',
-          urine_ketones: '', urine_blood: '', urine_leukocytes: '', urine_nitrites: '',
-          urobilinogen: '', bilirubin: '', urine_rbc: '', urine_wbc: '', urine_epithelial: '', urine_bacteria: '',
-          urine_crystals: '', urine_casts: '', mucus_thread: '', amorphous_urates: '', urine_others: '', fecal_color: '', fecal_consistency: '',
-          fecal_occult_blood: '', fecal_rbc: '', fecal_wbc: '', fecal_bacteria: '', fecal_parasite_ova: '', pregnancy_test: '', blood_type: '', rh_factor: '', hepatitis_b: '', hepatitis_c: '',
-          hiv: '', vdrl: '', dengue_duo: '', salmonella: '', 
-          tsh: '', ft3: '', ft4: '', t3: '', t4: '',
-          remarks: '', technician: '',
-          datePerformed: new Date().toISOString().split('T')[0],
-          timePerformed: new Date().toTimeString().split(' ')[0].substring(0, 5)
-        });
-        
-        setSelectedAppointment(null);
-        setActiveSection('testing-queue');
-        
-        // Refresh the testing queue
-        fetchTestingQueue();
-        
-      } catch (error) {
-        console.error('Error completing test:', error);
-        alert('Failed to complete test. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     const pendingSamples = samples.filter(sample => 
       sample.status === 'pending' || sample.status === 'processing'
     );

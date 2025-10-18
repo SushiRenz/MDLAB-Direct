@@ -17,6 +17,8 @@ function ReviewResults({ currentUser }) {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('completed');
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [selectedTestForApproval, setSelectedTestForApproval] = useState(null);
 
   // Complete field definitions based on MDLAB system arrangement (not appointment system)
   const testFieldDefinitions = {
@@ -233,18 +235,18 @@ function ReviewResults({ currentUser }) {
       if (response.success) {
         const testResults = response.data || [];
         
-        // Debug: Log the structure of test results to understand patient data
+        // Debug: Log appointment type classification
         if (testResults.length > 0) {
-          console.log('🔍 DEBUG: First test result structure:', testResults[0]);
-          console.log('🔍 DEBUG: Patient field type:', typeof testResults[0].patientId);
-          console.log('🔍 DEBUG: Patient field value:', testResults[0].patientId);
-          console.log('🔍 DEBUG: Patient name from object:', testResults[0].patientId?.name);
-          console.log('🔍 DEBUG: Available keys:', Object.keys(testResults[0]));
-          console.log('🔍 DEBUG: Patient name alternatives:', {
-            patientName: testResults[0].patientName,
-            'patient.name': testResults[0].patient?.name,
-            'patientInfo.name': testResults[0].patientInfo?.name,
-            'appointment.patientName': testResults[0].appointment?.patientName
+          console.log('🔍 DEBUG: Test Results Classification:');
+          testResults.forEach((result, index) => {
+            const hasAccountPatient = !!result.appointment?.patient;
+            const patientName = result.patientInfo?.name || 
+                              result.appointment?.patientName || 
+                              result.appointment?.patient?.firstName + ' ' + result.appointment?.patient?.lastName ||
+                              'Unknown';
+            console.log(`  ${index + 1}. ${patientName}: ${hasAccountPatient ? 'Account (Patient Created)' : 'Walk-in (Receptionist Created)'}`);
+            console.log(`      - Appointment Patient:`, result.appointment?.patient);
+            console.log(`      - Appointment Type:`, result.appointment?.type);
           });
         }
         
@@ -260,20 +262,39 @@ function ReviewResults({ currentUser }) {
     }
   };
 
-  // Handle approving test result
-  const handleApproveTest = async (testResult) => {
+  // Handle opening approve modal
+  const handleApproveTest = (testResult) => {
+    setSelectedTestForApproval(testResult);
+    setShowApproveModal(true);
+  };
+
+  // Handle the actual approval process
+  const handleConfirmApproval = async (options) => {
+    if (!selectedTestForApproval) return;
+
     try {
-      console.log('Approving test result:', testResult._id);
+      console.log('Approving test result:', selectedTestForApproval._id);
       
-      const response = await testResultsAPI.updateTestResult(testResult._id, {
+      const response = await testResultsAPI.updateTestResult(selectedTestForApproval._id, {
         status: 'approved',
-        approvedBy: currentUser._id,
-        approvedDate: new Date().toISOString(),
+        pathologist: currentUser._id,  // Set pathologist who approved
         pathologistNotes: 'Results approved and verified'
       });
 
       if (response.success) {
-        alert('Test result approved successfully!');
+        // Show success message based on options
+        let message = 'Test result approved successfully!';
+        if (options.sendToAccount && options.print) {
+          message += '\n• Results sent to patient account\n• Print job queued';
+        } else if (options.sendToAccount) {
+          message += '\n• Results sent to patient account';
+        } else if (options.print) {
+          message += '\n• Print job queued';
+        }
+        
+        alert(message);
+        setShowApproveModal(false);
+        setSelectedTestForApproval(null);
         fetchCompletedTests(); // Refresh the list
       } else {
         alert('Failed to approve test result: ' + (response.message || 'Unknown error'));
@@ -286,9 +307,12 @@ function ReviewResults({ currentUser }) {
 
   // Handle rejecting test result
   const handleRejectTest = async (testResult) => {
-    const reason = prompt('Please provide a reason for rejecting this test result:');
-    if (!reason || reason.trim() === '') {
-      alert('Rejection reason is required');
+    const confirmed = window.confirm(
+      'Are you sure you want to reject this test result?\n\n' +
+      'This will send the test back to the MedTech for correction.'
+    );
+    
+    if (!confirmed) {
       return;
     }
 
@@ -296,11 +320,8 @@ function ReviewResults({ currentUser }) {
       console.log('Rejecting test result:', testResult._id);
       
       const response = await testResultsAPI.updateTestResult(testResult._id, {
-        status: 'rejected',
-        rejectedBy: currentUser._id,
-        rejectedDate: new Date().toISOString(),
-        rejectionReason: reason.trim(),
-        pathologistNotes: `Results rejected: ${reason.trim()}`
+        status: 'pending',  // Send back to MedTech by setting status to pending
+        pathologistNotes: 'Results rejected by pathologist - requires correction'
       });
 
       if (response.success) {
@@ -356,10 +377,9 @@ function ReviewResults({ currentUser }) {
                 backgroundColor: 'white'
               }}
             >
-              <option value="completed">Completed Tests</option>
+              <option value="completed">Completed Tests (Ready for Review)</option>
               <option value="approved">Approved Tests</option>
-              <option value="rejected">Rejected Tests</option>
-              <option value="pending">Pending Tests</option>
+              <option value="pending">Rejected/Pending Tests</option>
             </select>
           </div>
         </div>
@@ -442,10 +462,16 @@ function ReviewResults({ currentUser }) {
                       fontSize: '12px',
                       fontWeight: '600',
                       textTransform: 'uppercase',
-                      backgroundColor: testResult.status === 'completed' ? '#e7f3ff' : testResult.status === 'approved' ? '#e6f7e6' : '#fff3cd',
-                      color: testResult.status === 'completed' ? '#0066cc' : testResult.status === 'approved' ? '#28a745' : '#856404'
+                      backgroundColor: testResult.status === 'completed' ? '#e7f3ff' : 
+                                       testResult.status === 'approved' ? '#e6f7e6' : 
+                                       (testResult.status === 'pending' && testResult.pathologistNotes?.includes('rejected')) ? '#f8d7da' :
+                                       '#fff3cd',
+                      color: testResult.status === 'completed' ? '#0066cc' : 
+                             testResult.status === 'approved' ? '#28a745' : 
+                             (testResult.status === 'pending' && testResult.pathologistNotes?.includes('rejected')) ? '#721c24' :
+                             '#856404'
                     }}>
-                      {testResult.status || 'Pending'}
+                      {testResult.status === 'pending' && testResult.pathologistNotes?.includes('rejected') ? 'Rejected' : (testResult.status || 'Pending')}
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -500,18 +526,18 @@ function ReviewResults({ currentUser }) {
                     )}
                   </div>
                 </div>
-                {(filterStatus === 'approved' || filterStatus === 'rejected') && (
+                {(filterStatus === 'approved' || (filterStatus === 'pending' && testResult.pathologistNotes?.includes('rejected'))) && (
                   <div style={{
                     marginTop: '15px',
                     padding: '10px 20px',
-                    background: filterStatus === 'approved' ? '#d4edda' : '#fff3cd',
-                    border: `1px solid ${filterStatus === 'approved' ? '#c3e6cb' : '#ffeaa7'}`,
+                    background: filterStatus === 'approved' ? '#d4edda' : '#f8d7da',
+                    border: `1px solid ${filterStatus === 'approved' ? '#c3e6cb' : '#f5c6cb'}`,
                     borderRadius: '6px',
-                    color: filterStatus === 'approved' ? '#155724' : '#856404',
+                    color: filterStatus === 'approved' ? '#155724' : '#721c24',
                     fontSize: '14px',
                     fontWeight: 'bold'
                   }}>
-                    {filterStatus === 'approved' ? '✅ Result Approved' : '⚠️ Result Rejected - Under Revision'}
+                    {filterStatus === 'approved' ? '✅ Result Approved' : '❌ Result Rejected - Sent Back to MedTech'}
                   </div>
                 )}
               </div>
@@ -602,10 +628,16 @@ function ReviewResults({ currentUser }) {
                       padding: '2px 8px',
                       borderRadius: '12px',
                       fontSize: '12px',
-                      backgroundColor: testData.status === 'completed' ? '#d4edda' : '#fff3cd',
-                      color: testData.status === 'completed' ? '#155724' : '#856404'
+                      backgroundColor: testData.status === 'completed' ? '#d4edda' : 
+                                       testData.status === 'approved' ? '#d1ecf1' :
+                                       (testData.status === 'pending' && testData.pathologistNotes?.includes('rejected')) ? '#f8d7da' :
+                                       '#fff3cd',
+                      color: testData.status === 'completed' ? '#155724' : 
+                             testData.status === 'approved' ? '#0c5460' :
+                             (testData.status === 'pending' && testData.pathologistNotes?.includes('rejected')) ? '#721c24' :
+                             '#856404'
                     }}>
-                      {testData.status || 'Pending'}
+                      {testData.status === 'pending' && testData.pathologistNotes?.includes('rejected') ? 'Rejected' : (testData.status || 'Pending')}
                     </span>
                   </div>
                 </div>
@@ -711,6 +743,299 @@ function ReviewResults({ currentUser }) {
             </div>
           </div>
         )}
+
+        {/* Approval Modal */}
+        {showApproveModal && selectedTestForApproval && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              padding: '0',
+              width: '90%',
+              maxWidth: '500px',
+              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)',
+              animation: 'slideIn 0.3s ease-out'
+            }}>
+              {/* Modal Header */}
+              <div style={{
+                padding: '24px',
+                borderBottom: '1px solid #e0e0e0',
+                backgroundColor: '#21AEA8',
+                color: 'white',
+                borderRadius: '12px 12px 0 0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>
+                  ✅ Approve Test Results
+                </h3>
+                <button
+                  onClick={() => setShowApproveModal(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '24px',
+                    cursor: 'pointer',
+                    color: 'white',
+                    padding: '0',
+                    width: '30px',
+                    height: '30px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <ApprovalModalContent 
+                testResult={selectedTestForApproval}
+                onConfirm={handleConfirmApproval}
+                onCancel={() => setShowApproveModal(false)}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Approval Modal Component
+function ApprovalModalContent({ testResult, onConfirm, onCancel }) {
+  const [selectedOptions, setSelectedOptions] = React.useState({
+    sendToAccount: false,
+    print: false
+  });
+
+  // Determine if this is a walk-in or account appointment
+  // Walk-in: appointment.patient is null (no user account linked)
+  // Account: appointment.patient exists (user account linked)
+  const isWalkIn = !testResult.appointment?.patient;
+
+  const patientName = typeof testResult.patientId === 'string' ? testResult.patientId :
+                      testResult.patientId?.name || 
+                      testResult.patient?.name || 
+                      testResult.patientInfo?.name ||
+                      testResult.appointment?.patientName ||
+                      testResult.patientName ||
+                      'Unknown Patient';
+
+  const handleOptionChange = (option, checked) => {
+    setSelectedOptions(prev => ({
+      ...prev,
+      [option]: checked
+    }));
+  };
+
+  const handleConfirm = () => {
+    // For walk-ins, only print option should be available and selected
+    if (isWalkIn) {
+      onConfirm({ sendToAccount: false, print: true });
+    } else {
+      // For account patients, use selected options
+      onConfirm(selectedOptions);
+    }
+  };
+
+  return (
+    <div style={{ padding: '24px' }}>
+      {/* Patient Info */}
+      <div style={{
+        backgroundColor: '#f8f9fa',
+        padding: '16px',
+        borderRadius: '8px',
+        marginBottom: '20px',
+        border: '1px solid #e9ecef'
+      }}>
+        <h4 style={{ margin: '0 0 8px 0', color: '#495057', fontSize: '16px' }}>
+          Patient Information
+        </h4>
+        <p style={{ margin: '4px 0', color: '#6c757d' }}>
+          <strong>Name:</strong> {patientName}
+        </p>
+        <p style={{ margin: '4px 0', color: '#6c757d' }}>
+          <strong>Test Type:</strong> {testResult.testType || 'N/A'}
+        </p>
+        <p style={{ margin: '4px 0', color: '#6c757d' }}>
+          <strong>Appointment Type:</strong> 
+          <span style={{
+            marginLeft: '8px',
+            padding: '2px 8px',
+            borderRadius: '12px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            backgroundColor: isWalkIn ? '#fff3cd' : '#d1ecf1',
+            color: isWalkIn ? '#856404' : '#0c5460'
+          }}>
+            {isWalkIn ? 'Walk-in (Receptionist Created)' : 'Account Appointment (Patient Created)'}
+          </span>
+        </p>
+        <p style={{ margin: '4px 0', color: '#6c757d', fontSize: '11px' }}>
+          <strong>Debug Info:</strong> 
+          appointmentPatient: {testResult.appointment?.patient ? 'Has Account' : 'No Account'}, 
+          appointmentType: {testResult.appointment?.type || 'N/A'}, 
+          patientName: {testResult.appointment?.patient?.firstName || 'N/A'} {testResult.appointment?.patient?.lastName || ''}
+        </p>
+      </div>
+
+      {/* Options */}
+      <div style={{ marginBottom: '24px' }}>
+        <h4 style={{ margin: '0 0 16px 0', color: '#495057', fontSize: '16px' }}>
+          Approval Options
+        </h4>
+        
+        {isWalkIn ? (
+          // Walk-in patients - only print option
+          <div style={{
+            padding: '16px',
+            backgroundColor: '#fff3cd',
+            borderRadius: '8px',
+            border: '1px solid #ffeaa7'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '20px', marginRight: '8px' }}>🖨️</span>
+              <span style={{ fontWeight: 'bold', color: '#856404' }}>Print Physical Copy</span>
+            </div>
+            <p style={{ margin: '0', fontSize: '14px', color: '#856404' }}>
+              Results will be printed for walk-in patient pickup.
+            </p>
+          </div>
+        ) : (
+          // Account holders - both options available
+          <div style={{ space: '12px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '12px',
+              border: '2px solid #e9ecef',
+              borderRadius: '8px',
+              marginBottom: '12px',
+              cursor: 'pointer',
+              backgroundColor: selectedOptions.sendToAccount ? '#e8f5e8' : 'white',
+              borderColor: selectedOptions.sendToAccount ? '#28a745' : '#e9ecef'
+            }}
+            onClick={() => handleOptionChange('sendToAccount', !selectedOptions.sendToAccount)}
+            >
+              <input
+                type="checkbox"
+                checked={selectedOptions.sendToAccount}
+                onChange={(e) => handleOptionChange('sendToAccount', e.target.checked)}
+                style={{ marginRight: '12px', transform: 'scale(1.2)' }}
+              />
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '20px', marginRight: '8px' }}>📱</span>
+                  <span style={{ fontWeight: 'bold', color: '#495057' }}>Send to Patient Account</span>
+                </div>
+                <p style={{ margin: '0', fontSize: '13px', color: '#6c757d' }}>
+                  Results will be available in the patient's online portal.
+                </p>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '12px',
+              border: '2px solid #e9ecef',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              backgroundColor: selectedOptions.print ? '#e8f5e8' : 'white',
+              borderColor: selectedOptions.print ? '#28a745' : '#e9ecef'
+            }}
+            onClick={() => handleOptionChange('print', !selectedOptions.print)}
+            >
+              <input
+                type="checkbox"
+                checked={selectedOptions.print}
+                onChange={(e) => handleOptionChange('print', e.target.checked)}
+                style={{ marginRight: '12px', transform: 'scale(1.2)' }}
+              />
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '20px', marginRight: '8px' }}>🖨️</span>
+                  <span style={{ fontWeight: 'bold', color: '#495057' }}>Print Physical Copy</span>
+                </div>
+                <p style={{ margin: '0', fontSize: '13px', color: '#6c757d' }}>
+                  A printed copy will be prepared for pickup.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Warning for account holders if no option selected */}
+      {!isWalkIn && !selectedOptions.sendToAccount && !selectedOptions.print && (
+        <div style={{
+          padding: '12px',
+          backgroundColor: '#f8d7da',
+          borderRadius: '6px',
+          marginBottom: '20px',
+          border: '1px solid #f5c6cb'
+        }}>
+          <p style={{ margin: '0', fontSize: '14px', color: '#721c24' }}>
+            ⚠️ Please select at least one delivery option to proceed.
+          </p>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div style={{ 
+        display: 'flex', 
+        gap: '12px', 
+        justifyContent: 'flex-end',
+        borderTop: '1px solid #e9ecef',
+        paddingTop: '20px'
+      }}>
+        <button
+          onClick={onCancel}
+          style={{
+            padding: '10px 20px',
+            border: '2px solid #6c757d',
+            borderRadius: '6px',
+            backgroundColor: 'white',
+            color: '#6c757d',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleConfirm}
+          disabled={!isWalkIn && !selectedOptions.sendToAccount && !selectedOptions.print}
+          style={{
+            padding: '10px 20px',
+            border: 'none',
+            borderRadius: '6px',
+            backgroundColor: (!isWalkIn && !selectedOptions.sendToAccount && !selectedOptions.print) 
+              ? '#ccc' : '#28a745',
+            color: 'white',
+            fontWeight: 'bold',
+            cursor: (!isWalkIn && !selectedOptions.sendToAccount && !selectedOptions.print) 
+              ? 'not-allowed' : 'pointer',
+            fontSize: '14px'
+          }}
+        >
+          ✅ Approve & Process
+        </button>
       </div>
     </div>
   );
