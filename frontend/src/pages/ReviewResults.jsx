@@ -106,8 +106,10 @@ function ReviewResults({ currentUser }) {
         { key: 'urine_glucose', label: 'Glucose', normalRange: 'Negative', group: 'chemical' },
         { key: 'urine_protein', label: 'Protein', normalRange: 'Negative', group: 'chemical' },
         { key: 'urobilinogen', label: 'Urobilinogen', normalRange: 'Normal', group: 'chemical' },
+        { key: 'urine_urobilinogen', label: 'Urobilinogen', normalRange: 'Normal', group: 'chemical' },
         { key: 'urine_ketones', label: 'Ketones', normalRange: 'Negative', group: 'chemical' },
         { key: 'bilirubin', label: 'Bilirubin', normalRange: 'Negative', group: 'chemical' },
+        { key: 'urine_bilirubin', label: 'Bilirubin', normalRange: 'Negative', group: 'chemical' },
         { key: 'urine_leukocytes', label: 'Leukocytes', normalRange: 'Negative', group: 'chemical' },
         { key: 'urine_nitrites', label: 'Nitrites', normalRange: 'Negative', group: 'chemical' },
         { key: 'urine_blood', label: 'Blood', normalRange: 'Negative', group: 'chemical' },
@@ -115,7 +117,9 @@ function ReviewResults({ currentUser }) {
         { key: 'urine_rbc', label: 'RBC/hpf', normalRange: '0-2/hpf', group: 'microscopic' },
         { key: 'urine_epithelial', label: 'Epithelial Cells', normalRange: 'Few', group: 'microscopic' },
         { key: 'mucus_thread', label: 'Mucus Threads', normalRange: 'Few', group: 'microscopic' },
+        { key: 'urine_mucus_thread', label: 'Mucus Threads', normalRange: 'Few', group: 'microscopic' },
         { key: 'amorphous_urates', label: 'Amorphous Urates', normalRange: 'Few', group: 'microscopic' },
+        { key: 'urine_amorphous_urates', label: 'Amorphous Urates', normalRange: 'Few', group: 'microscopic' },
         { key: 'urine_bacteria', label: 'Bacteria', normalRange: 'Few', group: 'microscopic' },
         { key: 'urine_crystals', label: 'Crystals', normalRange: 'None', group: 'microscopic' },
         { key: 'urine_casts', label: 'Casts', normalRange: 'None', group: 'microscopic' },
@@ -147,8 +151,9 @@ function ReviewResults({ currentUser }) {
     pregnancy_test: {
       title: 'PREGNANCY TEST',
       fields: [
-        { key: 'pregnancy_test', label: 'Pregnancy Test (Urine)', normalRange: 'Negative', group: 'pregnancy' },
-        { key: 'serum_pregnancy_test', label: 'Serum Pregnancy Test', normalRange: 'Negative', group: 'pregnancy' }
+        { key: 'pregnancy_test_urine', label: 'Pregnancy Test (Urine)', normalRange: 'Negative', group: 'pregnancy' },
+        { key: 'pregnancy_test_serum', label: 'Serum Pregnancy Test', normalRange: 'Negative', group: 'pregnancy' },
+        { key: 'pregnancy_test', label: 'Pregnancy Test', normalRange: 'Negative', group: 'pregnancy' }
       ]
     },
     // Thyroid Function Tests - Following MDLAB system  
@@ -183,7 +188,20 @@ function ReviewResults({ currentUser }) {
 
   // Get all test results organized by category
   const getOrganizedTestResults = (modalTestData) => {
-    if (!modalTestData?.results) return {};
+    if (!modalTestData?.results) {
+      console.log('🔍 DEBUG: No results in modalTestData');
+      return {};
+    }
+    
+    console.log('🔍 DEBUG: Modal test data results:', modalTestData.results);
+    console.log('🔍 DEBUG: Results type:', typeof modalTestData.results);
+    console.log('🔍 DEBUG: Results keys:', Object.keys(modalTestData.results));
+    
+    // Show non-empty fields
+    const nonEmptyFields = Object.entries(modalTestData.results).filter(([key, value]) => 
+      value !== null && value !== undefined && value !== ''
+    );
+    console.log('🔍 DEBUG: Non-empty fields:', nonEmptyFields);
     
     const results = {};
     
@@ -201,6 +219,12 @@ function ReviewResults({ currentUser }) {
             group: field.group
           };
           hasData = true;
+          console.log(`🔍 DEBUG: Found data for ${category} - ${field.key}: ${value}`);
+        } else {
+          // Check if field exists in results even if empty
+          if (modalTestData.results.hasOwnProperty(field.key)) {
+            console.log(`🔍 DEBUG: Empty field in ${category} - ${field.key}: "${value}"`);
+          }
         }
       });
       
@@ -209,9 +233,11 @@ function ReviewResults({ currentUser }) {
           title: config.title,
           fields: categoryResults
         };
+        console.log(`🔍 DEBUG: Added category ${category} with data`);
       }
     });
     
+    console.log('🔍 DEBUG: Final organized results:', results);
     return results;
   };
 
@@ -274,12 +300,23 @@ function ReviewResults({ currentUser }) {
 
     try {
       console.log('Approving test result:', selectedTestForApproval._id);
+      console.log('Approval options:', options);
       
-      const response = await testResultsAPI.updateTestResult(selectedTestForApproval._id, {
-        status: 'approved',
-        pathologist: currentUser._id,  // Set pathologist who approved
-        pathologistNotes: 'Results approved and verified'
-      });
+      // Determine the appropriate API call based on options
+      let response;
+      
+      if (options.sendToAccount) {
+        // If sending to patient account, use release endpoint to make results available to patients
+        console.log('Releasing test result to patient account...');
+        response = await testResultsAPI.releaseTestResult(selectedTestForApproval._id, {
+          pathologistNotes: 'Results reviewed and approved for release to patient account'
+        });
+      } else {
+        // Otherwise, just approve without releasing to patient
+        response = await testResultsAPI.approveTestResult(selectedTestForApproval._id, {
+          pathologistNotes: 'Results reviewed and approved'
+        });
+      }
 
       if (response.success) {
         // Show success message based on options
@@ -319,9 +356,9 @@ function ReviewResults({ currentUser }) {
     try {
       console.log('Rejecting test result:', testResult._id);
       
-      const response = await testResultsAPI.updateTestResult(testResult._id, {
-        status: 'pending',  // Send back to MedTech by setting status to pending
-        pathologistNotes: 'Results rejected by pathologist - requires correction'
+      // Use the testResultsAPI to make the request with proper authentication
+      const response = await testResultsAPI.rejectTestResult(testResult._id, {
+        rejectionReason: 'Test result requires correction and resubmission'
       });
 
       if (response.success) {
@@ -378,8 +415,9 @@ function ReviewResults({ currentUser }) {
               }}
             >
               <option value="completed">Completed Tests (Ready for Review)</option>
-              <option value="approved">Approved Tests</option>
-              <option value="pending">Rejected/Pending Tests</option>
+              <option value="reviewed">Approved Tests</option>
+              <option value="rejected">Rejected Tests</option>
+              <option value="pending">Pending Tests (MedTech Queue)</option>
             </select>
           </div>
         </div>
@@ -463,15 +501,17 @@ function ReviewResults({ currentUser }) {
                       fontWeight: '600',
                       textTransform: 'uppercase',
                       backgroundColor: testResult.status === 'completed' ? '#e7f3ff' : 
-                                       testResult.status === 'approved' ? '#e6f7e6' : 
-                                       (testResult.status === 'pending' && testResult.pathologistNotes?.includes('rejected')) ? '#f8d7da' :
-                                       '#fff3cd',
+                                       testResult.status === 'reviewed' ? '#e6f7e6' : 
+                                       testResult.status === 'rejected' ? '#f8d7da' :
+                                       testResult.status === 'pending' ? '#fff3cd' :
+                                       '#f8f9fa',
                       color: testResult.status === 'completed' ? '#0066cc' : 
-                             testResult.status === 'approved' ? '#28a745' : 
-                             (testResult.status === 'pending' && testResult.pathologistNotes?.includes('rejected')) ? '#721c24' :
-                             '#856404'
+                             testResult.status === 'reviewed' ? '#28a745' : 
+                             testResult.status === 'rejected' ? '#721c24' :
+                             testResult.status === 'pending' ? '#856404' :
+                             '#495057'
                     }}>
-                      {testResult.status === 'pending' && testResult.pathologistNotes?.includes('rejected') ? 'Rejected' : (testResult.status || 'Pending')}
+                      {testResult.status === 'reviewed' ? 'Approved' : (testResult.status || 'Pending')}
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -526,18 +566,19 @@ function ReviewResults({ currentUser }) {
                     )}
                   </div>
                 </div>
-                {(filterStatus === 'approved' || (filterStatus === 'pending' && testResult.pathologistNotes?.includes('rejected'))) && (
+                {(testResult.status === 'reviewed' || testResult.status === 'rejected') && (
                   <div style={{
                     marginTop: '15px',
                     padding: '10px 20px',
-                    background: filterStatus === 'approved' ? '#d4edda' : '#f8d7da',
-                    border: `1px solid ${filterStatus === 'approved' ? '#c3e6cb' : '#f5c6cb'}`,
+                    background: testResult.status === 'reviewed' ? '#d4edda' : '#f8d7da',
+                    border: `1px solid ${testResult.status === 'reviewed' ? '#c3e6cb' : '#f5c6cb'}`,
                     borderRadius: '6px',
-                    color: filterStatus === 'approved' ? '#155724' : '#721c24',
+                    color: testResult.status === 'reviewed' ? '#155724' : '#721c24',
                     fontSize: '14px',
                     fontWeight: 'bold'
                   }}>
-                    {filterStatus === 'approved' ? '✅ Result Approved' : '❌ Result Rejected - Sent Back to MedTech'}
+                    {testResult.status === 'reviewed' ? '✅ Result Approved' : 
+                     testResult.status === 'rejected' ? `❌ Result Rejected: ${testResult.rejectionReason || 'Requires correction'}` : ''}
                   </div>
                 )}
               </div>
@@ -629,15 +670,17 @@ function ReviewResults({ currentUser }) {
                       borderRadius: '12px',
                       fontSize: '12px',
                       backgroundColor: testData.status === 'completed' ? '#d4edda' : 
-                                       testData.status === 'approved' ? '#d1ecf1' :
-                                       (testData.status === 'pending' && testData.pathologistNotes?.includes('rejected')) ? '#f8d7da' :
-                                       '#fff3cd',
+                                       testData.status === 'reviewed' ? '#d1ecf1' :
+                                       testData.status === 'rejected' ? '#f8d7da' :
+                                       testData.status === 'pending' ? '#fff3cd' :
+                                       '#f8f9fa',
                       color: testData.status === 'completed' ? '#155724' : 
-                             testData.status === 'approved' ? '#0c5460' :
-                             (testData.status === 'pending' && testData.pathologistNotes?.includes('rejected')) ? '#721c24' :
-                             '#856404'
+                             testData.status === 'reviewed' ? '#0c5460' :
+                             testData.status === 'rejected' ? '#721c24' :
+                             testData.status === 'pending' ? '#856404' :
+                             '#495057'
                     }}>
-                      {testData.status === 'pending' && testData.pathologistNotes?.includes('rejected') ? 'Rejected' : (testData.status || 'Pending')}
+                      {testData.status === 'reviewed' ? 'Approved' : (testData.status || 'Pending')}
                     </span>
                   </div>
                 </div>
@@ -646,7 +689,11 @@ function ReviewResults({ currentUser }) {
                 {(() => {
                   const organizedResults = getOrganizedTestResults(testData);
                   
+                  console.log('🔍 DEBUG: Organized results keys:', Object.keys(organizedResults));
+                  console.log('🔍 DEBUG: Organized results length:', Object.keys(organizedResults).length);
+                  
                   if (Object.keys(organizedResults).length === 0) {
+                    console.log('🔍 DEBUG: No organized results found, showing "No test results" message');
                     return (
                       <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
                         <p>No test results available for display.</p>
@@ -823,9 +870,9 @@ function ApprovalModalContent({ testResult, onConfirm, onCancel }) {
   });
 
   // Determine if this is a walk-in or account appointment
-  // Walk-in: appointment.patient is null (no user account linked)
+  // Walk-in: no appointment OR appointment.patient is null (no user account linked)
   // Account: appointment.patient exists (user account linked)
-  const isWalkIn = !testResult.appointment?.patient;
+  const isWalkIn = !testResult.appointment || !testResult.appointment.patient;
 
   const patientName = typeof testResult.patientId === 'string' ? testResult.patientId :
                       testResult.patientId?.name || 

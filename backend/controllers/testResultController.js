@@ -46,8 +46,9 @@ const getTestResults = asyncHandler(async (req, res) => {
 
   // Role-based filtering
   if (req.user.role === 'patient') {
-    // Patients can only see their own results
+    // Patients can only see their own results that have been released
     query.patient = req.user._id;
+    query.status = 'released'; // Only show released results to patients
   } else if (req.user.role === 'medtech') {
     // MedTechs can see results they're assigned to or unassigned ones
     // BUT if filtering by appointmentId, allow access to any results for that appointment
@@ -597,18 +598,18 @@ const deleteTestResult = asyncHandler(async (req, res) => {
 // @route   PUT /api/test-results/:id/release
 // @access  Private (Pathologist, Admin)
 const releaseTestResult = asyncHandler(async (req, res) => {
-  // Only pathologist or admin can release results
-  if (!['pathologist', 'admin'].includes(req.user.role)) {
+  // Allow MedTech, pathologist, or admin to release results
+  if (!['medtech', 'pathologist', 'admin'].includes(req.user.role)) {
     return res.status(403).json({
       success: false,
-      message: 'Access denied. Only pathologists can release test results.'
+      message: 'Access denied. Only medical staff can release test results to patients.'
     });
   }
 
   const testResult = await TestResult.findOne({
     _id: req.params.id,
     isDeleted: false
-  });
+  }).populate('appointment');
 
   if (!testResult) {
     return res.status(404).json({
@@ -617,12 +618,33 @@ const releaseTestResult = asyncHandler(async (req, res) => {
     });
   }
 
+  // Validate that this test result can be released to a patient account
+  // Check if there's a patient association either directly or through appointment
+  const hasPatientAssociation = testResult.patient || 
+                                 (testResult.appointment && testResult.appointment.patient);
+
+  if (!hasPatientAssociation) {
+    return res.status(400).json({
+      success: false,
+      message: 'Cannot release test result to patient account. This test result is not associated with a registered patient account.'
+    });
+  }
+
+  const { pathologistNotes } = req.body;
+
   // Update status and dates
   testResult.status = 'released';
   testResult.releasedDate = new Date();
   testResult.pathologist = req.user._id;
   testResult.isNew = true; // Mark as new for patient
   testResult.lastModifiedBy = req.user._id;
+  
+  // Add notes if provided
+  if (pathologistNotes) {
+    testResult.pathologistNotes = pathologistNotes;
+  } else {
+    testResult.pathologistNotes = `Results reviewed and released by ${req.user.firstName} ${req.user.lastName}`;
+  }
 
   await testResult.save();
 
@@ -938,6 +960,169 @@ const getTestResultsByAppointment = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Approve test result (move from completed to reviewed)
+// @route   PUT /api/test-results/:id/approve
+// @access  Private (Pathologist, Admin)
+const approveTestResult = asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: errors.array()
+    });
+  }
+
+  // Only MedTech can approve results in this workflow
+  if (req.user.role !== 'medtech') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Only MedTech users can approve test results in this workflow.'
+    });
+  }
+
+  const testResult = await TestResult.findOne({
+    _id: req.params.id,
+    isDeleted: false
+  });
+
+  if (!testResult) {
+    return res.status(404).json({
+      success: false,
+      message: 'Test result not found'
+    });
+  }
+
+  // Check if test result is in the right status to be approved
+  if (testResult.status !== 'completed') {
+    return res.status(400).json({
+      success: false,
+      message: 'Test result must be completed before it can be approved'
+    });
+  }
+
+  const { pathologistNotes } = req.body;
+
+  // Update status to reviewed (approved)
+  testResult.status = 'reviewed';
+  testResult.reviewedDate = new Date();
+  testResult.lastModifiedBy = req.user._id;
+  
+  // Set MedTech as the reviewer
+  testResult.medTech = req.user._id;
+  
+  if (pathologistNotes) {
+    testResult.pathologistNotes = pathologistNotes;
+  } else {
+    testResult.pathologistNotes = `Results reviewed and approved by MedTech ${req.user.firstName} ${req.user.lastName}`;
+  }
+
+  await testResult.save();
+
+  // Populate the updated result
+  await testResult.populate([
+    {
+      path: 'patient',
+      select: 'firstName lastName email phone'
+    },
+    {
+      path: 'service',
+      select: 'serviceName category price'
+    },
+    {
+      path: 'pathologist',
+      select: 'firstName lastName'
+    }
+  ]);
+
+  res.status(200).json({
+    success: true,
+    message: 'Test result approved successfully',
+    data: testResult
+  });
+});
+
+// @desc    Reject test result (move from completed back to pending)
+// @route   PUT /api/test-results/:id/reject
+// @access  Private (Pathologist, Admin)
+const rejectTestResult = asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: errors.array()
+    });
+  }
+
+  // Only MedTech can reject results in this workflow
+  if (req.user.role !== 'medtech') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Only MedTech users can reject test results in this workflow.'
+    });
+  }
+
+  const testResult = await TestResult.findOne({
+    _id: req.params.id,
+    isDeleted: false
+  });
+
+  if (!testResult) {
+    return res.status(404).json({
+      success: false,
+      message: 'Test result not found'
+    });
+  }
+
+  // Check if test result is in the right status to be rejected
+  if (testResult.status !== 'completed') {
+    return res.status(400).json({
+      success: false,
+      message: 'Test result must be completed before it can be rejected'
+    });
+  }
+
+  const { rejectionReason = 'Test result requires correction and resubmission' } = req.body;
+
+  // Update status to rejected (will go back to pending for MedTech to fix)
+  testResult.status = 'rejected';
+  testResult.rejectionReason = rejectionReason;
+  testResult.rejectedBy = req.user._id;
+  testResult.rejectedDate = new Date();
+  testResult.lastModifiedBy = req.user._id;
+  
+  // Add rejection note
+  const rejectionNote = `REJECTED: ${rejectionReason} (Rejected by MedTech ${req.user.firstName} ${req.user.lastName} on ${new Date().toLocaleDateString()})`;
+  testResult.pathologistNotes = testResult.pathologistNotes 
+    ? `${testResult.pathologistNotes}\n\n${rejectionNote}`
+    : rejectionNote;
+
+  await testResult.save();
+
+  // Populate the updated result
+  await testResult.populate([
+    {
+      path: 'patient',
+      select: 'firstName lastName email phone'
+    },
+    {
+      path: 'service',
+      select: 'serviceName category price'
+    },
+    {
+      path: 'rejectedBy',
+      select: 'firstName lastName'
+    }
+  ]);
+
+  res.status(200).json({
+    success: true,
+    message: 'Test result rejected and sent back to MedTech for correction',
+    data: testResult
+  });
+});
+
 module.exports = {
   getTestResults,
   getTestResult,
@@ -947,5 +1132,7 @@ module.exports = {
   deleteTestResult,
   releaseTestResult,
   markAsViewed,
-  getTestResultStats
+  getTestResultStats,
+  approveTestResult,
+  rejectTestResult
 };

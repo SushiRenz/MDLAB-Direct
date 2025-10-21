@@ -72,8 +72,27 @@ const testResultSchema = new mongoose.Schema({
   // Test status
   status: {
     type: String,
-    enum: ['pending', 'in-progress', 'completed', 'reviewed', 'released'],
+    enum: ['pending', 'in-progress', 'completed', 'reviewed', 'released', 'rejected'],
     default: 'pending'
+  },
+  
+  // Rejection tracking
+  rejectionCount: {
+    type: Number,
+    default: 0
+  },
+  rejectionReason: {
+    type: String,
+    default: ''
+  },
+  rejectedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  rejectedDate: {
+    type: Date,
+    default: null
   },
   
   // Dates
@@ -83,6 +102,10 @@ const testResultSchema = new mongoose.Schema({
     default: Date.now
   },
   completedDate: {
+    type: Date,
+    default: null
+  },
+  reviewedDate: {
     type: Date,
     default: null
   },
@@ -284,9 +307,28 @@ testResultSchema.pre('save', function(next) {
     this.completedDate = new Date();
   }
   
+  // Update reviewed date when status changes to reviewed
+  if (this.status === 'reviewed' && !this.reviewedDate) {
+    this.reviewedDate = new Date();
+  }
+  
   // Update released date when status changes to released
   if (this.status === 'released' && !this.releasedDate) {
     this.releasedDate = new Date();
+  }
+  
+  // Update rejection fields when status changes to rejected
+  if (this.status === 'rejected' && !this.rejectedDate) {
+    this.rejectedDate = new Date();
+    this.rejectionCount += 1;
+  }
+  
+  // Reset rejection fields when status changes from rejected
+  if (this.status !== 'rejected' && this.isModified('status') && this.rejectedDate) {
+    // Keep rejection history but clear active rejection state
+    this.rejectedDate = null;
+    this.rejectionReason = '';
+    this.rejectedBy = null;
   }
   
   // Increment version on updates

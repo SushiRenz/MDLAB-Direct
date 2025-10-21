@@ -184,6 +184,21 @@ app.get('/api/ping', (req, res) => {
   });
 });
 
+// Global request logger for debugging
+app.use('/api/test-results', (req, res, next) => {
+  console.log('🌐 GLOBAL TEST-RESULTS REQUEST:', {
+    method: req.method,
+    path: req.path,
+    originalUrl: req.originalUrl,
+    headers: {
+      authorization: req.headers.authorization ? req.headers.authorization.substring(0, 20) + '...' : 'none',
+      'content-type': req.headers['content-type']
+    },
+    timestamp: new Date().toISOString()
+  });
+  next();
+});
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

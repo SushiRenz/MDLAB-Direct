@@ -50,7 +50,7 @@ const validateCreateTestResult = [
     .withMessage('Invalid appointment ID'),
   body('status')
     .optional()
-    .isIn(['pending', 'in-progress', 'completed', 'reviewed', 'released'])
+    .isIn(['pending', 'in-progress', 'completed', 'reviewed', 'released', 'rejected'])
     .withMessage('Invalid status'),
   body('sampleDate')
     .optional()
@@ -80,7 +80,7 @@ const validateUpdateTestResult = [
     .withMessage('Results must be an object'),
   body('status')
     .optional()
-    .isIn(['pending', 'in-progress', 'completed', 'reviewed', 'released'])
+    .isIn(['pending', 'in-progress', 'completed', 'reviewed', 'released', 'rejected'])
     .withMessage('Invalid status'),
   body('notes')
     .optional()
@@ -113,7 +113,12 @@ const validateUpdateTestResult = [
   body('pathologist')
     .optional()
     .isMongoId()
-    .withMessage('Invalid pathologist ID')
+    .withMessage('Invalid pathologist ID'),
+  body('rejectionReason')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Rejection reason must not exceed 500 characters')
 ];
 
 const validateGetTestResults = [
@@ -128,7 +133,7 @@ const validateGetTestResults = [
   query('status')
     .optional()
     .custom((value) => {
-      const validStatuses = ['pending', 'in-progress', 'completed', 'reviewed', 'released'];
+      const validStatuses = ['pending', 'in-progress', 'completed', 'reviewed', 'released', 'rejected'];
       if (Array.isArray(value)) {
         return value.every(status => validStatuses.includes(status));
       }
@@ -207,7 +212,7 @@ const validateStatsQuery = [
 
 // @route   GET /api/test-results
 // @desc    Get all test results with filtering and pagination
-// @access  Private (All authenticated users)
+// @access  Private (MedTech only)
 router.get('/', 
   (req, res, next) => {
     console.log('🚀 ROUTE DEBUG - GET /api/test-results hit with query:', req.query);
@@ -215,9 +220,71 @@ router.get('/',
     next();
   },
   auth.protect, 
-  auth.staffOnly, 
+  auth.authorize('medtech'), 
   validateGetTestResults, 
   getTestResults
+);
+
+// @route   GET /api/test-results/debug/auth
+// @desc    Debug authentication status
+// @access  Private (Any authenticated user)
+router.get('/debug/auth', auth.protect, (req, res) => {
+  res.json({
+    success: true,
+    message: 'Authentication successful',
+    user: {
+      id: req.user._id,
+      role: req.user.role,
+      firstName: req.user.firstName,
+      lastName: req.user.lastName,
+      email: req.user.email,
+      isActive: req.user.isActive
+    },
+    canAccessReviewResults: req.user.role === 'medtech',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// @route   GET /api/test-results/my
+// @desc    Get patient's own released test results
+// @access  Private (Patient only)
+router.get('/my', 
+  auth.protect, 
+  auth.authorize('patient'), 
+  async (req, res) => {
+    try {
+      // Find test results that have been released to this patient
+      const TestResult = require('../models/TestResult');
+      const mongoose = require('mongoose');
+      
+      // Query for released test results belonging to this patient
+      // Handle both string and ObjectId patient field formats for compatibility
+      const testResults = await TestResult.find({
+        $or: [
+          { patient: req.user.id },
+          { patient: new mongoose.Types.ObjectId(req.user.id) }
+        ],
+        status: 'released'
+      })
+      .populate('appointment', 'services appointmentDate')
+      .sort({ releasedDate: -1 })
+      .select('-__v');
+
+      res.status(200).json({
+        success: true,
+        message: 'Test results retrieved successfully',
+        data: testResults,
+        count: testResults.length
+      });
+    } catch (error) {
+      console.error('❌ Error fetching patient test results:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching test results',
+        error: error.message
+      });
+    }
+  }
 );
 
 // @route   GET /api/test-results/stats
@@ -240,6 +307,58 @@ router.get('/:id', auth.protect, validateIdParam, getTestResult);
 // @access  Private (MedTech, Pathologist, Admin)
 router.post('/', auth.protect, auth.staffOnly, validateCreateTestResult, createTestResult);
 
+// @route   PUT /api/test-results/:id/release
+// @desc    Release test result to patient
+// @access  Private (MedTech, Pathologist, Admin)
+router.put('/:id/release', 
+  auth.protect, 
+  (req, res, next) => {
+    console.log('🔍 RELEASE ROUTE HIT - DEBUG INFO:');
+    console.log('- User ID:', req.user?._id);
+    console.log('- User role:', req.user?.role);
+    console.log('- User email:', req.user?.email);
+    console.log('- Test result ID:', req.params.id);
+    console.log('- Timestamp:', new Date().toISOString());
+    next();
+  },
+  auth.authorize('medtech', 'pathologist', 'admin'), 
+  validateIdParam, 
+  releaseTestResult
+);
+
+// @route   PUT /api/test-results/:id/mark-viewed
+// @desc    Mark test result as viewed by patient
+// @access  Private (Patient only)
+router.put('/:id/mark-viewed', auth.protect, validateIdParam, markAsViewed);
+
+// @route   PUT /api/test-results/:id/approve
+// @desc    Approve test result (move from completed to reviewed) - MedTech only
+// @access  Private (MedTech only)
+router.put('/:id/approve', auth.protect, auth.authorize('medtech'), validateIdParam, 
+  [
+    body('pathologistNotes')
+      .optional()
+      .trim()
+      .isLength({ max: 1000 })
+      .withMessage('Notes must not exceed 1000 characters')
+  ], 
+  require('../controllers/testResultController').approveTestResult
+);
+
+// @route   PUT /api/test-results/:id/reject
+// @desc    Reject test result (move from completed back to pending) - MedTech only
+// @access  Private (MedTech only)
+router.put('/:id/reject', auth.protect, auth.authorize('medtech'), validateIdParam,
+  [
+    body('rejectionReason')
+      .optional()
+      .trim()
+      .isLength({ max: 500 })
+      .withMessage('Rejection reason must not exceed 500 characters')
+  ],
+  require('../controllers/testResultController').rejectTestResult
+);
+
 // @route   PUT /api/test-results/:id
 // @desc    Update test result
 // @access  Private (MedTech, Pathologist, Admin)
@@ -249,15 +368,5 @@ router.put('/:id', auth.protect, auth.staffOnly, validateIdParam, validateUpdate
 // @desc    Delete test result (soft delete)
 // @access  Private (Admin only)
 router.delete('/:id', auth.protect, auth.adminOnly, validateIdParam, deleteTestResult);
-
-// @route   PUT /api/test-results/:id/release
-// @desc    Release test result to patient
-// @access  Private (Pathologist, Admin)
-router.put('/:id/release', auth.protect, auth.medicalOnly, validateIdParam, releaseTestResult);
-
-// @route   PUT /api/test-results/:id/mark-viewed
-// @desc    Mark test result as viewed by patient
-// @access  Private (Patient only)
-router.put('/:id/mark-viewed', auth.protect, validateIdParam, markAsViewed);
 
 module.exports = router;

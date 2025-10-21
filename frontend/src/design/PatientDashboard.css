@@ -872,11 +872,11 @@
   margin: 0 0 16px 0;
 }
 
-.result-summary {
+.result-info {
   margin-bottom: 16px;
 }
 
-.summary-item {
+.info-item {
   display: flex;
   justify-content: space-between;
   margin-bottom: 8px;
@@ -885,23 +885,31 @@
   border-bottom: 1px solid #f5f5f5;
 }
 
-.summary-item:last-child {
+.info-item:last-child {
   border-bottom: none;
   margin-bottom: 0;
 }
 
-.summary-item span:first-child {
+.info-item .label {
   color: #4a5568;
   font-weight: 500;
 }
 
-.summary-item span:last-child {
+.info-item .value {
   font-weight: 600;
   color: #2d3748;
 }
 
-.summary-item .normal {
+.info-item .value.status-released {
   color: #10b981;
+}
+
+.info-item .value.status-completed {
+  color: #10b981;
+}
+
+.info-item .value.status-pending {
+  color: #f59e0b;
 }
 
 .result-overall {

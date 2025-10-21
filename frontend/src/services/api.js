@@ -31,7 +31,8 @@ console.log('🌐 API Service Configuration:', {
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = sessionStorage.getItem('token');
+    // Check both sessionStorage and localStorage for backwards compatibility
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -58,6 +59,8 @@ api.interceptors.response.use(
         console.log('Authentication failed, logging out:', error.response?.data?.message);
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('user');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
         window.location.href = '/login';
       } else {
         // For other 401 errors (like insufficient permissions), don't logout
@@ -121,6 +124,8 @@ export const authAPI = {
       // Always clear session storage
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
     }
   },
 
@@ -636,15 +641,15 @@ export const servicesAPI = {
 export const authUtils = {
   // Check if user is logged in
   isAuthenticated: () => {
-    const token = sessionStorage.getItem('token');
-    const user = sessionStorage.getItem('user');
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+    const user = sessionStorage.getItem('user') || localStorage.getItem('user');
     return !!(token && user);
   },
 
   // Get stored user data
   getStoredUser: () => {
     try {
-      const user = sessionStorage.getItem('user');
+      const user = sessionStorage.getItem('user') || localStorage.getItem('user');
       return user ? JSON.parse(user) : null;
     } catch (error) {
       console.error('Error parsing stored user data:', error);
@@ -654,7 +659,7 @@ export const authUtils = {
 
   // Get stored token
   getStoredToken: () => {
-    return sessionStorage.getItem('token');
+    return sessionStorage.getItem('token') || localStorage.getItem('token');
   },
 
   // Check if user has specific role
@@ -678,6 +683,8 @@ export const authUtils = {
   clearAuthData: () => {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
   },
 };
 
@@ -1041,6 +1048,26 @@ export const testResultsAPI = {
     }
   },
 
+  // Get patient's own released test results
+  getMyTestResults: async () => {
+    try {
+      const response = await api.get('/test-results/my');
+      return {
+        success: true,
+        data: response.data.data,
+        count: response.data.count,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Get my test results error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch your test results',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
   // Mark test result as viewed (patient only)
   markAsViewed: async (testResultId) => {
     try {
@@ -1157,9 +1184,9 @@ export const testResultsAPI = {
   },
 
   // Release test result to patient (Pathologist, Admin)
-  releaseTestResult: async (testResultId) => {
+  releaseTestResult: async (testResultId, releaseData = {}) => {
     try {
-      const response = await api.put(`/test-results/${testResultId}/release`);
+      const response = await api.put(`/test-results/${testResultId}/release`, releaseData);
       return {
         success: true,
         data: response.data.data,
@@ -1200,6 +1227,44 @@ export const testResultsAPI = {
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to fetch test result statistics',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Approve test result (Pathologist, Admin)
+  approveTestResult: async (testResultId, approvalData = {}) => {
+    try {
+      const response = await api.put(`/test-results/${testResultId}/approve`, approvalData);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Approve test result error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to approve test result',
+        error: error.response?.data?.error
+      };
+    }
+  },
+
+  // Reject test result (Pathologist, Admin)
+  rejectTestResult: async (testResultId, rejectionData) => {
+    try {
+      const response = await api.put(`/test-results/${testResultId}/reject`, rejectionData);
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Reject test result error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to reject test result',
         error: error.response?.data?.error
       };
     }

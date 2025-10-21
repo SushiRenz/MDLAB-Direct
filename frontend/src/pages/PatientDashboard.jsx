@@ -26,6 +26,10 @@ function PatientDashboard(props) {
   
   // Test Results state - moved to component level
   const [testResults, setTestResults] = useState([]);
+  
+  // Modal state for test results
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [selectedTestResult, setSelectedTestResult] = useState(null);
   const [filteredResults, setFilteredResults] = useState([]);
 
   // Mobile Lab state
@@ -63,20 +67,22 @@ function PatientDashboard(props) {
   useEffect(() => {
     const fetchTestResults = async () => {
       try {
-        // For patients, the API automatically filters to their results
-        const response = await testResultsAPI.getTestResults({
-          sortBy: 'sampleDate',
-          sortOrder: 'desc'
-        });
+        // For patients, get their own released test results
+        const response = await testResultsAPI.getMyTestResults();
         
         if (response.success) {
+          console.log('✅ Patient test results loaded:', {
+            count: response.count,
+            data: response.data
+          });
+          
           // Transform API data to match component format
           const transformedResults = response.data.map(result => ({
             sampleId: result.sampleId,
             patient: result.patientName || `${currentUser?.firstName} ${currentUser?.lastName}` || 'Patient',
             patientId: result.patient,
             testType: result.testType || result.serviceName,
-            results: Object.fromEntries(result.results || new Map()),
+            results: result.results || {},
             date: result.sampleDate,
             status: result.status,
             technician: result.medTech?.firstName ? `${result.medTech.firstName} ${result.medTech.lastName}` : 'medtech',
@@ -574,6 +580,88 @@ function PatientDashboard(props) {
     }
   };
 
+  // Handle viewing full test report
+  const handleViewFullReport = (testResult) => {
+    setSelectedTestResult(testResult);
+    setShowResultModal(true);
+  };
+
+  // Helper function to get test result value from MongoDB data (same as ReviewResults)
+  const getTestFieldValue = (fieldKey, results) => {
+    if (!results || !fieldKey) return null;
+    
+    // Handle regular objects (JSON-serialized from MongoDB)
+    if (typeof results === 'object' && !(results instanceof Map)) {
+      return results[fieldKey];
+    }
+    
+    // Handle Map objects (direct MongoDB access)
+    if (results instanceof Map) {
+      return results.get(fieldKey);
+    }
+    
+    return null;
+  };
+
+  // Function to organize test results for display in modal (similar to ReviewResults)
+  const getOrganizedTestResults = (testData) => {
+    if (!testData?.results) {
+      return {};
+    }
+
+    const results = testData.results;
+    const testType = testData.testType?.toLowerCase() || '';
+    
+    // Define test categories based on test type
+    if (testType.includes('cbc') || testType.includes('blood')) {
+      return {
+        hematology: {
+          title: 'HEMATOLOGY',
+          fields: {
+            wbc: { label: 'White Blood Cell Count', value: getTestFieldValue('wbc', results) || getTestFieldValue('whiteBloodCells', results), normalRange: '4.0-11.0 x10³/µL' },
+            rbc: { label: 'Red Blood Cell Count', value: getTestFieldValue('rbc', results) || getTestFieldValue('redBloodCells', results), normalRange: '4.5-5.5 x10⁶/µL' },
+            hemoglobin: { label: 'Hemoglobin', value: getTestFieldValue('hemoglobin', results) || getTestFieldValue('hgb', results), normalRange: '12.0-16.0 g/dL' },
+            hematocrit: { label: 'Hematocrit', value: getTestFieldValue('hematocrit', results) || getTestFieldValue('hct', results), normalRange: '36-46%' },
+            platelets: { label: 'Platelet Count', value: getTestFieldValue('platelets', results) || getTestFieldValue('plateletCount', results), normalRange: '150-450 x10³/µL' }
+          }
+        }
+      };
+    } else if (testType.includes('urine')) {
+      return {
+        urinalysis: {
+          title: 'URINALYSIS',
+          fields: {
+            color: { label: 'Color', value: getTestFieldValue('color', results), normalRange: 'Yellow' },
+            transparency: { label: 'Transparency', value: getTestFieldValue('transparency', results), normalRange: 'Clear' },
+            specificGravity: { label: 'Specific Gravity', value: getTestFieldValue('specificGravity', results), normalRange: '1.010-1.025' },
+            protein: { label: 'Protein', value: getTestFieldValue('protein', results), normalRange: 'Negative' },
+            glucose: { label: 'Glucose', value: getTestFieldValue('glucose', results), normalRange: 'Negative' }
+          }
+        }
+      };
+    } else {
+      // Generic results display
+      const genericFields = {};
+      Object.entries(results).forEach(([key, value]) => {
+        const fieldValue = getTestFieldValue(key, results);
+        if (fieldValue) {
+          genericFields[key] = {
+            label: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1'),
+            value: fieldValue,
+            normalRange: 'See reference'
+          };
+        }
+      });
+      
+      return {
+        general: {
+          title: testData.testType || 'TEST RESULTS',
+          fields: genericFields
+        }
+      };
+    }
+  };
+
   const renderPageTitle = () => {
     switch (activeSection) {
       case 'appointments': return 'My Appointments';
@@ -1020,32 +1108,30 @@ function PatientDashboard(props) {
                 </div>
                 <div className="result-content">
                   <h4>{result.testType}</h4>
-                  <div className="result-summary">
-                    {Object.entries(result.results).map(([key, value]) => {
-                      const formatted = formatResultValue(key, value, result.testType);
-                      return (
-                        <div key={key} className="summary-item">
-                          <span>{key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}:</span>
-                          <span className={formatted.isNormal ? 'normal' : 'abnormal'}>
-                            {formatted.value} ({formatted.status})
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="result-overall">
-                    <span className={`overall-status ${getOverallStatus(result.results, result.testType).includes('Normal') ? 'normal' : 'abnormal'}`}>
-                      Overall: {getOverallStatus(result.results, result.testType)}
-                    </span>
-                  </div>
-                  {result.technician && (
-                    <div className="result-tech">
-                      <small>Processed by: {result.technician}</small>
+                  <div className="result-info">
+                    <div className="info-item">
+                      <span className="label">Sample ID:</span>
+                      <span className="value">{result.sampleId || 'N/A'}</span>
                     </div>
-                  )}
+                    <div className="info-item">
+                      <span className="label">Status:</span>
+                      <span className={`value status-${result.status}`}>{result.status || 'Completed'}</span>
+                    </div>
+                    {result.technician && (
+                      <div className="info-item">
+                        <span className="label">Processed by:</span>
+                        <span className="value">{result.technician}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="result-actions">
-                  <button className="btn-view">View Full Report</button>
+                  <button 
+                    className="btn-view"
+                    onClick={() => handleViewFullReport(result)}
+                  >
+                    View Full Report
+                  </button>
                   <button className="btn-download">Download PDF</button>
                 </div>
               </div>
@@ -1346,6 +1432,195 @@ function PatientDashboard(props) {
         error={mobileLabError}
       />
       
+      {/* Test Results Modal */}
+      {showResultModal && selectedTestResult && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            maxWidth: '900px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '20px',
+              borderBottom: '1px solid #dee2e6',
+              backgroundColor: '#f8f9fa',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{ margin: 0, color: '#2c3e50' }}>Laboratory Test Results</h3>
+              <button
+                onClick={() => setShowResultModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#6c757d'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Professional Lab Report Content */}
+            <div style={{ padding: '25px' }}>
+              {/* Patient Information */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '15px',
+                marginBottom: '30px',
+                padding: '15px',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '6px'
+              }}>
+                <div>
+                  <strong>Patient:</strong> {selectedTestResult.patient || `${currentUser?.firstName} ${currentUser?.lastName}` || 'Patient'}
+                </div>
+                <div>
+                  <strong>Test Type:</strong> {selectedTestResult.testType || 'N/A'}
+                </div>
+                <div>
+                  <strong>Sample Date:</strong> {selectedTestResult.date ? new Date(selectedTestResult.date).toLocaleDateString() : 'N/A'}
+                </div>
+                <div>
+                  <strong>Sample ID:</strong> {selectedTestResult.sampleId || 'N/A'}
+                </div>
+                <div>
+                  <strong>Status:</strong> 
+                  <span style={{
+                    marginLeft: '8px',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    backgroundColor: '#d4edda',
+                    color: '#155724'
+                  }}>
+                    Released
+                  </span>
+                </div>
+              </div>
+
+              {/* Test Results by Category */}
+              {(() => {
+                const organizedResults = getOrganizedTestResults(selectedTestResult);
+                
+                if (Object.keys(organizedResults).length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                      <p>No test results available for display.</p>
+                    </div>
+                  );
+                }
+
+                return Object.entries(organizedResults).map(([category, categoryData]) => (
+                  <div key={category} style={{ marginBottom: '30px' }}>
+                    {/* Category Header */}
+                    <div style={{
+                      background: '#21AEA8',
+                      color: 'white',
+                      padding: '10px 15px',
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      marginBottom: '15px',
+                      textAlign: 'center'
+                    }}>
+                      {categoryData.title}
+                    </div>
+                    
+                    {/* Tests Table */}
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                      <thead>
+                        <tr style={{ background: '#f1f3f4' }}>
+                          <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Test</th>
+                          <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>Result</th>
+                          <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>Normal Range</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(categoryData.fields).map(([fieldKey, fieldData]) => (
+                          <tr key={fieldKey}>
+                            <td style={{ border: '1px solid #ddd', padding: '12px', fontWeight: 'bold' }}>
+                              {fieldData.label}
+                            </td>
+                            <td style={{ 
+                              border: '1px solid #ddd', 
+                              padding: '12px', 
+                              textAlign: 'center',
+                              fontWeight: 'bold',
+                              color: fieldData.value && (fieldData.value.toString().includes('Positive') || fieldData.value.toString().includes('Reactive')) ? '#e74c3c' : '#27ae60'
+                            }}>
+                              {fieldData.value || 'Pending'}
+                            </td>
+                            <td style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>
+                              {fieldData.normalRange}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ));
+              })()}
+
+              {/* Verification Note */}
+              <div style={{
+                marginTop: '30px',
+                fontSize: '13px',
+                color: '#666',
+                borderTop: '1px solid #eee',
+                paddingTop: '15px'
+              }}>
+                <p style={{ margin: '0 0 5px 0' }}>
+                  <strong>Specimen rechecked, result/s verified.</strong>
+                </p>
+              </div>
+
+              {/* Signatures */}
+              <div style={{ 
+                marginTop: '20px',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '40px',
+                fontSize: '13px',
+                textAlign: 'center'
+              }}>
+                <div>
+                  <div style={{ borderBottom: '1px solid #333', marginBottom: '5px', height: '40px' }}></div>
+                  <div style={{ fontWeight: 'bold' }}>MARIA SHIELA M. RAMOS, RMT</div>
+                  <div>License#0033711</div>
+                  <div>MEDICAL TECHNOLOGIST</div>
+                </div>
+                <div>
+                  <div style={{ borderBottom: '1px solid #333', marginBottom: '5px', height: '40px' }}></div>
+                  <div style={{ fontWeight: 'bold' }}>GIDEON M. RAMOS, MD</div>
+                  <div>License#0108071</div>
+                  <div>PATHOLOGIST</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Logout Confirmation Modal */}
       {isLogoutModalOpen && (
         <div className="logout-modal-overlay">
