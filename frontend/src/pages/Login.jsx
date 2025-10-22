@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../design/Login.css';
 import mdlabLogo from '../assets/mdlab-logo.png';
-import { API_ENDPOINTS } from '../config/api';
+import api from '../services/api'; // Use the configured axios instance instead
 
 function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLogin }) {
   const [formData, setFormData] = useState({
@@ -52,46 +52,14 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
     try {
       console.log('Attempting login with:', formData.identifier);
       
-      const response = await fetch(API_ENDPOINTS.LOGIN, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          identifier: formData.identifier.trim(),
-          password: formData.password
-        }),
+      const response = await api.post('/auth/login', {
+        identifier: formData.identifier.trim(),
+        password: formData.password
       });
 
-      const data = await response.json();
+      const data = response.data;
       console.log('Login response status:', response.status);
       console.log('Login response data:', data);
-
-      if (!response.ok) {
-        // Handle different error status codes - ALL should show error without reload
-        let errorMessage = 'Login failed. Please try again.';
-        
-        if (response.status === 401) {
-          // Check if the message specifically mentions deactivation
-          if (data.message && data.message.toLowerCase().includes('deactivated')) {
-            errorMessage = data.message;
-          } else {
-            // This covers both "user not found" AND "wrong password"
-            errorMessage = 'Invalid username/email or password. Please check your credentials and try again.';
-          }
-        } else if (response.status === 423) {
-          errorMessage = 'Account is temporarily locked due to too many failed attempts. Please try again later.';
-        } else if (response.status === 403) {
-          errorMessage = 'Account has been deactivated. Please contact administrator.';
-        } else if (data.message) {
-          errorMessage = data.message;
-        }
-        
-        console.log('Setting error message:', errorMessage);
-        setError(errorMessage);
-        setLoading(false);
-        return; // Important: return here to prevent further execution
-      }
 
       // Success - store user data and redirect based on role
       if (data.success && data.token) {
@@ -126,7 +94,33 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
 
     } catch (err) {
       console.error('Login error:', err);
-      setError('Network error. Please check if the server is running and try again.');
+      
+      if (err.response) {
+        // Server responded with error status
+        const data = err.response.data;
+        let errorMessage = 'Login failed. Please try again.';
+        
+        if (err.response.status === 401) {
+          // Check if the message specifically mentions deactivation
+          if (data.message && data.message.toLowerCase().includes('deactivated')) {
+            errorMessage = data.message;
+          } else {
+            // This covers both "user not found" AND "wrong password"
+            errorMessage = 'Invalid username/email or password. Please check your credentials and try again.';
+          }
+        } else if (err.response.status === 423) {
+          errorMessage = 'Account is temporarily locked due to too many failed attempts. Please try again later.';
+        } else if (err.response.status === 403) {
+          errorMessage = 'Account has been deactivated. Please contact administrator.';
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
+        
+        setError(errorMessage);
+      } else {
+        // Network or other error
+        setError('Network error. Please check if the server is running and try again.');
+      }
       setLoading(false);
     }
   };

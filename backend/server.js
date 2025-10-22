@@ -84,13 +84,16 @@ app.use(cors({
 
 // Additional CORS headers middleware (fallback)
 app.use((req, res, next) => {
-  const allowedOrigins = [
-    'http://localhost:5173',
-    'http://localhost:5174'
-  ];
-  
   const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
+  
+  // Allow all origins matching our patterns
+  if (origin && (
+    origin.includes('localhost') ||
+    origin.includes('127.0.0.1') ||
+    /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin) ||
+    /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/.test(origin) ||
+    /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+:\d+$/.test(origin)
+  )) {
     res.header('Access-Control-Allow-Origin', origin);
   }
   
@@ -104,6 +107,13 @@ app.use((req, res, next) => {
     return res.status(200).end();
   }
   
+  next();
+});
+
+// Debug logging for CORS requests
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  console.log(`🔍 Request: ${req.method} ${req.url} from origin: ${origin || 'none'}`);
   next();
 });
 

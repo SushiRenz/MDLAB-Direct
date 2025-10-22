@@ -8,7 +8,7 @@ import MedTechDashboard from './pages/MedTechDashboard';
 import PathologistDashboard from './pages/PathologistDashboard';
 import PatientDashboard from './pages/PatientDashboard';
 import ReceptionistDashboard from './pages/ReceptionistDashboard';
-import { API_ENDPOINTS } from './config/api';
+import api from './services/api'; // Use the configured axios instance
 
 function App() {
   const [currentView, setCurrentView] = useState('login');
@@ -54,19 +54,10 @@ function App() {
           const userData = JSON.parse(user);
           
           // Validate token with backend
-          const response = await fetch(API_ENDPOINTS.ME, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          });
+          const response = await api.get('/auth/me');
           
-          if (response.ok) {
-            const currentUserData = await response.json();
-            
-            // Use the fresh user data from the server
-            const validUser = currentUserData.user || currentUserData;
+          // Use the fresh user data from the server
+          const validUser = response.data.user || response.data;
             
             // Update sessionStorage with fresh user data
             sessionStorage.setItem('user', JSON.stringify(validUser));
@@ -129,19 +120,9 @@ function App() {
             }
             
             console.log('Session restored successfully for:', validUser.role, validUser.firstName);
-          } else {
-            // Token is invalid or expired
-            console.log('Invalid token - clearing session');
-            sessionStorage.removeItem('token');
-            sessionStorage.removeItem('user');
-            sessionStorage.removeItem('currentView');
-            setCurrentUser(null);
-            setIsAuthenticated(false);
-            setCurrentView('login');
-          }
         } catch (error) {
-          // Error validating token or parsing user data
-          console.error('Error validating session:', error);
+          // Token is invalid or expired
+          console.log('Invalid token - clearing session');
           sessionStorage.removeItem('token');
           sessionStorage.removeItem('user');
           sessionStorage.removeItem('currentView');
@@ -304,12 +285,7 @@ function App() {
     
     // Optional: Call backend logout endpoint
     if (token) {
-      fetch(API_ENDPOINTS.LOGOUT, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      }).catch(err => console.log('Backend logout call failed:', err));
+      api.post('/auth/logout').catch(err => console.log('Backend logout call failed:', err));
     }
   };
 
@@ -318,8 +294,15 @@ function App() {
     sessionStorage.setItem('currentView', 'signup');
   };
 
-  const handleNavigateToLogin = () => {
-    // Clear any existing authentication state when navigating to login
+  const handleNavigateToLogin = (userData = null) => {
+    // If userData is provided (from automatic login after signup), handle it
+    if (userData && userData.token) {
+      console.log('Automatic login after signup with user:', userData);
+      handleLogin(userData);
+      return;
+    }
+    
+    // Otherwise, clear authentication state and navigate to login
     setIsAuthenticated(false);
     setCurrentUser(null);
     setCurrentView('login');

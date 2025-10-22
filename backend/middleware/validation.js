@@ -40,6 +40,81 @@ const validateRegister = [
     .matches(/^(\+63|0)[0-9]{10}$/)
     .withMessage('Please provide a valid Philippine phone number'),
 
+  body('dateOfBirth')
+    .optional()
+    .isISO8601()
+    .toDate()
+    .custom((value) => {
+      if (!value) return true; // Optional field
+      
+      const today = new Date();
+      const birthDate = new Date(value);
+      const age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      
+      if (age < 13) {
+        throw new Error('You must be at least 13 years old to register');
+      }
+      
+      if (birthDate > today) {
+        throw new Error('Date of birth cannot be in the future');
+      }
+      
+      return true;
+    }),
+
+  body('gender')
+    .optional()
+    .isIn(['male', 'female', 'other'])
+    .withMessage('Gender must be male, female, or other'),
+
+  body('address')
+    .notEmpty()
+    .withMessage('Address is required')
+    .custom((value) => {
+      // Address is required
+      if (!value) {
+        throw new Error('Address is required');
+      }
+      
+      // Allow string format (new format)
+      if (typeof value === 'string') {
+        if (value.trim().length === 0) {
+          throw new Error('Address cannot be empty');
+        }
+        if (value.length > 500) {
+          throw new Error('Address cannot exceed 500 characters');
+        }
+        return true;
+      }
+      
+      // Allow object format (old format) for backward compatibility
+      if (typeof value === 'object' && value !== null) {
+        if (!value.street && !value.city && !value.province && !value.zipCode) {
+          throw new Error('Address object must have at least one field');
+        }
+        if (value.street && value.street.length > 200) {
+          throw new Error('Street address cannot exceed 200 characters');
+        }
+        if (value.city && value.city.length > 100) {
+          throw new Error('City cannot exceed 100 characters');
+        }
+        if (value.province && value.province.length > 100) {
+          throw new Error('Province cannot exceed 100 characters');
+        }
+        if (value.zipCode && value.zipCode.length > 10) {
+          throw new Error('ZIP code cannot exceed 10 characters');
+        }
+        return true;
+      }
+      
+      throw new Error('Address must be either a string or an object with address fields');
+    }),
+
   body('role')
     .optional()
     .isIn(['patient', 'medtech', 'pathologist', 'admin'])
@@ -91,29 +166,39 @@ const validateUpdateProfile = [
     .isIn(['male', 'female', 'other'])
     .withMessage('Gender must be male, female, or other'),
 
-  body('address.street')
+  body('address')
     .optional()
-    .trim()
-    .isLength({ max: 100 })
-    .withMessage('Street address cannot exceed 100 characters'),
-
-  body('address.city')
-    .optional()
-    .trim()
-    .isLength({ max: 50 })
-    .withMessage('City cannot exceed 50 characters'),
-
-  body('address.province')
-    .optional()
-    .trim()
-    .isLength({ max: 50 })
-    .withMessage('Province cannot exceed 50 characters'),
-
-  body('address.zipCode')
-    .optional()
-    .trim()
-    .isLength({ max: 10 })
-    .withMessage('Zip code cannot exceed 10 characters')
+    .custom((value) => {
+      // Allow null/undefined
+      if (!value) return true;
+      
+      // Allow string format (new format)
+      if (typeof value === 'string') {
+        if (value.length > 500) {
+          throw new Error('Address cannot exceed 500 characters');
+        }
+        return true;
+      }
+      
+      // Allow object format (old format) for backward compatibility
+      if (typeof value === 'object' && value !== null) {
+        if (value.street && value.street.length > 100) {
+          throw new Error('Street address cannot exceed 100 characters');
+        }
+        if (value.city && value.city.length > 50) {
+          throw new Error('City cannot exceed 50 characters');
+        }
+        if (value.province && value.province.length > 50) {
+          throw new Error('Province cannot exceed 50 characters');
+        }
+        if (value.zipCode && value.zipCode.length > 10) {
+          throw new Error('ZIP code cannot exceed 10 characters');
+        }
+        return true;
+      }
+      
+      throw new Error('Address must be either a string or an object with address fields');
+    })
 ];
 
 // Change password validation
@@ -180,29 +265,39 @@ const validateUpdateUser = [
     .isBoolean()
     .withMessage('isActive must be a boolean value'),
 
-  body('address.street')
+  body('address')
     .optional()
-    .trim()
-    .isLength({ max: 100 })
-    .withMessage('Street address cannot exceed 100 characters'),
-
-  body('address.city')
-    .optional()
-    .trim()
-    .isLength({ max: 50 })
-    .withMessage('City cannot exceed 50 characters'),
-
-  body('address.province')
-    .optional()
-    .trim()
-    .isLength({ max: 50 })
-    .withMessage('Province cannot exceed 50 characters'),
-
-  body('address.zipCode')
-    .optional()
-    .trim()
-    .isLength({ max: 10 })
-    .withMessage('Zip code cannot exceed 10 characters')
+    .custom((value) => {
+      // Allow null/undefined
+      if (!value) return true;
+      
+      // Allow string format (new format)
+      if (typeof value === 'string') {
+        if (value.length > 500) {
+          throw new Error('Address cannot exceed 500 characters');
+        }
+        return true;
+      }
+      
+      // Allow object format (old format) for backward compatibility
+      if (typeof value === 'object' && value !== null) {
+        if (value.street && value.street.length > 100) {
+          throw new Error('Street address cannot exceed 100 characters');
+        }
+        if (value.city && value.city.length > 50) {
+          throw new Error('City cannot exceed 50 characters');
+        }
+        if (value.province && value.province.length > 50) {
+          throw new Error('Province cannot exceed 50 characters');
+        }
+        if (value.zipCode && value.zipCode.length > 10) {
+          throw new Error('ZIP code cannot exceed 10 characters');
+        }
+        return true;
+      }
+      
+      throw new Error('Address must be either a string or an object with address fields');
+    })
 ];
 
 module.exports = {

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { calculateAge, formatAge, formatDate } from '../utils/dateUtils';
+import { API_ENDPOINTS } from '../config/api';
 import '../design/PatientDashboard.css';
 
 function PatientProfile({ user, onProfileUpdate }) {
@@ -44,14 +45,14 @@ function PatientProfile({ user, onProfileUpdate }) {
     }
   }, [user]);
 
-  // Fetch fresh user data when component mounts to ensure we have latest profile info
+  // Only fetch fresh user data on initial mount if we don't have complete user data
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         const token = sessionStorage.getItem('token');
-        if (token && user?.id) {
-          console.log('PatientProfile - Fetching fresh user data');
-          const response = await axios.get('/api/auth/me', {
+        if (token) {
+          console.log('PatientProfile - Fetching fresh user data (initial mount)');
+          const response = await axios.get(API_ENDPOINTS.ME, {
             headers: {
               Authorization: `Bearer ${token}`
             }
@@ -70,11 +71,11 @@ function PatientProfile({ user, onProfileUpdate }) {
       }
     };
 
-    // Only fetch if we have a user but missing profile data
-    if (user?.id && (!user.gender && !user.dateOfBirth && !user.address)) {
+    // Only fetch on initial mount if we don't have user data or if essential fields are missing
+    if (!user || !user.id || !user.email) {
       fetchUserData();
     }
-  }, [user?.id, onProfileUpdate]);
+  }, []); // Remove dependencies to prevent infinite loop
 
   const handleEditClick = () => {
     // Update profile data when entering edit mode

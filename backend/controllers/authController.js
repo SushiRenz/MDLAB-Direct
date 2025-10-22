@@ -25,6 +25,9 @@ const register = asyncHandler(async (req, res, next) => {
     firstName,
     lastName,
     phone,
+    dateOfBirth,
+    gender,
+    address,
     role = 'patient'
   } = req.body;
 
@@ -45,6 +48,9 @@ const register = asyncHandler(async (req, res, next) => {
     firstName,
     lastName,
     phone,
+    dateOfBirth,
+    gender,
+    address,
     role
   });
 

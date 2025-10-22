@@ -662,6 +662,22 @@ function PatientDashboard(props) {
     }
   };
 
+  // Helper function to calculate age from date of birth
+  const calculateAge = (dateOfBirth) => {
+    if (!dateOfBirth) return null;
+    
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
   const renderPageTitle = () => {
     switch (activeSection) {
       case 'appointments': return 'My Appointments';
@@ -1492,29 +1508,39 @@ function PatientDashboard(props) {
                 backgroundColor: '#f8f9fa',
                 borderRadius: '6px'
               }}>
-                <div>
-                  <strong>Patient:</strong> {selectedTestResult.patient || `${currentUser?.firstName} ${currentUser?.lastName}` || 'Patient'}
+                <div style={{ color: '#2d3748' }}>
+                  <strong style={{ color: '#2d3748' }}>Patient:</strong> {selectedTestResult.patient || `${currentUser?.firstName} ${currentUser?.lastName}` || 'Patient'}
                 </div>
-                <div>
-                  <strong>Test Type:</strong> {selectedTestResult.testType || 'N/A'}
+                <div style={{ color: '#2d3748' }}>
+                  <strong style={{ color: '#2d3748' }}>Test Type:</strong> {selectedTestResult.testType || 'N/A'}
                 </div>
-                <div>
-                  <strong>Sample Date:</strong> {selectedTestResult.date ? new Date(selectedTestResult.date).toLocaleDateString() : 'N/A'}
+                <div style={{ color: '#2d3748' }}>
+                  <strong style={{ color: '#2d3748' }}>Sample Date:</strong> {selectedTestResult.date ? new Date(selectedTestResult.date).toLocaleDateString() : 'N/A'}
                 </div>
-                <div>
-                  <strong>Sample ID:</strong> {selectedTestResult.sampleId || 'N/A'}
+                <div style={{ color: '#2d3748' }}>
+                  <strong style={{ color: '#2d3748' }}>Sample ID:</strong> {selectedTestResult.sampleId || 'N/A'}
                 </div>
-                <div>
-                  <strong>Status:</strong> 
+                <div style={{ color: '#2d3748' }}>
+                  <strong style={{ color: '#2d3748' }}>Status:</strong> 
                   <span style={{
                     marginLeft: '8px',
                     padding: '2px 8px',
                     borderRadius: '12px',
                     fontSize: '12px',
-                    backgroundColor: '#d4edda',
-                    color: '#155724'
+                    backgroundColor: selectedTestResult.status === 'completed' ? '#d4edda' : 
+                                     selectedTestResult.status === 'reviewed' ? '#d1ecf1' :
+                                     selectedTestResult.status === 'released' ? '#d4edda' :
+                                     selectedTestResult.status === 'rejected' ? '#f8d7da' :
+                                     selectedTestResult.status === 'pending' ? '#fff3cd' :
+                                     '#f8f9fa',
+                    color: selectedTestResult.status === 'completed' ? '#155724' : 
+                           selectedTestResult.status === 'reviewed' ? '#0c5460' :
+                           selectedTestResult.status === 'released' ? '#155724' :
+                           selectedTestResult.status === 'rejected' ? '#721c24' :
+                           selectedTestResult.status === 'pending' ? '#856404' :
+                           '#495057'
                   }}>
-                    Released
+                    {selectedTestResult.status === 'released' ? 'Released' : (selectedTestResult.status || 'Pending')}
                   </span>
                 </div>
               </div>
@@ -1550,15 +1576,15 @@ function PatientDashboard(props) {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                       <thead>
                         <tr style={{ background: '#f1f3f4' }}>
-                          <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Test</th>
-                          <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>Result</th>
-                          <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>Normal Range</th>
+                          <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left', color: '#2d3748' }}>Test</th>
+                          <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center', color: '#2d3748' }}>Result</th>
+                          <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center', color: '#2d3748' }}>Normal Range</th>
                         </tr>
                       </thead>
                       <tbody>
                         {Object.entries(categoryData.fields).map(([fieldKey, fieldData]) => (
                           <tr key={fieldKey}>
-                            <td style={{ border: '1px solid #ddd', padding: '12px', fontWeight: 'bold' }}>
+                            <td style={{ border: '1px solid #ddd', padding: '12px', fontWeight: 'bold', color: '#2d3748' }}>
                               {fieldData.label}
                             </td>
                             <td style={{ 
@@ -1570,7 +1596,7 @@ function PatientDashboard(props) {
                             }}>
                               {fieldData.value || 'Pending'}
                             </td>
-                            <td style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>
+                            <td style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center', color: '#2d3748' }}>
                               {fieldData.normalRange}
                             </td>
                           </tr>
@@ -1601,19 +1627,20 @@ function PatientDashboard(props) {
                 gridTemplateColumns: '1fr 1fr',
                 gap: '40px',
                 fontSize: '13px',
-                textAlign: 'center'
+                textAlign: 'center',
+                color: '#2d3748'
               }}>
                 <div>
                   <div style={{ borderBottom: '1px solid #333', marginBottom: '5px', height: '40px' }}></div>
-                  <div style={{ fontWeight: 'bold' }}>MARIA SHIELA M. RAMOS, RMT</div>
-                  <div>License#0033711</div>
-                  <div>MEDICAL TECHNOLOGIST</div>
+                  <div style={{ fontWeight: 'bold', color: '#2d3748' }}>MARIA SHIELA M. RAMOS, RMT</div>
+                  <div style={{ color: '#2d3748' }}>License#0033711</div>
+                  <div style={{ color: '#2d3748' }}>MEDICAL TECHNOLOGIST</div>
                 </div>
                 <div>
                   <div style={{ borderBottom: '1px solid #333', marginBottom: '5px', height: '40px' }}></div>
-                  <div style={{ fontWeight: 'bold' }}>GIDEON M. RAMOS, MD</div>
-                  <div>License#0108071</div>
-                  <div>PATHOLOGIST</div>
+                  <div style={{ fontWeight: 'bold', color: '#2d3748' }}>AMABEL A. CALUB,MD,DPSP</div>
+                  <div style={{ color: '#2d3748' }}>License# 0109978</div>
+                  <div style={{ color: '#2d3748' }}>PATHOLOGIST</div>
                 </div>
               </div>
             </div>

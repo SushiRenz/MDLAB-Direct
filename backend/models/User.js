@@ -50,14 +50,8 @@ const userSchema = new mongoose.Schema({
   patientId: {
     type: String,
     unique: true,
-    sparse: true, // Only enforce uniqueness for non-null values (patients only)
-    default: function() {
-      // Only generate patient ID for patients
-      if (this.role === 'patient') {
-        return 'P' + Date.now().toString().slice(-6) + Math.random().toString(36).substr(2, 3).toUpperCase();
-      }
-      return null;
-    }
+    sparse: true, // Only enforce uniqueness for non-null values
+    default: null // Will be generated in pre-save middleware
   },
   profilePic: {
     type: String,  
@@ -72,10 +66,25 @@ const userSchema = new mongoose.Schema({
     ]
   },
   address: {
-    street: { type: String, trim: true },
-    city: { type: String, trim: true },
-    province: { type: String, trim: true },
-    zipCode: { type: String, trim: true }
+    type: mongoose.Schema.Types.Mixed, // Allow both string and object
+    required: [true, 'Address is required'],
+    validate: {
+      validator: function(v) {
+        // Address is required, so don't allow null/undefined
+        if (!v) return false;
+        
+        // Allow string format (new)
+        if (typeof v === 'string') return v.trim().length > 0;
+        
+        // Allow object format (old) - at least one field must be present
+        if (typeof v === 'object' && v !== null) {
+          return v.street || v.city || v.province || v.zipCode;
+        }
+        
+        return false;
+      },
+      message: 'Address is required and must be either a non-empty string or an object with at least one field (street, city, province, zipCode)'
+    }
   },
   dateOfBirth: {
     type: Date
@@ -160,6 +169,28 @@ userSchema.virtual('age').get(function() {
   return age;
 });
 
+// Virtual for formatted address (handles both string and object formats)
+userSchema.virtual('formattedAddress').get(function() {
+  if (!this.address) return '';
+  
+  // If address is already a string, return it
+  if (typeof this.address === 'string') {
+    return this.address;
+  }
+  
+  // If address is an object, format it as a string
+  if (typeof this.address === 'object') {
+    const parts = [];
+    if (this.address.street) parts.push(this.address.street);
+    if (this.address.city) parts.push(this.address.city);
+    if (this.address.province) parts.push(this.address.province);
+    if (this.address.zipCode) parts.push(this.address.zipCode);
+    return parts.join(', ');
+  }
+  
+  return '';
+});
+
 // Virtual for account lock status
 userSchema.virtual('isLocked').get(function() {
   // Never lock accounts in development
@@ -172,8 +203,8 @@ userSchema.virtual('isLocked').get(function() {
 // Pre-save middleware to hash password and generate patient ID
 userSchema.pre('save', async function(next) {
   try {
-    // Generate patient ID for patients if not exists
-    if (this.role === 'patient' && !this.patientId) {
+    // Generate patient ID for ALL users if not exists
+    if (!this.patientId) {
       let patientId;
       let isUnique = false;
       let attempts = 0;

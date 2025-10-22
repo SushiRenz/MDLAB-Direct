@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import '../design/SignUp.css';
-import { API_BASE_URL, API_ENDPOINTS } from '../config/api';
+import api from '../services/api'; // Use the configured axios instance
 
 function SignUp({ onNavigateToLogin }) {
   const [formData, setFormData] = useState({
@@ -11,6 +11,9 @@ function SignUp({ onNavigateToLogin }) {
     firstName: '',
     lastName: '',
     phone: '',
+    dateOfBirth: '',
+    gender: '',
+    address: '',
     role: 'patient'
   });
   const [loading, setLoading] = useState(false);
@@ -81,6 +84,7 @@ function SignUp({ onNavigateToLogin }) {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -183,6 +187,47 @@ function SignUp({ onNavigateToLogin }) {
       return;
     }
 
+    // Validate date of birth
+    if (!formData.dateOfBirth) {
+      setError('Date of birth is required');
+      setLoading(false);
+      return;
+    }
+
+    const birthDate = new Date(formData.dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+
+    if (age < 0 || birthDate > today) {
+      setError('Please enter a valid date of birth');
+      setLoading(false);
+      return;
+    }
+
+    if (age < 13) {
+      setError('You must be at least 13 years old to create an account');
+      setLoading(false);
+      return;
+    }
+
+    // Validate required address field
+    if (!formData.address || formData.address.trim().length < 10) {
+      setError('Please enter a complete address (minimum 10 characters)');
+      setLoading(false);
+      return;
+    }
+
+    if (!formData.gender) {
+      setError('Please select your gender');
+      setLoading(false);
+      return;
+    }
+
     // Check if there are any validation errors
     if (Object.values(validationErrors).some(error => error !== '')) {
       setError('Please fix the validation errors before submitting');
@@ -191,52 +236,73 @@ function SignUp({ onNavigateToLogin }) {
     }
 
     try {
-      const response = await fetch(API_ENDPOINTS.REGISTER, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          phone: formData.phone,
-          role: 'patient' // Always register as patient
-        }),
+      const response = await api.post('/auth/register', {
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+        dateOfBirth: formData.dateOfBirth,
+        gender: formData.gender,
+        address: formData.address,
+        role: 'patient' // Always register as patient
       });
-
-      const data = await response.json();
+      
+      const data = response.data;
 
       if (data.success) {
-        setSuccess('Registration successful! You can now log in.');
-        // Clear form
-        setFormData({
-          username: '',
-          email: '',
-          password: '',
-          confirmPassword: '',
-          firstName: '',
-          lastName: '',
-          phone: '',
-          role: 'patient'
-        });
+        setSuccess('Registration successful! Logging you in...');
         
-        // Clear any existing auth tokens to prevent conflicts
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        
-        // Redirect to login after 2 seconds
-        setTimeout(() => {
-          onNavigateToLogin();
-        }, 2000);
+        // If the backend returns user data and token, automatically log the user in
+        if (data.token && data.user) {
+          // Store the auth data
+          sessionStorage.setItem('token', data.token);
+          sessionStorage.setItem('user', JSON.stringify(data.user));
+          
+          // Navigate to dashboard after brief delay
+          setTimeout(() => {
+            onNavigateToLogin(data.user); // Pass user data
+          }, 1500);
+        } else {
+          // Fallback: clear form and redirect to login page
+          setFormData({
+            username: '',
+            email: '',
+            password: '',
+            confirmPassword: '',
+            firstName: '',
+            lastName: '',
+            phone: '',
+            dateOfBirth: '',
+            gender: '',
+            address: '',
+            role: 'patient'
+          });
+          
+          // Clear any existing auth tokens to prevent conflicts
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          
+          // Redirect to login after 2 seconds
+          setTimeout(() => {
+            onNavigateToLogin();
+          }, 2000);
+        }
       } else {
         setError(data.message || 'Registration failed');
       }
     } catch (error) {
       console.error('Registration error:', error);
-      setError('Network error. Please try again.');
+      
+      if (error.response) {
+        // Server responded with error status
+        const data = error.response.data;
+        setError(data.message || 'Registration failed');
+      } else {
+        // Network or other error
+        setError('Network error. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -384,6 +450,46 @@ function SignUp({ onNavigateToLogin }) {
               value={formData.phone}
               onChange={handleInputChange}
               className="signup-input"
+              disabled={loading}
+            />
+
+            <input
+              type="date"
+              name="dateOfBirth"
+              placeholder="Date of Birth"
+              value={formData.dateOfBirth}
+              onChange={handleInputChange}
+              className="signup-input"
+              required
+              disabled={loading}
+              max={new Date().toISOString().split('T')[0]} // Prevent future dates
+            />
+
+            <select
+              name="gender"
+              value={formData.gender}
+              onChange={handleInputChange}
+              className="signup-input"
+              required
+              disabled={loading}
+              style={{
+                color: formData.gender ? '#333' : '#999'
+              }}
+            >
+              <option value="" disabled>Select Gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+
+            <input
+              type="text"
+              name="address"
+              placeholder="Complete Address *"
+              value={formData.address}
+              onChange={handleInputChange}
+              className="signup-input"
+              required
               disabled={loading}
             />
 

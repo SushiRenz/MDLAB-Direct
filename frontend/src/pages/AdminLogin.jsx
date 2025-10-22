@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import '../design/AdminLogin.css';
 import mdlabLogo from '../assets/mdlab-logo.png';
-import { API_ENDPOINTS } from '../config/api';
+import api from '../services/api'; // Use the configured axios instance
 
 function AdminLogin({ onNavigateToLogin, onNavigateToDashboard }) {
   const [formData, setFormData] = useState({
@@ -39,40 +39,14 @@ function AdminLogin({ onNavigateToLogin, onNavigateToDashboard }) {
     try {
       console.log('Admin login attempt with:', formData.identifier);
       
-      const response = await fetch(API_ENDPOINTS.LOGIN, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          identifier: formData.identifier.trim(),
-          password: formData.password
-        }),
+      const response = await api.post('/auth/login', {
+        identifier: formData.identifier.trim(),
+        password: formData.password
       });
 
-      const data = await response.json();
+      const data = response.data;
       console.log('Admin login response status:', response.status);
       console.log('Admin login response data:', data);
-
-      if (!response.ok) {
-        // Handle different error status codes
-        let errorMessage = 'Login failed. Please try again.';
-        
-        if (response.status === 401) {
-          errorMessage = 'Invalid staff credentials. Please check your username/email and password.';
-        } else if (response.status === 423) {
-          errorMessage = 'Account is temporarily locked due to too many failed attempts. Please try again later.';
-        } else if (response.status === 403) {
-          errorMessage = 'Account has been deactivated. Please contact system administrator.';
-        } else if (data.message) {
-          errorMessage = data.message;
-        }
-        
-        console.log('Setting admin error message:', errorMessage);
-        setError(errorMessage);
-        setLoading(false);
-        return;
-      }
 
       // Success - but check if user is admin/staff
       if (data.success && data.token) {
@@ -106,7 +80,27 @@ function AdminLogin({ onNavigateToLogin, onNavigateToDashboard }) {
 
     } catch (err) {
       console.error('Admin login error:', err);
-      setError('Network error. Please check if the server is running and try again.');
+      
+      if (err.response) {
+        // Server responded with error status
+        const data = err.response.data;
+        let errorMessage = 'Staff login failed. Please try again.';
+        
+        if (err.response.status === 401) {
+          errorMessage = 'Invalid staff credentials. Please check your username/email and password.';
+        } else if (err.response.status === 423) {
+          errorMessage = 'Account is temporarily locked due to too many failed attempts. Please try again later.';
+        } else if (err.response.status === 403) {
+          errorMessage = 'Account has been deactivated. Please contact system administrator.';
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
+        
+        setError(errorMessage);
+      } else {
+        // Network or other error
+        setError('Network error. Please check if the server is running and try again.');
+      }
       setLoading(false);
     }
   };
