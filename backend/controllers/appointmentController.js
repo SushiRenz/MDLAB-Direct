@@ -1100,12 +1100,43 @@ async function createTestResultForAppointment(appointment, currentUser) {
 
     // Handle patient data - registered vs walk-in
     if (appointment.patient && typeof appointment.patient === 'object' && appointment.patient._id) {
-      // Registered patient
+      // Registered patient (populated object)
       testResultData.patient = appointment.patient._id;
       testResultData.isWalkInPatient = false;
+    } else if (appointment.patient && typeof appointment.patient === 'string') {
+      // Check if this is a registered patient ID or email
+      const User = require('../models/User');
+      
+      // Try to find user by ID first, then by email
+      let registeredPatient = null;
+      if (appointment.patient.match(/^[0-9a-fA-F]{24}$/)) {
+        // It's a MongoDB ObjectId
+        registeredPatient = await User.findById(appointment.patient);
+      } else if (appointment.patient.includes('@')) {
+        // It's an email
+        registeredPatient = await User.findOne({ email: appointment.patient });
+      }
+      
+      if (registeredPatient) {
+        // It's a registered patient
+        testResultData.patient = registeredPatient._id;
+        testResultData.isWalkInPatient = false;
+        console.log(`📧 Found registered patient for test result: ${registeredPatient.firstName} ${registeredPatient.lastName} (${registeredPatient.email})`);
+      } else {
+        // It's a walk-in patient identifier
+        testResultData.patient = appointment.patient;
+        testResultData.isWalkInPatient = true;
+        testResultData.patientInfo = {
+          name: appointment.patientName,
+          age: appointment.age,
+          gender: appointment.sex,
+          address: appointment.address,
+          contactNumber: appointment.contactNumber
+        };
+      }
     } else {
-      // Walk-in patient or patient ID string
-      testResultData.patient = appointment.patient || `WALKIN-${appointment.patientName?.replace(/\s+/g, '-').toUpperCase()}-${Date.now()}`;
+      // Walk-in patient with no patient identifier
+      testResultData.patient = `WALKIN-${appointment.patientName?.replace(/\s+/g, '-').toUpperCase()}-${Date.now()}`;
       testResultData.isWalkInPatient = true;
       testResultData.patientInfo = {
         name: appointment.patientName,

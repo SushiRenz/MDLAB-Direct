@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MDLAB Direct - Frontend Debug Logs</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            margin: 20px;
+            background-color: #1e1e1e;
+            color: #fff;
+        }
+        .header {
+            background-color: #007bff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin-right: 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        button.clear {
+            background-color: #dc3545;
+        }
+        button.clear:hover {
+            background-color: #c82333;
+        }
+        .logs-container {
+            background-color: #2d2d2d;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 80vh;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 3px;
+        }
+        .status.success {
+            background-color: #28a745;
+        }
+        .status.error {
+            background-color: #dc3545;
+        }
+        .auto-refresh {
+            margin-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 MDLAB Direct - Frontend Debug Logs</h1>
+        <p>Real-time authentication and session debugging</p>
+    </div>
+
+    <div class="controls">
+        <button onclick="refreshLogs()">🔄 Refresh Logs</button>
+        <button onclick="clearLogs()" class="clear">🗑️ Clear Logs</button>
+        <button onclick="exportLogs()">📥 Export Logs</button>
+        <label class="auto-refresh">
+            <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">
+            Auto-refresh (5s)
+        </label>
+    </div>
+
+    <div id="status" class="status" style="display: none;"></div>
+
+    <div class="logs-container" id="logsContainer">
+        Loading logs...
+    </div>
+
+    <script>
+        let autoRefreshInterval = null;
+
+        async function refreshLogs() {
+            try {
+                showStatus('Loading logs...', 'success');
+                
+                // Get backend logs
+                const backendResponse = await fetch('http://192.168.1.112:5000/api/debug/frontend-logs');
+                const backendData = await backendResponse.json();
+                
+                // Get localStorage logs
+                const localLogs = JSON.parse(localStorage.getItem('auth_debug_logs') || '[]');
+                
+                let allLogs = '';
+                
+                if (backendData.success && backendData.logs && backendData.logs !== 'No logs found') {
+                    allLogs += '=== BACKEND STORED LOGS ===\\n';
+                    allLogs += backendData.logs + '\\n';
+                }
+                
+                if (localLogs.length > 0) {
+                    allLogs += '\\n=== LOCAL STORAGE LOGS ===\\n';
+                    localLogs.forEach(log => {
+                        allLogs += `[${log.timestamp}] ${log.message}\\n`;
+                        if (log.data) {
+                            allLogs += `Data: ${log.data}\\n`;
+                        }
+                        allLogs += `URL: ${log.url}\\n---\\n`;
+                    });
+                }
+                
+                if (!allLogs) {
+                    allLogs = 'No debug logs found. Try logging in with a new account to generate logs.';
+                }
+                
+                document.getElementById('logsContainer').textContent = allLogs;
+                showStatus('Logs refreshed successfully', 'success');
+                
+            } catch (error) {
+                showStatus(`Error loading logs: ${error.message}`, 'error');
+                console.error('Error loading logs:', error);
+            }
+        }
+
+        async function clearLogs() {
+            try {
+                // Clear backend logs
+                await fetch('http://192.168.1.112:5000/api/debug/frontend-logs', { method: 'DELETE' });
+                
+                // Clear localStorage logs
+                localStorage.removeItem('auth_debug_logs');
+                
+                document.getElementById('logsContainer').textContent = 'All logs cleared.';
+                showStatus('Logs cleared successfully', 'success');
+                
+            } catch (error) {
+                showStatus(`Error clearing logs: ${error.message}`, 'error');
+                console.error('Error clearing logs:', error);
+            }
+        }
+
+        function exportLogs() {
+            const logs = document.getElementById('logsContainer').textContent;
+            const blob = new Blob([logs], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `mdlab-debug-logs-${new Date().toISOString().slice(0, 10)}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showStatus('Logs exported successfully', 'success');
+        }
+
+        function toggleAutoRefresh() {
+            const checkbox = document.getElementById('autoRefresh');
+            
+            if (checkbox.checked) {
+                autoRefreshInterval = setInterval(refreshLogs, 5000);
+                showStatus('Auto-refresh enabled (5 second interval)', 'success');
+            } else {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                showStatus('Auto-refresh disabled', 'success');
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+            
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 3000);
+        }
+
+        // Load logs on page load
+        refreshLogs();
+    </script>
+</body>
+</html>

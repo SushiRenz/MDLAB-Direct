@@ -349,22 +349,41 @@ const createTestResult = asyncHandler(async (req, res) => {
     pathologistNotes
   } = req.body;
 
-  // Validate patient exists (or is a walk-in patient)
+  // Validate patient exists (prioritize registered accounts)
   let patient = null;
   let isWalkInPatient = false;
   
-  // Check if patientId is a valid MongoDB ObjectId
+  console.log('🔍 Processing patient ID:', patientId, 'Type:', typeof patientId);
+  
+  // First, try to find by ObjectId if it looks like one
   if (patientId && patientId.match(/^[0-9a-fA-F]{24}$/)) {
+    console.log('   Attempting ObjectId lookup...');
     patient = await User.findById(patientId);
-    if (!patient || patient.role !== 'patient') {
-      return res.status(404).json({
-        success: false,
-        message: 'Registered patient not found'
-      });
+    if (patient && patient.role === 'patient') {
+      console.log('   ✅ Found registered patient:', patient.firstName, patient.lastName);
+    } else {
+      console.log('   ❌ No registered patient found with this ObjectId');
     }
+  } 
+  
+  // If not found as ObjectId, try to find by email (for registered accounts)
+  if (!patient && patientId && patientId.includes('@')) {
+    console.log('   Attempting email lookup...');
+    patient = await User.findOne({ email: patientId, role: 'patient' });
+    if (patient) {
+      console.log('   ✅ Found registered patient by email:', patient.firstName, patient.lastName);
+    } else {
+      console.log('   ❌ No registered patient found with this email');
+    }
+  }
+  
+  // If we found a registered patient, use their ObjectId
+  if (patient) {
+    console.log('   📝 Using registered patient account');
+    isWalkInPatient = false;
   } else {
     // Handle walk-in patients (patientId might be a name or other identifier)
-    console.log('Processing walk-in patient:', patientId);
+    console.log('   📝 Processing as walk-in patient:', patientId);
     isWalkInPatient = true;
     
     // For walk-in patients, we'll store the patientId as-is (could be a name)
@@ -412,7 +431,7 @@ const createTestResult = asyncHandler(async (req, res) => {
 
   // Create test result
   const testResultData = {
-    patient: isWalkInPatient ? patientId : patientId, // Store ID/name for walk-ins, ObjectId for registered
+    patient: isWalkInPatient ? patientId : patient._id, // Store ID/name for walk-ins, ObjectId for registered
     appointment: appointmentId,
     service: serviceId,
     testType,

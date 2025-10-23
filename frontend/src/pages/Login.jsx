@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import '../design/Login.css';
 import mdlabLogo from '../assets/mdlab-logo.png';
 import api from '../services/api'; // Use the configured axios instance instead
+import authDebugger from '../utils/authDebugger';
 
 function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLogin }) {
   const [formData, setFormData] = useState({
@@ -16,6 +17,11 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
   // Reset component state when component mounts (useful when navigating from SignUp)
   useEffect(() => {
     console.log('Login component mounted/reset');
+    authDebugger.log('Login component mounted', {
+      hasExistingToken: !!sessionStorage.getItem('token'),
+      hasExistingUser: !!sessionStorage.getItem('user'),
+      currentUrl: window.location.href
+    });
     setFormData({
       identifier: '',
       password: ''
@@ -33,6 +39,15 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
       [name]: value
     });
     
+    authDebugger.log('Form input changed', {
+      fieldName: name,
+      fieldValue: value.substring(0, 20) + (value.length > 20 ? '...' : ''),
+      currentFormData: {
+        identifier: formData.identifier,
+        hasPassword: !!formData.password
+      }
+    });
+    
     // Clear error when user starts typing
     if (error) setError('');
   };
@@ -41,16 +56,35 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
     e.preventDefault();
     setError('');
 
+    authDebugger.log('Login form submitted', {
+      identifier: formData.identifier,
+      hasPassword: !!formData.password,
+      passwordLength: formData.password?.length,
+      formDataComplete: formData
+    });
+
     // Basic validation
     if (!formData.identifier || !formData.password) {
+      authDebugger.log('Login validation failed', {
+        missingIdentifier: !formData.identifier,
+        missingPassword: !formData.password
+      });
       setError('Please fill in all fields');
       return;
     }
 
     setLoading(true);
+    authDebugger.log('Starting login process', {
+      identifier: formData.identifier,
+      loadingState: true
+    });
 
     try {
       console.log('Attempting login with:', formData.identifier);
+      authDebugger.log('Login attempt started', {
+        identifier: formData.identifier,
+        hasPassword: !!formData.password
+      });
       
       const response = await api.post('/auth/login', {
         identifier: formData.identifier.trim(),
@@ -60,6 +94,13 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
       const data = response.data;
       console.log('Login response status:', response.status);
       console.log('Login response data:', data);
+      authDebugger.log('Login API response received', {
+        status: response.status,
+        success: data.success,
+        hasToken: !!data.token,
+        hasUser: !!data.user,
+        userRole: data.user?.role
+      });
 
       // Success - store user data and redirect based on role
       if (data.success && data.token) {
@@ -70,8 +111,17 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
         
         if (userRole === 'patient') {
           // Only patients allowed on this login page
+          authDebugger.log('Storing patient session data', {
+            token: data.token.substr(0, 20) + '...',
+            userEmail: data.user.email,
+            userRole: data.user.role,
+            userName: `${data.user.firstName} ${data.user.lastName}`
+          });
+          
           sessionStorage.setItem('token', data.token);
           sessionStorage.setItem('user', JSON.stringify(data.user));
+          
+          authDebugger.log('Session data stored, navigating to dashboard');
           
           setTimeout(() => {
             setLoading(false);
@@ -79,21 +129,39 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
           }, 500);
         } else if (userRole === 'admin' || userRole === 'pathologist' || userRole === 'medtech' || userRole === 'receptionist') {
           // Staff/admin accounts should use staff portal
+          authDebugger.log('User is staff, not patient', {
+            userRole: userRole,
+            message: 'Staff accounts must use staff portal'
+          });
           setLoading(false);
           setError('Staff accounts must use the Staff Portal. Please click the arrow in the top-right corner.');
         } else {
           // Unknown role
+          authDebugger.log('Unknown user role', {
+            userRole: userRole,
+            message: 'Account role not recognized'
+          });
           setLoading(false);
           setError('Account role not recognized. Please contact administrator.');
         }
       } else {
         console.log('Login response missing token or success flag');
+        authDebugger.log('Login failed - missing token or success flag', {
+          success: data.success,
+          hasToken: !!data.token,
+          responseData: data
+        });
         setError('Login failed. Please try again.');
         setLoading(false);
       }
 
     } catch (err) {
       console.error('Login error:', err);
+      authDebugger.log('Login error occurred', {
+        errorMessage: err.message,
+        errorResponse: err.response?.data,
+        errorStatus: err.response?.status
+      });
       
       if (err.response) {
         // Server responded with error status

@@ -9,6 +9,7 @@ import PathologistDashboard from './pages/PathologistDashboard';
 import PatientDashboard from './pages/PatientDashboard';
 import ReceptionistDashboard from './pages/ReceptionistDashboard';
 import api from './services/api'; // Use the configured axios instance
+import authDebugger from './utils/authDebugger';
 
 function App() {
   const [currentView, setCurrentView] = useState('login');
@@ -39,12 +40,31 @@ function App() {
         hasToken: !!token 
       });
       
+      authDebugger.log('App authentication check started', {
+        hasToken: !!token,
+        hasUser: !!user,
+        savedView,
+        navigationType,
+        isFreshTab,
+        isReload,
+        currentView: currentView
+      });
+      
       if (token && user) {
         console.log('Found stored credentials - validating session');
         
+        // Check if this is immediately after signup (user has token but no saved view)
+        // Don't treat post-signup navigation as "fresh tab"
+        const isPostSignup = token && user && !savedView && 
+                           (currentView === 'login' || currentView === 'signup');
+        
         // If it's a fresh tab (new tab/window), go to login for multi-account support
-        if (isFreshTab) {
+        // BUT NOT if this is immediately after signup
+        if (isFreshTab && !isPostSignup) {
           console.log('Fresh tab detected - going to login for multi-account support');
+          authDebugger.log('Fresh tab detected - redirecting to login', {
+            reason: 'Multi-account support for fresh tabs'
+          });
           setCurrentView('login');
           sessionStorage.setItem('currentView', 'login');
           return;
@@ -53,8 +73,20 @@ function App() {
         try {
           const userData = JSON.parse(user);
           
+          authDebugger.log('Validating token with backend', {
+            hasToken: !!token,
+            userRole: userData.role,
+            userName: `${userData.firstName} ${userData.lastName}`
+          });
+          
           // Validate token with backend
           const response = await api.get('/auth/me');
+          
+          authDebugger.log('Token validation successful', {
+            responseStatus: response.status,
+            hasUser: !!response.data.user,
+            userRole: response.data.user?.role
+          });
           
           // Use the fresh user data from the server
           const validUser = response.data.user || response.data;
@@ -123,6 +155,11 @@ function App() {
         } catch (error) {
           // Token is invalid or expired
           console.log('Invalid token - clearing session');
+          authDebugger.log('Token validation failed - clearing session', {
+            errorMessage: error.message,
+            errorStatus: error.response?.status,
+            errorData: error.response?.data
+          });
           sessionStorage.removeItem('token');
           sessionStorage.removeItem('user');
           sessionStorage.removeItem('currentView');
@@ -229,8 +266,7 @@ function App() {
     // Navigate to appropriate dashboard
     navigateBasedOnRole(user.role);
     
-    // Force a re-render
-    window.location.reload();
+    // No reload needed - React state changes should be sufficient
   };
 
   const navigateBasedOnRole = (role) => {
@@ -319,11 +355,23 @@ function App() {
     const token = sessionStorage.getItem('token');
     const user = sessionStorage.getItem('user');
     
+    authDebugger.log('handleNavigateToDashboard called', {
+      hasToken: !!token,
+      hasUser: !!user,
+      currentView: currentView
+    });
+    
     if (token && user) {
       try {
         const userData = JSON.parse(user);
         setCurrentUser(userData);
         setIsAuthenticated(true);
+        
+        authDebugger.log('Post-login routing starting', {
+          userRole: userData.role,
+          userName: `${userData.firstName} ${userData.lastName}`,
+          userId: userData.id
+        });
         
         // Role-based routing - ALWAYS route based on the current user's role
         console.log('Post-login routing for user role:', userData.role);

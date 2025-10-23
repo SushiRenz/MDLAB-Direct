@@ -218,6 +218,7 @@ app.use('/api/services', servicesRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/mobile-lab', mobileLabRoutes);
 app.use('/api/test-results', testResultRoutes); // Re-enabled for test result functionality
+app.use('/api/debug', require('./routes/debug')); // Debug routes for development
 
 // 404 handler
 app.use('*', (req, res) => {

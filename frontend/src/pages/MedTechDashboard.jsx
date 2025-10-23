@@ -419,6 +419,19 @@ function MedTechDashboard({ currentUser, onLogout }) {
     }
   }, [activeSection]);
 
+  // Listen for test result updates from other components (like ReviewResults)
+  useEffect(() => {
+    const handleTestResultUpdate = (event) => {
+      console.log('🔄 Test result updated, refreshing Testing Queue...', event.detail);
+      if (activeSection === 'testing-queue') {
+        fetchTestingQueue();
+      }
+    };
+
+    window.addEventListener('testResultUpdated', handleTestResultUpdate);
+    return () => window.removeEventListener('testResultUpdated', handleTestResultUpdate);
+  }, [activeSection]);
+
   const handleSectionClick = async (section) => {
     // Protect navigation when in enter-results mode with unsaved changes
     if (activeSection === 'enter-results') {
@@ -2687,8 +2700,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
                 rejectedDate: existingResult.rejectedDate,
                 testResultData: existingResult
               });
-            } else if (existingResult.status === 'completed') {
-              // Completed test
+            } else if (existingResult.status === 'completed' || existingResult.status === 'reviewed') {
+              // Completed or reviewed (approved) test
               draftsMap.set(appointment._id, { 
                 hasSavedResult: true, 
                 isCompleted: true,

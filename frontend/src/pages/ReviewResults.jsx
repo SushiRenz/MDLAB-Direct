@@ -333,6 +333,14 @@ function ReviewResults({ currentUser }) {
         setShowApproveModal(false);
         setSelectedTestForApproval(null);
         fetchCompletedTests(); // Refresh the list
+        
+        // Notify other components that a test result was approved/released
+        window.dispatchEvent(new CustomEvent('testResultUpdated', {
+          detail: { 
+            action: options.sendToAccount ? 'released' : 'approved',
+            testResultId: selectedTestForApproval._id 
+          }
+        }));
       } else {
         alert('Failed to approve test result: ' + (response.message || 'Unknown error'));
       }
@@ -864,15 +872,15 @@ function ReviewResults({ currentUser }) {
 
 // Approval Modal Component
 function ApprovalModalContent({ testResult, onConfirm, onCancel }) {
-  const [selectedOptions, setSelectedOptions] = React.useState({
-    sendToAccount: false,
-    print: false
-  });
-
   // Determine if this is a walk-in or account appointment
   // Walk-in: no appointment OR appointment.patient is null (no user account linked)
   // Account: appointment.patient exists (user account linked)
   const isWalkIn = !testResult.appointment || !testResult.appointment.patient;
+  
+  const [selectedOptions, setSelectedOptions] = React.useState({
+    sendToAccount: !isWalkIn, // Default to true for account patients, false for walk-ins
+    print: false
+  });
 
   const patientName = typeof testResult.patientId === 'string' ? testResult.patientId :
                       testResult.patientId?.name || 

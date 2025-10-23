@@ -262,7 +262,8 @@ function SignUp({ onNavigateToLogin }) {
           
           // Navigate to dashboard after brief delay
           setTimeout(() => {
-            onNavigateToLogin(data.user); // Pass user data
+            // Pass the user data with token for proper login handling
+            onNavigateToLogin({ ...data.user, token: data.token });
           }, 1500);
         } else {
           // Fallback: clear form and redirect to login page

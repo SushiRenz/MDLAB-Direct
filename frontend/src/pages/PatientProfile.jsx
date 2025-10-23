@@ -9,9 +9,8 @@ function PatientProfile({ user, onProfileUpdate }) {
   const [profileData, setProfileData] = useState({
     gender: user?.gender || '',
     dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).split('T')[0] : '',
-    address: typeof user?.address === 'object' && user?.address ? 
-      JSON.stringify(user.address) : 
-      user?.address || '',
+    address: (user?.address && user.address !== 'Address not provided') ? 
+      (typeof user.address === 'object' ? JSON.stringify(user.address) : user.address) : '',
     profilePic: user?.profilePic || null,
   });
   const [previewPic, setPreviewPic] = useState(null);
@@ -34,9 +33,8 @@ function PatientProfile({ user, onProfileUpdate }) {
       const newProfileData = {
         gender: user?.gender || '',
         dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).split('T')[0] : '',
-        address: typeof user?.address === 'object' && user?.address ? 
-          JSON.stringify(user.address) : 
-          user?.address || '',
+        address: (user?.address && user.address !== 'Address not provided') ? 
+          (typeof user.address === 'object' ? JSON.stringify(user.address) : user.address) : '',
         profilePic: user?.profilePic || null,
       };
       
@@ -82,9 +80,8 @@ function PatientProfile({ user, onProfileUpdate }) {
     setProfileData({
       gender: user?.gender || '',
       dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).split('T')[0] : '',
-      address: typeof user?.address === 'object' && user?.address ? 
-        JSON.stringify(user.address) : 
-        user?.address || '',
+      address: (user?.address && user.address !== 'Address not provided') ? 
+        (typeof user.address === 'object' ? JSON.stringify(user.address) : user.address) : '',
       profilePic: user?.profilePic || null,
     });
     setEditMode(true);
@@ -97,9 +94,8 @@ function PatientProfile({ user, onProfileUpdate }) {
     setProfileData({
       gender: user?.gender || '',
       dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).split('T')[0] : '',
-      address: typeof user?.address === 'object' && user?.address ? 
-        JSON.stringify(user.address) : 
-        user?.address || '',
+      address: (user?.address && user.address !== 'Address not provided') ? 
+        (typeof user.address === 'object' ? JSON.stringify(user.address) : user.address) : '',
       profilePic: user?.profilePic || null,
     });
   };
@@ -167,9 +163,8 @@ function PatientProfile({ user, onProfileUpdate }) {
       const newProfileData = {
         gender: updatedUser.gender || '',
         dateOfBirth: updatedUser.dateOfBirth ? String(updatedUser.dateOfBirth).split('T')[0] : '',
-        address: typeof updatedUser.address === 'object' && updatedUser.address ? 
-          JSON.stringify(updatedUser.address) : 
-          updatedUser.address || '',
+        address: (updatedUser.address && updatedUser.address !== 'Address not provided') ? 
+          (typeof updatedUser.address === 'object' ? JSON.stringify(updatedUser.address) : updatedUser.address) : '',
         profilePic: updatedUser.profilePic || null
       };
       
@@ -359,7 +354,7 @@ function PatientProfile({ user, onProfileUpdate }) {
                 />
               ) : (
                 <div className="field-value">
-                  {profileData.address || 'Not provided'}
+                  {(profileData.address && profileData.address !== 'Address not provided') ? profileData.address : 'Not provided'}
                 </div>
               )}
             </div>

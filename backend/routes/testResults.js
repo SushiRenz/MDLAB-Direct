@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body, query, param } = require('express-validator');
 const auth = require('../middleware/auth');
+const User = require('../models/User'); // Add User model import
 const {
   getTestResults,
   getTestResult,
@@ -257,18 +258,45 @@ router.get('/my',
       const TestResult = require('../models/TestResult');
       const mongoose = require('mongoose');
       
+      console.log('🔍 Fetching results for patient ID:', req.user.id);
+      
+      // Get current user info for better matching
+      const currentUser = await User.findById(req.user.id);
+      console.log('📧 Current user email:', currentUser?.email);
+      
       // Query for released test results belonging to this patient
-      // Handle both string and ObjectId patient field formats for compatibility
+      // Handle multiple formats: ObjectId, string ObjectId, and email
+      const queryConditions = [
+        { patient: req.user.id }, // Direct ObjectId match
+        { patient: new mongoose.Types.ObjectId(req.user.id) }, // Mongoose ObjectId match
+        { patient: req.user.id.toString() } // String ObjectId match
+      ];
+      
+      // Also match by email if available (for cases where email was stored as patient field)
+      if (currentUser?.email) {
+        queryConditions.push({ patient: currentUser.email });
+      }
+      
       const testResults = await TestResult.find({
-        $or: [
-          { patient: req.user.id },
-          { patient: new mongoose.Types.ObjectId(req.user.id) }
-        ],
-        status: 'released'
+        $and: [
+          { $or: queryConditions },
+          { status: 'released' },
+          { patient: { $ne: null, $ne: undefined } }, // Exclude corrupted patient fields
+          { isDeleted: { $ne: true } } // Exclude soft-deleted results
+        ]
       })
+      .populate('patient', 'firstName lastName email phone')
       .populate('appointment', 'services appointmentDate')
+      .populate('service', 'serviceName category')
       .sort({ releasedDate: -1 })
       .select('-__v');
+
+      console.log(`📊 Found ${testResults.length} released results for patient`);
+      
+      // Debug each result
+      testResults.forEach((result, index) => {
+        console.log(`   ${index + 1}. ${result.testType} - Patient: ${result.patient?.firstName} ${result.patient?.lastName}`);
+      });
 
       res.status(200).json({
         success: true,
