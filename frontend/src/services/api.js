@@ -55,17 +55,18 @@ api.interceptors.response.use(
       const authPaths = ['/auth/login', '/auth/me', '/auth/logout'];
       const isAuthRequest = authPaths.some(path => error.config?.url?.includes(path));
       
-      if (isAuthRequest || error.response?.data?.message?.includes('token')) {
+      if (isAuthRequest && error.response?.data?.message?.includes('token')) {
         // Token expired or invalid during auth operations
-        console.log('Authentication failed, logging out:', error.response?.data?.message);
+        console.log('Authentication token failed, logging out:', error.response?.data?.message);
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('user');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        // Don't redirect here - let the component handle it
+        // window.location.href = '/login';
       } else {
-        // For other 401 errors (like insufficient permissions), don't logout
-        console.log('Authorization failed but not logging out:', error.response?.data?.message);
+        // For login attempts with wrong credentials or other 401 errors, don't logout
+        console.log('Authorization failed but not redirecting:', error.response?.data?.message);
       }
     }
     return Promise.reject(error);

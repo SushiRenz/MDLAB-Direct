@@ -67,6 +67,9 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    // Clear any existing error first
     setError('');
 
     authDebugger.log('Login form submitted', {
@@ -83,7 +86,12 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
         missingPassword: !formData.password
       });
       setError('Please fill in all fields');
-      return;
+      return false;
+    }
+
+    // Prevent multiple submissions
+    if (loading) {
+      return false;
     }
 
     setLoading(true);
@@ -164,8 +172,8 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
           hasToken: !!data.token,
           responseData: data
         });
-        setError('Login failed. Please try again.');
         setLoading(false);
+        setError('Login failed. Please try again.');
       }
 
     } catch (err) {
@@ -176,10 +184,12 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
         errorStatus: err.response?.status
       });
       
+      setLoading(false);
+      let errorMessage = 'Login failed. Please try again.';
+      
       if (err.response) {
         // Server responded with error status
         const data = err.response.data;
-        let errorMessage = 'Login failed. Please try again.';
         
         if (err.response.status === 401) {
           // Check if the message specifically mentions deactivation
@@ -196,14 +206,16 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
         } else if (data.message) {
           errorMessage = data.message;
         }
-        
-        setError(errorMessage);
       } else {
         // Network or other error
-        setError('Network error. Please check if the server is running and try again.');
+        errorMessage = 'Network error. Please check if the server is running and try again.';
       }
-      setLoading(false);
+      
+      // Set error state for UI display
+      setError(errorMessage);
     }
+    
+    return false;
   };
 
   const handleLogoClick = () => {
@@ -440,21 +452,37 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
           {/* Error message display */}
           {error && (
             <div style={{
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
+              background: 'linear-gradient(135deg, #fef2f2 0%, #fde8e8 100%)',
+              border: '2px solid #f87171',
               color: '#dc2626',
-              padding: '12px 16px',
-              borderRadius: '8px',
-              marginBottom: '16px',
-              fontSize: '14px',
+              padding: '16px 20px',
+              borderRadius: '12px',
+              marginBottom: '20px',
+              fontSize: '15px',
               textAlign: 'center',
-              fontWeight: '500'
+              fontWeight: '600',
+              boxShadow: '0 4px 12px rgba(248, 113, 113, 0.2)',
+              animation: 'errorPulse 0.5s ease-out',
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
             }}>
-              {error}
+              <svg 
+                width="20" 
+                height="20" 
+                viewBox="0 0 24 24" 
+                fill="currentColor"
+                style={{ flexShrink: 0 }}
+              >
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+              </svg>
+              <span>{error}</span>
             </div>
           )}
           
-          <form className="login-form" onSubmit={handleSubmit}>
+          <form className="login-form" onSubmit={handleSubmit} autoComplete="off" noValidate>
             <input
               type="text"
               name="identifier"
