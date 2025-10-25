@@ -13,6 +13,19 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  
+  // Forgot Password Modal State
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [forgotPasswordStep, setForgotPasswordStep] = useState(1); // 1: email, 2: code & new password
+  const [forgotPasswordData, setForgotPasswordData] = useState({
+    identifier: '',
+    verificationCode: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordError, setForgotPasswordError] = useState('');
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState('');
 
   // Reset component state when component mounts (useful when navigating from SignUp)
   useEffect(() => {
@@ -207,6 +220,153 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
     onNavigateToAdminLogin();
   };
 
+  // Forgot Password Functions
+  const handleForgotPasswordClick = (e) => {
+    e.preventDefault();
+    setShowForgotPasswordModal(true);
+    setForgotPasswordStep(1);
+    setForgotPasswordData({
+      identifier: '',
+      verificationCode: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+    setForgotPasswordError('');
+    setForgotPasswordSuccess('');
+  };
+
+  const handleCloseForgotPasswordModal = () => {
+    setShowForgotPasswordModal(false);
+    setForgotPasswordStep(1);
+    setForgotPasswordData({
+      identifier: '',
+      verificationCode: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+    setForgotPasswordError('');
+    setForgotPasswordSuccess('');
+    setForgotPasswordLoading(false);
+  };
+
+  const handleForgotPasswordInputChange = (e) => {
+    const { name, value } = e.target;
+    setForgotPasswordData({
+      ...forgotPasswordData,
+      [name]: value
+    });
+    if (forgotPasswordError) setForgotPasswordError('');
+  };
+
+  const handleSendResetCode = async (e) => {
+    e.preventDefault();
+    setForgotPasswordError('');
+    
+    if (!forgotPasswordData.identifier.trim()) {
+      setForgotPasswordError('Please enter your email or username');
+      return;
+    }
+
+    setForgotPasswordLoading(true);
+
+    try {
+      const response = await api.post('/auth/forgot-password', {
+        identifier: forgotPasswordData.identifier.trim()
+      });
+
+      if (response.data.success) {
+        setForgotPasswordSuccess('Verification code sent to your email!');
+        setForgotPasswordStep(2);
+      }
+    } catch (err) {
+      console.error('Forgot password error:', err);
+      if (err.response?.data?.message) {
+        setForgotPasswordError(err.response.data.message);
+      } else {
+        setForgotPasswordError('Failed to send reset code. Please try again.');
+      }
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setForgotPasswordError('');
+
+    // Validation
+    if (!forgotPasswordData.verificationCode.trim()) {
+      setForgotPasswordError('Please enter the verification code');
+      return;
+    }
+
+    if (!forgotPasswordData.newPassword) {
+      setForgotPasswordError('Please enter a new password');
+      return;
+    }
+
+    if (forgotPasswordData.newPassword.length < 6) {
+      setForgotPasswordError('Password must be at least 6 characters long');
+      return;
+    }
+
+    if (forgotPasswordData.newPassword !== forgotPasswordData.confirmPassword) {
+      setForgotPasswordError('Passwords do not match');
+      return;
+    }
+
+    setForgotPasswordLoading(true);
+
+    try {
+      const response = await api.post('/auth/reset-password', {
+        identifier: forgotPasswordData.identifier,
+        verificationCode: forgotPasswordData.verificationCode,
+        newPassword: forgotPasswordData.newPassword
+      });
+
+      if (response.data.success) {
+        setForgotPasswordSuccess('Password reset successful! You can now login with your new password.');
+        setTimeout(() => {
+          handleCloseForgotPasswordModal();
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Reset password error:', err);
+      if (err.response?.data?.message) {
+        setForgotPasswordError(err.response.data.message);
+      } else {
+        setForgotPasswordError('Failed to reset password. Please try again.');
+      }
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setForgotPasswordLoading(true);
+    setForgotPasswordError('');
+    setForgotPasswordSuccess('');
+
+    try {
+      const response = await api.post('/auth/forgot-password', {
+        identifier: forgotPasswordData.identifier
+      });
+
+      if (response.data.success) {
+        setForgotPasswordSuccess('New verification code sent to your email!');
+      }
+    } catch (err) {
+      console.error('Resend code error:', err);
+      if (err.response?.data?.message) {
+        setForgotPasswordError(err.response.data.message);
+      } else {
+        setForgotPasswordError('Failed to resend code. Please try again.');
+      }
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
   return (
     <div className="login-container">
       {/* Subtle Admin Arrow - Top Right */}
@@ -353,7 +513,7 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
                 />
                 Remember me
               </label>
-              <a href="#" className="forgot-link">Forgot password?</a>
+              <a href="#" className="forgot-link" onClick={handleForgotPasswordClick}>Forgot password?</a>
             </div>
             
             <button 
@@ -375,6 +535,338 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
           </div>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotPasswordModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '0',
+            width: '90%',
+            maxWidth: '500px',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)',
+            animation: 'slideIn 0.3s ease-out'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '24px',
+              borderBottom: '1px solid #e0e0e0',
+              backgroundColor: '#21AEA8',
+              color: 'white',
+              borderRadius: '12px 12px 0 0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>
+                {forgotPasswordStep === 1 ? 'Forgot Password' : 'Reset Password'}
+              </h3>
+              <button
+                onClick={handleCloseForgotPasswordModal}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: 'white',
+                  padding: '0',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{ padding: '24px' }}>
+              {forgotPasswordStep === 1 ? (
+                // Step 1: Enter Email/Username
+                <form onSubmit={handleSendResetCode}>
+                  <p style={{ margin: '0 0 20px 0', color: '#666', fontSize: '16px' }}>
+                    Enter your username to receive a verification code at your registered email address.
+                  </p>
+
+                  <input
+                    type="text"
+                    name="identifier"
+                    placeholder="Username"
+                    value={forgotPasswordData.identifier}
+                    onChange={handleForgotPasswordInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: '2px solid #e1e5e9',
+                      borderRadius: '8px',
+                      fontSize: '16px',
+                      marginBottom: '16px',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                      transition: 'border-color 0.2s ease',
+                      backgroundColor: 'white',
+                      color: '#333'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#21AEA8'}
+                    onBlur={(e) => e.target.style.borderColor = '#e1e5e9'}
+                    disabled={forgotPasswordLoading}
+                    required
+                  />
+
+                  {forgotPasswordError && (
+                    <div style={{
+                      background: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      color: '#dc2626',
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      marginBottom: '16px',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}>
+                      {forgotPasswordError}
+                    </div>
+                  )}
+
+                  {forgotPasswordSuccess && (
+                    <div style={{
+                      background: '#f0f9ff',
+                      border: '1px solid #bfdbfe',
+                      color: '#1e40af',
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      marginBottom: '16px',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}>
+                      {forgotPasswordSuccess}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      onClick={handleCloseForgotPasswordModal}
+                      style={{
+                        padding: '10px 20px',
+                        border: '2px solid #6c757d',
+                        borderRadius: '6px',
+                        backgroundColor: 'white',
+                        color: '#6c757d',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={forgotPasswordLoading}
+                      style={{
+                        padding: '10px 20px',
+                        border: 'none',
+                        borderRadius: '6px',
+                        backgroundColor: forgotPasswordLoading ? '#ccc' : '#21AEA8',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        cursor: forgotPasswordLoading ? 'not-allowed' : 'pointer',
+                        fontSize: '14px'
+                      }}
+                    >
+                      {forgotPasswordLoading ? 'Sending...' : 'Send Code'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                // Step 2: Enter Code and New Password
+                <form onSubmit={handleResetPassword}>
+                  <p style={{ margin: '0 0 20px 0', color: '#666', fontSize: '16px' }}>
+                    Enter the 6-digit verification code sent to your email and set a new password.
+                  </p>
+
+                  <input
+                    type="text"
+                    name="verificationCode"
+                    placeholder="6-Digit Verification Code"
+                    value={forgotPasswordData.verificationCode}
+                    onChange={handleForgotPasswordInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: '2px solid #e1e5e9',
+                      borderRadius: '8px',
+                      fontSize: '16px',
+                      marginBottom: '12px',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                      transition: 'border-color 0.2s ease',
+                      textAlign: 'center',
+                      letterSpacing: '2px',
+                      backgroundColor: 'white',
+                      color: '#333'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#21AEA8'}
+                    onBlur={(e) => e.target.style.borderColor = '#e1e5e9'}
+                    disabled={forgotPasswordLoading}
+                    maxLength="6"
+                    required
+                  />
+
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                    <button
+                      type="button"
+                      onClick={handleResendCode}
+                      disabled={forgotPasswordLoading}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#21AEA8',
+                        fontSize: '14px',
+                        cursor: forgotPasswordLoading ? 'not-allowed' : 'pointer',
+                        textDecoration: 'underline',
+                        opacity: forgotPasswordLoading ? 0.5 : 1,
+                        padding: '4px 8px'
+                      }}
+                    >
+                      {forgotPasswordLoading ? 'Sending...' : 'Resend Code'}
+                    </button>
+                  </div>
+
+                  <input
+                    type="password"
+                    name="newPassword"
+                    placeholder="New Password"
+                    value={forgotPasswordData.newPassword}
+                    onChange={handleForgotPasswordInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: '2px solid #e1e5e9',
+                      borderRadius: '8px',
+                      fontSize: '16px',
+                      marginBottom: '16px',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                      transition: 'border-color 0.2s ease',
+                      backgroundColor: 'white',
+                      color: '#333'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#21AEA8'}
+                    onBlur={(e) => e.target.style.borderColor = '#e1e5e9'}
+                    disabled={forgotPasswordLoading}
+                    required
+                  />
+
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    placeholder="Confirm New Password"
+                    value={forgotPasswordData.confirmPassword}
+                    onChange={handleForgotPasswordInputChange}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: '2px solid #e1e5e9',
+                      borderRadius: '8px',
+                      fontSize: '16px',
+                      marginBottom: '16px',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                      transition: 'border-color 0.2s ease',
+                      backgroundColor: 'white',
+                      color: '#333'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#21AEA8'}
+                    onBlur={(e) => e.target.style.borderColor = '#e1e5e9'}
+                    disabled={forgotPasswordLoading}
+                    required
+                  />
+
+                  {forgotPasswordError && (
+                    <div style={{
+                      background: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      color: '#dc2626',
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      marginBottom: '16px',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}>
+                      {forgotPasswordError}
+                    </div>
+                  )}
+
+                  {forgotPasswordSuccess && (
+                    <div style={{
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      color: '#15803d',
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      marginBottom: '16px',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}>
+                      {forgotPasswordSuccess}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      onClick={() => setForgotPasswordStep(1)}
+                      style={{
+                        padding: '10px 20px',
+                        border: '2px solid #6c757d',
+                        borderRadius: '6px',
+                        backgroundColor: 'white',
+                        color: '#6c757d',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                      }}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={forgotPasswordLoading}
+                      style={{
+                        padding: '10px 20px',
+                        border: 'none',
+                        borderRadius: '6px',
+                        backgroundColor: forgotPasswordLoading ? '#ccc' : '#21AEA8',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        cursor: forgotPasswordLoading ? 'not-allowed' : 'pointer',
+                        fontSize: '14px'
+                      }}
+                    >
+                      {forgotPasswordLoading ? 'Resetting...' : 'Reset Password'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -643,6 +643,11 @@ function PatientDashboard(props) {
       // Generic results display
       const genericFields = {};
       Object.entries(results).forEach(([key, value]) => {
+        // Skip date and time performed fields as they're now in the header
+        if (['date_performed', 'datePerformed', 'time_performed', 'timePerformed'].includes(key)) {
+          return;
+        }
+        
         const fieldValue = getTestFieldValue(key, results);
         if (fieldValue) {
           genericFields[key] = {
@@ -1516,6 +1521,12 @@ function PatientDashboard(props) {
                 </div>
                 <div style={{ color: '#2d3748' }}>
                   <strong style={{ color: '#2d3748' }}>Sample Date:</strong> {selectedTestResult.date ? new Date(selectedTestResult.date).toLocaleDateString() : 'N/A'}
+                </div>
+                <div style={{ color: '#2d3748' }}>
+                  <strong style={{ color: '#2d3748' }}>Date Performed:</strong> {selectedTestResult.results?.date_performed || selectedTestResult.results?.datePerformed || 'N/A'}
+                </div>
+                <div style={{ color: '#2d3748' }}>
+                  <strong style={{ color: '#2d3748' }}>Time Performed:</strong> {selectedTestResult.results?.time_performed || selectedTestResult.results?.timePerformed || 'N/A'}
                 </div>
                 <div style={{ color: '#2d3748' }}>
                   <strong style={{ color: '#2d3748' }}>Sample ID:</strong> {selectedTestResult.sampleId || 'N/A'}

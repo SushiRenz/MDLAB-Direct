@@ -3,6 +3,8 @@ const User = require('../models/User');
 const Log = require('../models/Log');
 const asyncHandler = require('../utils/asyncHandler');
 const { sendTokenResponse } = require('../utils/tokenUtils');
+const { sendPasswordResetEmail } = require('../utils/emailService');
+const crypto = require('crypto');
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -328,11 +330,147 @@ const changePassword = asyncHandler(async (req, res, next) => {
   });
 });
 
+// @desc    Forgot password - send reset code
+// @route   POST /api/auth/forgot-password
+// @access  Public
+const forgotPassword = asyncHandler(async (req, res, next) => {
+  const { identifier } = req.body; // Can be email or username
+
+  if (!identifier) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please provide email or username'
+    });
+  }
+
+  // Find user by email or username
+  const user = await User.findByEmailOrUsername(identifier);
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'No account found with that email or username'
+    });
+  }
+
+  // Generate reset code (6-digit number)
+  const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+  
+  // Hash the reset code and set expire time (10 minutes)
+  const resetPasswordToken = crypto.createHash('sha256').update(resetCode).digest('hex');
+  const resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+  // Save to user
+  user.resetPasswordToken = resetPasswordToken;
+  user.resetPasswordExpire = resetPasswordExpire;
+  await user.save({ validateBeforeSave: false });
+
+  try {
+    // Send email with reset code using the emailService
+    const { sendPasswordResetEmail } = require('../utils/emailService');
+    
+    await sendPasswordResetEmail(user.email, resetCode);
+    
+    // Also log to console for development
+    console.log(`📧 Password reset code sent to ${user.email} for username: ${user.username}`);
+
+    // Log password reset request
+    await Log.logUserAction(
+      'Password Reset Request',
+      `Password reset requested for user: ${user.firstName} ${user.lastName} (${user.email})`,
+      user.email,
+      req.ip || req.connection.remoteAddress || '127.0.0.1',
+      'success',
+      { userId: user._id, resetCodeSent: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Password reset code sent to the email address associated with this account`
+    });
+  } catch (error) {
+    console.error('Email sending error:', error);
+    
+    // Clear reset fields if email fails
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to send password reset email. Please try again later.'
+    });
+  }
+});
+
+// @desc    Reset password with verification code
+// @route   POST /api/auth/reset-password
+// @access  Public
+const resetPassword = asyncHandler(async (req, res, next) => {
+  const { identifier, verificationCode, newPassword } = req.body;
+
+  if (!identifier || !verificationCode || !newPassword) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please provide email/username, verification code, and new password'
+    });
+  }
+
+  // Hash the provided code to compare with stored hash
+  const resetPasswordToken = crypto.createHash('sha256').update(verificationCode).digest('hex');
+
+  // Find user with matching reset token and check if not expired
+  const user = await User.findOne({
+    $or: [
+      { email: identifier },
+      { username: identifier }
+    ],
+    resetPasswordToken,
+    resetPasswordExpire: { $gt: Date.now() }
+  });
+
+  if (!user) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid or expired verification code'
+    });
+  }
+
+  // Set new password
+  user.passwordHash = newPassword;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpire = undefined;
+  
+  // Reset login attempts if any
+  if (user.loginAttempts > 0) {
+    await user.resetLoginAttempts();
+  }
+
+  await user.save();
+
+  // Log successful password reset
+  await Log.logUserAction(
+    'Password Reset Complete',
+    `Password successfully reset for user: ${user.firstName} ${user.lastName} (${user.email})`,
+    user.email,
+    req.ip || req.connection.remoteAddress || '127.0.0.1',
+    'success',
+    { userId: user._id, passwordResetSuccess: true }
+  );
+
+  res.status(200).json({
+    success: true,
+    message: 'Password reset successful. You can now login with your new password.'
+  });
+});
+
 module.exports = {
   register,
   login,
   logout,
   getMe,
   updateProfile,
-  changePassword
+  changePassword,
+  forgotPassword,
+  resetPassword
 };

@@ -3850,8 +3850,38 @@ function MedTechDashboard({ currentUser, onLogout }) {
             </p>
           </div>
           <div style={{ textAlign: 'right', fontSize: '14px' }}>
-            <div>Date: {resultForm.datePerformed}</div>
-            <div>Time: {resultForm.timePerformed}</div>
+            {(() => {
+              const testResult = savedDrafts.get(selectedAppointment._id)?.testResultData;
+              const status = testResult?.status || 'pending';
+              const statusColors = {
+                'pending': { bg: '#fff3cd', color: '#856404' },
+                'completed': { bg: '#d4edda', color: '#155724' },
+                'reviewed': { bg: '#d1ecf1', color: '#0c5460' },
+                'released': { bg: '#d4edda', color: '#155724' },
+                'rejected': { bg: '#f8d7da', color: '#721c24' }
+              };
+              const statusColor = statusColors[status] || statusColors.pending;
+              
+              return (
+                <>
+                  <div style={{ marginBottom: '8px' }}>
+                    <span style={{ 
+                      backgroundColor: statusColor.bg, 
+                      color: statusColor.color,
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      textTransform: 'capitalize'
+                    }}>
+                      {status}
+                    </span>
+                  </div>
+                  <div>Date Performed: {resultForm.datePerformed}</div>
+                  <div>Time Performed: {resultForm.timePerformed}</div>
+                </>
+              );
+            })()}
           </div>
         </div>
 

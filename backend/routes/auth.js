@@ -6,7 +6,9 @@ const {
   logout,
   getMe,
   updateProfile,
-  changePassword
+  changePassword,
+  forgotPassword,
+  resetPassword
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 const {
@@ -47,6 +49,8 @@ const loginLimiter = rateLimit({
 // Public routes - NO RATE LIMITING IN DEVELOPMENT
 router.post('/register', validateRegister, register);
 router.post('/login', validateLogin, login);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 // Protected routes
 router.post('/logout', protect, logout);

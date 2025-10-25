@@ -7,6 +7,18 @@
   justify-content: center;
 }
 
+/* Forgot Password Modal Animation */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .login-left {
   flex: 1;
   display: flex;

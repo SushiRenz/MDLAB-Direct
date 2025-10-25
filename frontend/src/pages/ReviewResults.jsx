@@ -197,11 +197,12 @@ function ReviewResults({ currentUser }) {
     console.log('🔍 DEBUG: Results type:', typeof modalTestData.results);
     console.log('🔍 DEBUG: Results keys:', Object.keys(modalTestData.results));
     
-    // Show non-empty fields
+    // Show non-empty fields but exclude date and time performed as they're now in header
     const nonEmptyFields = Object.entries(modalTestData.results).filter(([key, value]) => 
-      value !== null && value !== undefined && value !== ''
+      value !== null && value !== undefined && value !== '' &&
+      !['date_performed', 'datePerformed', 'time_performed', 'timePerformed'].includes(key)
     );
-    console.log('🔍 DEBUG: Non-empty fields:', nonEmptyFields);
+    console.log('🔍 DEBUG: Non-empty fields (excluding date/time):', nonEmptyFields);
     
     const results = {};
     
@@ -210,6 +211,11 @@ function ReviewResults({ currentUser }) {
       let hasData = false;
       
       config.fields.forEach(field => {
+        // Skip date and time performed fields as they're now in the header
+        if (['date_performed', 'datePerformed', 'time_performed', 'timePerformed'].includes(field.key)) {
+          return;
+        }
+        
         const value = getTestFieldValue(field.key, modalTestData.results);
         if (value !== null && value !== undefined && value !== '') {
           categoryResults[field.key] = {
@@ -236,6 +242,34 @@ function ReviewResults({ currentUser }) {
         console.log(`🔍 DEBUG: Added category ${category} with data`);
       }
     });
+    
+    // Also check for any remaining fields that might not be in definitions but show up as extra fields
+    // This handles fields like date_performed and time_performed that might be added dynamically
+    const remainingFields = {};
+    Object.entries(modalTestData.results).forEach(([key, value]) => {
+      // Skip fields that are already processed in categories or are date/time performed
+      const isInDefinitions = Object.values(testFieldDefinitions).some(config => 
+        config.fields.some(field => field.key === key)
+      );
+      const isDateTimeField = ['date_performed', 'datePerformed', 'time_performed', 'timePerformed'].includes(key);
+      
+      if (!isInDefinitions && !isDateTimeField && value !== null && value !== undefined && value !== '') {
+        remainingFields[key] = {
+          label: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          value: value,
+          normalRange: 'See reference',
+          group: 'other'
+        };
+      }
+    });
+    
+    // Only add remaining fields if there are any and they're not date/time fields
+    if (Object.keys(remainingFields).length > 0) {
+      results['other'] = {
+        title: 'OTHER RESULTS',
+        fields: remainingFields
+      };
+    }
     
     console.log('🔍 DEBUG: Final organized results:', results);
     return results;
@@ -669,6 +703,12 @@ function ReviewResults({ currentUser }) {
                   </div>
                   <div>
                     <strong>Sample Date:</strong> {testData.sampleDate ? new Date(testData.sampleDate).toLocaleDateString() : 'N/A'}
+                  </div>
+                  <div>
+                    <strong>Date Performed:</strong> {testData.results?.date_performed || testData.results?.datePerformed || 'N/A'}
+                  </div>
+                  <div>
+                    <strong>Time Performed:</strong> {testData.results?.time_performed || testData.results?.timePerformed || 'N/A'}
                   </div>
                   <div>
                     <strong>Status:</strong> 
