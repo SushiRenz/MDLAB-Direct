@@ -423,14 +423,13 @@ function MedTechDashboard({ currentUser, onLogout }) {
   useEffect(() => {
     const handleTestResultUpdate = (event) => {
       console.log('🔄 Test result updated, refreshing Testing Queue...', event.detail);
-      if (activeSection === 'testing-queue') {
-        fetchTestingQueue();
-      }
+      // Always refresh when test results are updated, regardless of current section
+      fetchTestingQueue();
     };
 
     window.addEventListener('testResultUpdated', handleTestResultUpdate);
     return () => window.removeEventListener('testResultUpdated', handleTestResultUpdate);
-  }, [activeSection]);
+  }, []); // Remove activeSection dependency to always listen
 
   const handleSectionClick = async (section) => {
     // Protect navigation when in enter-results mode with unsaved changes
@@ -2675,17 +2674,29 @@ function MedTechDashboard({ currentUser, onLogout }) {
         // For each appointment, check if there's a saved test result
         appointments.forEach(appointment => {
           console.log('Checking appointment:', appointment._id, 'for patient:', appointment.patientName);
-          const existingResult = testResults.find(result => {
+          
+          // Find ALL test results for this appointment
+          const appointmentResults = testResults.filter(result => {
             // Handle both cases: appointment as object or as string ID
             const resultAppointmentId = typeof result.appointment === 'object' 
               ? result.appointment?._id 
               : result.appointment;
             
-            console.log('Comparing appointment IDs:', resultAppointmentId, 'vs', appointment._id);
             return resultAppointmentId === appointment._id;
           });
-          if (existingResult) {
-            console.log('✅ Found existing result for appointment:', appointment._id, 'patient:', appointment.patientName, 'status:', existingResult.status);
+          
+          console.log(`Found ${appointmentResults.length} test results for appointment ${appointment._id}`);
+          
+          if (appointmentResults.length > 0) {
+            // Get the LATEST test result (most recent by creation date)
+            const existingResult = appointmentResults.reduce((latest, current) => {
+              const latestDate = new Date(latest.createdAt || latest.sampleDate || 0);
+              const currentDate = new Date(current.createdAt || current.sampleDate || 0);
+              return currentDate > latestDate ? current : latest;
+            });
+            
+            console.log('✅ Found existing result for appointment:', appointment._id, 'patient:', appointment.patientName, 'status:', existingResult.status, 'created:', existingResult.createdAt);
+            console.log(`   Using latest of ${appointmentResults.length} results`);
             
             // Check if this is a rejected test that needs complete re-entry
             if (existingResult.status === 'pending' && (existingResult.rejectionReason || existingResult.isRejected)) {
@@ -2700,8 +2711,8 @@ function MedTechDashboard({ currentUser, onLogout }) {
                 rejectedDate: existingResult.rejectedDate,
                 testResultData: existingResult
               });
-            } else if (existingResult.status === 'completed' || existingResult.status === 'reviewed') {
-              // Completed or reviewed (approved) test
+            } else if (existingResult.status === 'completed' || existingResult.status === 'reviewed' || existingResult.status === 'released') {
+              // Completed, reviewed (approved), or released test
               draftsMap.set(appointment._id, { 
                 hasSavedResult: true, 
                 isCompleted: true,
@@ -3668,13 +3679,26 @@ function MedTechDashboard({ currentUser, onLogout }) {
                           fontWeight: 'bold'
                         }}
                       >
-                        {savedDrafts.has(appointment._id) && savedDrafts.get(appointment._id)?.isCompleted 
-                          ? 'View Results' 
-                          : savedDrafts.has(appointment._id) && savedDrafts.get(appointment._id)?.hasSavedResult
-                            ? 'Continue Draft' 
-                            : savedDrafts.has(appointment._id) && savedDrafts.get(appointment._id)?.isRejected
-                              ? 'Re-enter Results'
-                              : 'Input Results'}
+                        {(() => {
+                          const savedData = savedDrafts.get(appointment._id);
+                          console.log(`🔍 Button logic for ${appointment.patientName}:`, {
+                            hasData: savedDrafts.has(appointment._id),
+                            isCompleted: savedData?.isCompleted,
+                            hasSavedResult: savedData?.hasSavedResult,
+                            isRejected: savedData?.isRejected,
+                            status: savedData?.testResultData?.status
+                          });
+                          
+                          if (savedDrafts.has(appointment._id) && savedDrafts.get(appointment._id)?.isCompleted) {
+                            return 'View Results';
+                          } else if (savedDrafts.has(appointment._id) && savedDrafts.get(appointment._id)?.hasSavedResult) {
+                            return 'Continue Draft';
+                          } else if (savedDrafts.has(appointment._id) && savedDrafts.get(appointment._id)?.isRejected) {
+                            return 'Re-enter Results';
+                          } else {
+                            return 'Input Results';
+                          }
+                        })()}
                       </button>
                       
                       {/* Rejection reason button - only show if test was rejected */}
