@@ -32,8 +32,10 @@ console.log('🌐 API Service Configuration:', {
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    // Check both sessionStorage and localStorage for backwards compatibility
-    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+    // Check sessionStorage first, then localStorage for remembered credentials
+    const token = sessionStorage.getItem('token') || 
+                  localStorage.getItem('rememberedToken') || 
+                  localStorage.getItem('token'); // backwards compatibility
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -57,11 +59,16 @@ api.interceptors.response.use(
       
       if (isAuthRequest && error.response?.data?.message?.includes('token')) {
         // Token expired or invalid during auth operations
-        console.log('Authentication token failed, logging out:', error.response?.data?.message);
+        console.log('Authentication token failed, clearing all stored credentials:', error.response?.data?.message);
+        
+        // Clear all stored credentials including remembered ones when token is invalid
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('user');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('rememberedToken');
+        localStorage.removeItem('rememberedUser');
+        
         // Don't redirect here - let the component handle it
         // window.location.href = '/login';
       } else {
@@ -643,15 +650,21 @@ export const servicesAPI = {
 export const authUtils = {
   // Check if user is logged in
   isAuthenticated: () => {
-    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
-    const user = sessionStorage.getItem('user') || localStorage.getItem('user');
+    const token = sessionStorage.getItem('token') || 
+                  localStorage.getItem('rememberedToken') || 
+                  localStorage.getItem('token'); // backwards compatibility
+    const user = sessionStorage.getItem('user') || 
+                 localStorage.getItem('rememberedUser') || 
+                 localStorage.getItem('user'); // backwards compatibility
     return !!(token && user);
   },
 
   // Get stored user data
   getStoredUser: () => {
     try {
-      const user = sessionStorage.getItem('user') || localStorage.getItem('user');
+      const user = sessionStorage.getItem('user') || 
+                   localStorage.getItem('rememberedUser') || 
+                   localStorage.getItem('user'); // backwards compatibility
       return user ? JSON.parse(user) : null;
     } catch (error) {
       console.error('Error parsing stored user data:', error);
@@ -661,7 +674,9 @@ export const authUtils = {
 
   // Get stored token
   getStoredToken: () => {
-    return sessionStorage.getItem('token') || localStorage.getItem('token');
+    return sessionStorage.getItem('token') || 
+           localStorage.getItem('rememberedToken') || 
+           localStorage.getItem('token'); // backwards compatibility
   },
 
   // Check if user has specific role
@@ -681,13 +696,34 @@ export const authUtils = {
     return ['medtech', 'pathologist', 'admin'].includes(user?.role);
   },
 
-  // Clear all stored auth data
+  // Clear all stored auth data (including remembered credentials)
   clearAuthData: () => {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    localStorage.removeItem('token'); // backwards compatibility
+    localStorage.removeItem('user'); // backwards compatibility
+    localStorage.removeItem('rememberedToken');
+    localStorage.removeItem('rememberedUser');
   },
+
+  // Clear only session data (preserve remembered credentials)
+  clearSessionData: () => {
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
+  },
+
+  // Clear only remembered credentials
+  clearRememberedData: () => {
+    localStorage.removeItem('rememberedToken');
+    localStorage.removeItem('rememberedUser');
+  },
+
+  // Check if credentials are remembered
+  hasRememberedCredentials: () => {
+    const rememberedToken = localStorage.getItem('rememberedToken');
+    const rememberedUser = localStorage.getItem('rememberedUser');
+    return !!(rememberedToken && rememberedUser);
+  }
 };
 
 // Appointment API functions

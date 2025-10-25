@@ -33,13 +33,39 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
     authDebugger.log('Login component mounted', {
       hasExistingToken: !!sessionStorage.getItem('token'),
       hasExistingUser: !!sessionStorage.getItem('user'),
+      hasRememberedToken: !!localStorage.getItem('rememberedToken'),
+      hasRememberedUser: !!localStorage.getItem('rememberedUser'),
       currentUrl: window.location.href
     });
-    setFormData({
-      identifier: '',
-      password: ''
-    });
-    setRememberMe(false);
+    
+    // Check if there are remembered credentials
+    const rememberedUser = localStorage.getItem('rememberedUser');
+    const rememberedToken = localStorage.getItem('rememberedToken');
+    
+    if (rememberedUser && rememberedToken) {
+      try {
+        const userData = JSON.parse(rememberedUser);
+        console.log('Found remembered credentials for:', userData.firstName, userData.lastName);
+        
+        // Auto-fill the username and set remember me to true
+        setFormData({
+          identifier: userData.username || userData.email,
+          password: ''
+        });
+        setRememberMe(true);
+        
+        authDebugger.log('Auto-filled remembered credentials', {
+          userEmail: userData.email,
+          userName: `${userData.firstName} ${userData.lastName}`
+        });
+      } catch (error) {
+        console.error('Error parsing remembered user data:', error);
+        // Clear invalid remembered data
+        localStorage.removeItem('rememberedUser');
+        localStorage.removeItem('rememberedToken');
+      }
+    }
+    
     setLoading(false);
     setError('');
     setShowPassword(false);
@@ -136,11 +162,31 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
             token: data.token.substr(0, 20) + '...',
             userEmail: data.user.email,
             userRole: data.user.role,
-            userName: `${data.user.firstName} ${data.user.lastName}`
+            userName: `${data.user.firstName} ${data.user.lastName}`,
+            rememberMe: rememberMe
           });
           
+          // Always store in sessionStorage for the current session
           sessionStorage.setItem('token', data.token);
           sessionStorage.setItem('user', JSON.stringify(data.user));
+          
+          // If Remember Me is checked, also store in localStorage for persistence
+          if (rememberMe) {
+            localStorage.setItem('rememberedToken', data.token);
+            localStorage.setItem('rememberedUser', JSON.stringify(data.user));
+            console.log('Credentials remembered for future sessions');
+            
+            authDebugger.log('Credentials saved to localStorage', {
+              userEmail: data.user.email,
+              userName: `${data.user.firstName} ${data.user.lastName}`,
+              persistent: true
+            });
+          } else {
+            // If not remembering, clear any previously remembered credentials
+            localStorage.removeItem('rememberedToken');
+            localStorage.removeItem('rememberedUser');
+            console.log('Previous remembered credentials cleared');
+          }
           
           authDebugger.log('Session data stored, navigating to dashboard');
           
@@ -449,6 +495,36 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
         <div className="login-box">
           <h1 className="login-title">LOGIN</h1>
           
+          {/* Remembered credentials indicator */}
+          {rememberMe && formData.identifier && (
+            <div style={{
+              background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+              border: '2px solid #38bdf8',
+              color: '#0369a1',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              marginBottom: '16px',
+              fontSize: '14px',
+              textAlign: 'center',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}>
+              <svg 
+                width="16" 
+                height="16" 
+                viewBox="0 0 24 24" 
+                fill="currentColor"
+                style={{ flexShrink: 0 }}
+              >
+                <path d="M12 1L3 5V11C3 16.55 6.84 21.74 12 23C17.16 21.74 21 16.55 21 11V5L12 1M10 17L6 13L7.41 11.59L10 14.17L16.59 7.58L18 9L10 17Z"/>
+              </svg>
+              <span>Welcome back! Your login has been remembered.</span>
+            </div>
+          )}
+
           {/* Error message display */}
           {error && (
             <div style={{
@@ -536,7 +612,17 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
                 <input
                   type="checkbox"
                   checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
+                  onChange={(e) => {
+                    const isChecked = e.target.checked;
+                    setRememberMe(isChecked);
+                    
+                    // If user unchecks "Remember me", clear any remembered credentials
+                    if (!isChecked) {
+                      localStorage.removeItem('rememberedToken');
+                      localStorage.removeItem('rememberedUser');
+                      console.log('Remembered credentials cleared due to unchecking Remember me');
+                    }
+                  }}
                   disabled={loading}
                 />
                 Remember me

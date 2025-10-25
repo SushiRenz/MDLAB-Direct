@@ -22,6 +22,14 @@ function App() {
       const token = sessionStorage.getItem('token');
       const user = sessionStorage.getItem('user');
       
+      // Check for remembered credentials if no session exists
+      const rememberedToken = localStorage.getItem('rememberedToken');
+      const rememberedUser = localStorage.getItem('rememberedUser');
+      
+      // Use session credentials first, then fall back to remembered credentials
+      const authToken = token || rememberedToken;
+      const authUser = user || rememberedUser;
+      
       // Check if there's a saved view for this tab
       const savedView = sessionStorage.getItem('currentView');
       
@@ -37,12 +45,18 @@ function App() {
         navigationType, 
         isFreshTab, 
         isReload,
-        hasToken: !!token 
+        hasSessionToken: !!token,
+        hasRememberedToken: !!rememberedToken,
+        hasAuthToken: !!authToken
       });
       
       authDebugger.log('App authentication check started', {
-        hasToken: !!token,
-        hasUser: !!user,
+        hasSessionToken: !!token,
+        hasSessionUser: !!user,
+        hasRememberedToken: !!rememberedToken,
+        hasRememberedUser: !!rememberedUser,
+        hasAuthToken: !!authToken,
+        hasAuthUser: !!authUser,
         savedView,
         navigationType,
         isFreshTab,
@@ -50,20 +64,33 @@ function App() {
         currentView: currentView
       });
       
-      if (token && user) {
+      if (authToken && authUser) {
         console.log('Found stored credentials - validating session');
+        
+        // If using remembered credentials, restore them to session storage
+        if (!token && rememberedToken) {
+          console.log('Restoring remembered credentials to session');
+          sessionStorage.setItem('token', rememberedToken);
+          sessionStorage.setItem('user', rememberedUser);
+          
+          authDebugger.log('Remembered credentials restored to session', {
+            source: 'localStorage',
+            hasToken: !!rememberedToken,
+            hasUser: !!rememberedUser
+          });
+        }
         
         // Check if this is immediately after signup (user has token but no saved view)
         // Don't treat post-signup navigation as "fresh tab"
-        const isPostSignup = token && user && !savedView && 
+        const isPostSignup = authToken && authUser && !savedView && 
                            (currentView === 'login' || currentView === 'signup');
         
-        // If it's a fresh tab (new tab/window), go to login for multi-account support
-        // BUT NOT if this is immediately after signup
-        if (isFreshTab && !isPostSignup) {
-          console.log('Fresh tab detected - going to login for multi-account support');
+        // For remembered credentials, don't redirect to login on fresh tabs
+        // Only redirect for fresh tabs if using session-only credentials
+        if (isFreshTab && !isPostSignup && !rememberedToken) {
+          console.log('Fresh tab detected with session-only credentials - going to login for multi-account support');
           authDebugger.log('Fresh tab detected - redirecting to login', {
-            reason: 'Multi-account support for fresh tabs'
+            reason: 'Multi-account support for fresh tabs (session-only credentials)'
           });
           setCurrentView('login');
           sessionStorage.setItem('currentView', 'login');
@@ -71,12 +98,13 @@ function App() {
         }
         
         try {
-          const userData = JSON.parse(user);
+          const userData = JSON.parse(authUser);
           
           authDebugger.log('Validating token with backend', {
-            hasToken: !!token,
+            hasToken: !!authToken,
             userRole: userData.role,
-            userName: `${userData.firstName} ${userData.lastName}`
+            userName: `${userData.firstName} ${userData.lastName}`,
+            tokenSource: token ? 'session' : 'remembered'
           });
           
           // Validate token with backend
@@ -85,7 +113,8 @@ function App() {
           authDebugger.log('Token validation successful', {
             responseStatus: response.status,
             hasUser: !!response.data.user,
-            userRole: response.data.user?.role
+            userRole: response.data.user?.role,
+            tokenSource: token ? 'session' : 'remembered'
           });
           
           // Use the fresh user data from the server
@@ -306,6 +335,10 @@ function App() {
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('currentView');
     
+    // Note: We intentionally DON'T clear localStorage here
+    // This allows remembered credentials to persist for future logins
+    // If user wants to clear remembered credentials, they can uncheck "Remember Me" on next login
+    
     // Signal other tabs to log out too (using localStorage for cross-tab communication)
     localStorage.setItem('sessionCleared', 'true');
     setTimeout(() => localStorage.removeItem('sessionCleared'), 100);
@@ -317,7 +350,7 @@ function App() {
     // Force navigation to login page
     setCurrentView('login');
     
-    console.log('User logged out successfully');
+    console.log('User logged out successfully (remembered credentials preserved)');
     
     // Optional: Call backend logout endpoint
     if (token) {
