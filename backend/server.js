@@ -52,7 +52,7 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// CORS configuration - Allow network access
+// CORS configuration - Allow network access and mobile clients
 app.use(cors({
   origin: [
     'http://localhost:5173',
@@ -64,7 +64,12 @@ app.use(cors({
     /^http:\/\/10\.\d+\.\d+\.\d+:5173$/,   // Allow any 10.x.x.x IP on port 5173
     /^http:\/\/10\.\d+\.\d+\.\d+:5174$/,   // Allow any 10.x.x.x IP on port 5174
     /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+:5173$/, // Allow 172.16-31.x.x IPs on port 5173
-    /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+:5174$/ // Allow 172.16-31.x.x IPs on port 5174
+    /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+:5174$/, // Allow 172.16-31.x.x IPs on port 5174
+    // Allow mobile app origins
+    'exp://192.168.1.112:8081',
+    'exp://192.168.1.112:8082',
+    /^exp:\/\/192\.168\.\d+\.\d+:80\d+$/, // Allow Expo development client
+    null // Allow null origin for mobile apps
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -86,15 +91,19 @@ app.use(cors({
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   
-  // Allow all origins matching our patterns
+  // Allow all origins matching our patterns including mobile apps
   if (origin && (
     origin.includes('localhost') ||
     origin.includes('127.0.0.1') ||
     /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin) ||
     /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/.test(origin) ||
-    /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+:\d+$/.test(origin)
+    /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+:\d+$/.test(origin) ||
+    /^exp:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin) // Allow Expo origins
   )) {
     res.header('Access-Control-Allow-Origin', origin);
+  } else if (!origin) {
+    // Allow requests with no origin (mobile apps)
+    res.header('Access-Control-Allow-Origin', '*');
   }
   
   res.header('Access-Control-Allow-Credentials', 'true');
