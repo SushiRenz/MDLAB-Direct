@@ -41,12 +41,7 @@ function ReviewResults({ currentUser }) {
         { key: 'chloride', label: 'Chloride (Cl)', normalRange: '94-110 mmol/L', group: 'electrolytes' },
         { key: 'magnesium', label: 'Magnesium (Mg)', normalRange: '0.70-1.05 mmol/L', group: 'electrolytes' },
         { key: 'phosphorus', label: 'Phosphorus (P)', normalRange: '0.85-1.50 mmol/L', group: 'electrolytes' },
-        // OGTT Tests
-        { key: 'ogtt_fasting', label: 'OGTT Fasting', normalRange: '70-100 mg/dL', group: 'ogtt' },
-        { key: 'ogtt_30min', label: 'OGTT 30 min', normalRange: '<180 mg/dL', group: 'ogtt' },
-        { key: 'ogtt_60min', label: 'OGTT 60 min', normalRange: '<180 mg/dL', group: 'ogtt' },
-        { key: 'ogtt_90min', label: 'OGTT 90 min', normalRange: '<155 mg/dL', group: 'ogtt' },
-        { key: 'ogtt_120min', label: 'OGTT 120 min', normalRange: '<140 mg/dL', group: 'ogtt' }
+        { key: 'fecalysis', label: 'Fecalysis', normalRange: 'See reference', group: 'other' }
       ]
     },
     // Serology/Immunology - Following MDLAB system
@@ -57,17 +52,13 @@ function ReviewResults({ currentUser }) {
         { key: 'hepatitis_c', label: 'Hepatitis C', normalRange: 'Non-Reactive', group: 'serology' },
         { key: 'hiv', label: 'HIV Screening', normalRange: 'Non-Reactive', group: 'serology' },
         { key: 'vdrl', label: 'VDRL (Syphilis)', normalRange: 'Non-Reactive', group: 'serology' },
-        // Dengue Duo Components
         { key: 'dengue_ns1', label: 'Dengue NS1 Antigen', normalRange: 'Negative', group: 'dengue' },
         { key: 'dengue_igg', label: 'Dengue IgG Antibody', normalRange: 'Negative', group: 'dengue' },
         { key: 'dengue_igm', label: 'Dengue IgM Antibody', normalRange: 'Negative', group: 'dengue' },
-        // Salmonella Components
         { key: 'salmonella_igg', label: 'Salmonella IgG', normalRange: 'Non-Reactive', group: 'salmonella' },
         { key: 'salmonella_igm', label: 'Salmonella IgM', normalRange: 'Non-Reactive', group: 'salmonella' },
-        // H. pylori Components
         { key: 'hpylori_antigen', label: 'H. Pylori Antigen', normalRange: 'Negative', group: 'hpylori' },
         { key: 'hpylori_antibody', label: 'H. Pylori Antibody', normalRange: 'Negative', group: 'hpylori' },
-        // Tumor Markers & Inflammation
         { key: 'psa', label: 'PSA (Prostate Specific Antigen)', normalRange: '<4.0 ng/mL', group: 'tumor_markers' },
         { key: 'crp', label: 'CRP (C-Reactive Protein)', normalRange: '<3.0 mg/L', group: 'inflammation' }
       ]
@@ -86,85 +77,37 @@ function ReviewResults({ currentUser }) {
         { key: 'mchc', label: 'MCHC', normalRange: '320-360 g/L', group: 'indices' },
         { key: 'neutrophils', label: 'Segmenters (Neutrophils)', normalRange: '2.0-7.0 x10⁹/L', group: 'differential' },
         { key: 'lymphocytes', label: 'Lymphocytes', normalRange: '0.8-4.0 x10⁹/L', group: 'differential' },
-        { key: 'monocytes', label: 'Monocytes', normalRange: '0.1-1.5 x10⁹/L', group: 'differential' },
+        { key: 'monocytes', label: 'Monocytes', normalRange: '0.1-1.5 x10⁩/L', group: 'differential' },
         { key: 'eosinophils', label: 'Eosinophils', normalRange: '0.0-0.4 x10⁹/L', group: 'differential' },
         { key: 'basophils', label: 'Basophils', normalRange: '0.0-0.1 x10⁹/L', group: 'differential' },
         { key: 'esr', label: 'ESR (Erythrocyte Sedimentation Rate)', normalRange: '<20 mm/hr', group: 'other' },
         { key: 'aptt', label: 'APTT (Activated Partial Thromboplastin Time)', normalRange: '25-35 seconds', group: 'coagulation' },
         { key: 'pt', label: 'PT (Prothrombin Time)', normalRange: '11-15 seconds', group: 'coagulation' },
-        { key: 'inr', label: 'INR (International Normalized Ratio)', normalRange: '0.8-1.2', group: 'coagulation' }
+        { key: 'inr', label: 'INR (International Normalized Ratio)', normalRange: '0.8-1.2', group: 'coagulation' },
+        { key: 'bleeding_time', label: 'Bleeding Time', normalRange: '1-6 minutes', group: 'coagulation' },
+        { key: 'clotting_time', label: 'Clotting Time', normalRange: '5-15 minutes', group: 'coagulation' }
       ]
     },
     // Clinical Microscopy/Urinalysis - Following MDLAB system
     urinalysis: {
       title: 'CLINICAL MICROSCOPY',
       fields: [
-        { key: 'urine_color', label: 'Color', normalRange: 'Yellow', group: 'physical' },
-        { key: 'urine_transparency', label: 'Transparency', normalRange: 'Clear', group: 'physical' },
-        { key: 'urine_specific_gravity', label: 'Specific Gravity', normalRange: '1.003-1.030', group: 'physical' },
-        { key: 'urine_ph', label: 'pH', normalRange: '4.6-8.0', group: 'chemical' },
-        { key: 'urine_glucose', label: 'Glucose', normalRange: 'Negative', group: 'chemical' },
-        { key: 'urine_protein', label: 'Protein', normalRange: 'Negative', group: 'chemical' },
-        { key: 'urobilinogen', label: 'Urobilinogen', normalRange: 'Normal', group: 'chemical' },
-        { key: 'urine_urobilinogen', label: 'Urobilinogen', normalRange: 'Normal', group: 'chemical' },
-        { key: 'urine_ketones', label: 'Ketones', normalRange: 'Negative', group: 'chemical' },
-        { key: 'bilirubin', label: 'Bilirubin', normalRange: 'Negative', group: 'chemical' },
-        { key: 'urine_bilirubin', label: 'Bilirubin', normalRange: 'Negative', group: 'chemical' },
-        { key: 'urine_leukocytes', label: 'Leukocytes', normalRange: 'Negative', group: 'chemical' },
-        { key: 'urine_nitrites', label: 'Nitrites', normalRange: 'Negative', group: 'chemical' },
-        { key: 'urine_blood', label: 'Blood', normalRange: 'Negative', group: 'chemical' },
-        { key: 'urine_wbc', label: 'WBC/hpf', normalRange: '0-5/hpf', group: 'microscopic' },
-        { key: 'urine_rbc', label: 'RBC/hpf', normalRange: '0-2/hpf', group: 'microscopic' },
-        { key: 'urine_epithelial', label: 'Epithelial Cells', normalRange: 'Few', group: 'microscopic' },
-        { key: 'mucus_thread', label: 'Mucus Threads', normalRange: 'Few', group: 'microscopic' },
-        { key: 'urine_mucus_thread', label: 'Mucus Threads', normalRange: 'Few', group: 'microscopic' },
-        { key: 'amorphous_urates', label: 'Amorphous Urates', normalRange: 'Few', group: 'microscopic' },
-        { key: 'urine_amorphous_urates', label: 'Amorphous Urates', normalRange: 'Few', group: 'microscopic' },
-        { key: 'urine_bacteria', label: 'Bacteria', normalRange: 'Few', group: 'microscopic' },
-        { key: 'urine_crystals', label: 'Crystals', normalRange: 'None', group: 'microscopic' },
-        { key: 'urine_casts', label: 'Casts', normalRange: 'None', group: 'microscopic' },
-        { key: 'urine_others', label: 'Others', normalRange: '-', group: 'microscopic' }
-      ]
-    },
-    // Fecalysis - Following MDLAB system
-    fecalysis: {
-      title: 'FECALYSIS',
-      fields: [
-        { key: 'fecal_color', label: 'Color', normalRange: 'Brown', group: 'physical' },
-        { key: 'fecal_consistency', label: 'Consistency', normalRange: 'Formed', group: 'physical' },
-        { key: 'fecal_occult_blood', label: 'Occult Blood', normalRange: 'Negative', group: 'chemical' },
-        { key: 'fecal_rbc', label: 'RBC/hpf', normalRange: '0-2/hpf', group: 'microscopic' },
-        { key: 'fecal_wbc', label: 'WBC/hpf', normalRange: '0-5/hpf', group: 'microscopic' },
-        { key: 'fecal_bacteria', label: 'Bacteria', normalRange: 'Few', group: 'microscopic' },
-        { key: 'fecal_parasite_ova', label: 'Parasite/Ova', normalRange: 'None seen', group: 'microscopic' }
-      ]
-    },
-    // Blood Typing - Following MDLAB system
-    blood_typing: {
-      title: 'BLOOD TYPING',
-      fields: [
-        { key: 'blood_type', label: 'ABO Blood Type', normalRange: 'A/B/AB/O', group: 'typing' },
-        { key: 'rh_factor', label: 'Rh Factor', normalRange: 'Positive/Negative', group: 'typing' }
-      ]
-    },
-    // Pregnancy Test - Following MDLAB system
-    pregnancy_test: {
-      title: 'PREGNANCY TEST',
-      fields: [
+        // Urinalysis
+        { key: 'color', label: 'Color', normalRange: 'Yellow', group: 'urine_physical' },
+        { key: 'transparency', label: 'Transparency', normalRange: 'Clear', group: 'urine_physical' },
+        { key: 'specificGravity', label: 'Specific Gravity', normalRange: '1.003-1.030', group: 'urine_physical' },
+        { key: 'ph', label: 'pH', normalRange: '4.6-8.0', group: 'urine_chemical' },
+        { key: 'protein', label: 'Protein', normalRange: 'Negative', group: 'urine_chemical' },
+        { key: 'glucose', label: 'Glucose', normalRange: 'Negative', group: 'urine_chemical' },
+        { key: 'ketones', label: 'Ketones', normalRange: 'Negative', group: 'urine_chemical' },
+        { key: 'bilirubin', label: 'Bilirubin', normalRange: 'Negative', group: 'urine_chemical' },
+        { key: 'urobilinogen', label: 'Urobilinogen', normalRange: 'Normal', group: 'urine_chemical' },
+        { key: 'blood', label: 'Blood', normalRange: 'Negative', group: 'urine_chemical' },
+        { key: 'leukocytes', label: 'Leukocytes', normalRange: 'Negative', group: 'urine_chemical' },
+        { key: 'nitrites', label: 'Nitrites', normalRange: 'Negative', group: 'urine_chemical' },
+        // Pregnancy Tests - grouped with Clinical Microscopy
         { key: 'pregnancy_test_urine', label: 'Pregnancy Test (Urine)', normalRange: 'Negative', group: 'pregnancy' },
-        { key: 'pregnancy_test_serum', label: 'Serum Pregnancy Test', normalRange: 'Negative', group: 'pregnancy' },
-        { key: 'pregnancy_test', label: 'Pregnancy Test', normalRange: 'Negative', group: 'pregnancy' }
-      ]
-    },
-    // Thyroid Function Tests - Following MDLAB system  
-    thyroid: {
-      title: 'THYROID FUNCTION TESTS',
-      fields: [
-        { key: 'tsh', label: 'TSH (Thyroid Stimulating Hormone)', normalRange: '0.3-4.2 mIU/L', group: 'thyroid' },
-        { key: 'ft3', label: 'FT3 (Free Triiodothyronine)', normalRange: '2.3-4.2 pg/mL', group: 'thyroid' },
-        { key: 'ft4', label: 'FT4 (Free Thyroxine)', normalRange: '0.8-1.8 ng/dL', group: 'thyroid' },
-        { key: 't3', label: 'T3 (Total Triiodothyronine)', normalRange: '80-200 ng/dL', group: 'thyroid' },
-        { key: 't4', label: 'T4 (Total Thyroxine)', normalRange: '5.1-14.1 μg/dL', group: 'thyroid' }
+        { key: 'pregnancy_test_serum', label: 'Pregnancy Test (Serum/β-HCG)', normalRange: 'Negative', group: 'pregnancy' }
       ]
     }
   };
@@ -173,14 +116,40 @@ function ReviewResults({ currentUser }) {
   const getTestFieldValue = (fieldKey, results) => {
     if (!results || !fieldKey) return null;
     
-    // Handle regular objects (JSON-serialized from MongoDB)
-    if (typeof results === 'object' && !(results instanceof Map)) {
-      return results[fieldKey];
-    }
-    
-    // Handle Map objects (direct MongoDB access)
-    if (results instanceof Map) {
-      return results.get(fieldKey);
+    try {
+      // Handle regular objects (JSON-serialized from MongoDB)
+      if (typeof results === 'object' && !(results instanceof Map)) {
+        const value = results[fieldKey];
+        
+        // If the value is an object with a 'value' property, extract it
+        if (value && typeof value === 'object' && 'value' in value) {
+          return value.value;
+        }
+        
+        // If the value is an object with a 'result' property, extract it
+        if (value && typeof value === 'object' && 'result' in value) {
+          return value.result;
+        }
+        
+        return value;
+      }
+      
+      // Handle Map objects (direct MongoDB access)
+      if (results instanceof Map) {
+        const value = results.get(fieldKey);
+        
+        // Apply same nested extraction logic
+        if (value && typeof value === 'object' && 'value' in value) {
+          return value.value;
+        }
+        if (value && typeof value === 'object' && 'result' in value) {
+          return value.result;
+        }
+        
+        return value;
+      }
+    } catch (error) {
+      console.error(`❌ Error extracting field "${fieldKey}":`, error);
     }
     
     return null;
@@ -219,10 +188,10 @@ function ReviewResults({ currentUser }) {
         const value = getTestFieldValue(field.key, modalTestData.results);
         if (value !== null && value !== undefined && value !== '') {
           categoryResults[field.key] = {
-            label: field.label,
+            label: field.label || field.key,
             value: value,
-            normalRange: field.normalRange,
-            group: field.group
+            normalRange: field.normalRange || 'See reference',
+            group: field.group || 'other'
           };
           hasData = true;
           console.log(`🔍 DEBUG: Found data for ${category} - ${field.key}: ${value}`);
@@ -236,39 +205,63 @@ function ReviewResults({ currentUser }) {
       
       if (hasData) {
         results[category] = {
-          title: config.title,
+          title: config.title || category.toUpperCase(),
           fields: categoryResults
         };
         console.log(`🔍 DEBUG: Added category ${category} with data`);
       }
     });
     
-    // Also check for any remaining fields that might not be in definitions but show up as extra fields
-    // This handles fields like date_performed and time_performed that might be added dynamically
-    const remainingFields = {};
-    Object.entries(modalTestData.results).forEach(([key, value]) => {
-      // Skip fields that are already processed in categories or are date/time performed
-      const isInDefinitions = Object.values(testFieldDefinitions).some(config => 
-        config.fields.some(field => field.key === key)
-      );
-      const isDateTimeField = ['date_performed', 'datePerformed', 'time_performed', 'timePerformed'].includes(key);
-      
-      if (!isInDefinitions && !isDateTimeField && value !== null && value !== undefined && value !== '') {
-        remainingFields[key] = {
-          label: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-          value: value,
-          normalRange: 'See reference',
-          group: 'other'
-        };
-      }
-    });
+    // Check for remarks/comments ONLY - "OTHER RESULTS" is for remarks/comments only
+    const commentsFields = {};
     
-    // Only add remaining fields if there are any and they're not date/time fields
-    if (Object.keys(remainingFields).length > 0) {
+    try {
+      const resultEntries = modalTestData.results instanceof Map 
+        ? Array.from(modalTestData.results.entries()) 
+        : Object.entries(modalTestData.results || {});
+      
+      resultEntries.forEach(([key, value]) => {
+        // ONLY include remarks/comments in "OTHER RESULTS"
+        const isCommentField = ['remarks', 'comments', 'comment', 'notes', 'observation', 'observations'].includes(key.toLowerCase());
+        
+        if (isCommentField) {
+          // Extract actual value if nested
+          let actualValue = value;
+          if (value && typeof value === 'object') {
+            actualValue = value.value || value.result || JSON.stringify(value);
+          }
+          
+          if (actualValue !== null && actualValue !== undefined && actualValue !== '') {
+            // Format the label nicely
+            const formattedLabel = key
+              .replace(/_/g, ' ')
+              .replace(/([A-Z])/g, ' $1')
+              .split(' ')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+              .join(' ')
+              .trim();
+            
+            commentsFields[key] = {
+              label: formattedLabel,
+              value: actualValue,
+              normalRange: '',
+              group: 'comments'
+            };
+            console.log(`✅ Found comment/remark field: ${key} = "${actualValue}"`);
+          }
+        }
+      });
+    } catch (error) {
+      console.error('❌ Error processing comment fields:', error);
+    }
+    
+    // Only add "OTHER RESULTS" if there are actual remarks/comments
+    if (Object.keys(commentsFields).length > 0) {
       results['other'] = {
         title: 'OTHER RESULTS',
-        fields: remainingFields
+        fields: commentsFields
       };
+      console.log(`✅ Added "OTHER RESULTS" category with ${Object.keys(commentsFields).length} comment/remark fields`);
     }
     
     console.log('🔍 DEBUG: Final organized results:', results);
@@ -295,27 +288,47 @@ function ReviewResults({ currentUser }) {
       if (response.success) {
         const testResults = response.data || [];
         
-        // Debug: Log appointment type classification
+        // Enhanced logging for debugging
         if (testResults.length > 0) {
-          console.log('🔍 DEBUG: Test Results Classification:');
+          console.log('🔍 TEST RESULTS DETAILED LOGGING:');
           testResults.forEach((result, index) => {
             const hasAccountPatient = !!result.appointment?.patient;
             const patientName = result.patientInfo?.name || 
                               result.appointment?.patientName || 
-                              result.appointment?.patient?.firstName + ' ' + result.appointment?.patient?.lastName ||
-                              'Unknown';
-            console.log(`  ${index + 1}. ${patientName}: ${hasAccountPatient ? 'Account (Patient Created)' : 'Walk-in (Receptionist Created)'}`);
-            console.log(`      - Appointment Patient:`, result.appointment?.patient);
-            console.log(`      - Appointment Type:`, result.appointment?.type);
+                              (result.appointment?.patient?.firstName && result.appointment?.patient?.lastName 
+                                ? `${result.appointment.patient.firstName} ${result.appointment.patient.lastName}`
+                                : 'Unknown');
+            
+            console.log(`📋 Test Result #${index + 1} (ID: ${result._id}):`, {
+              patientName,
+              accountType: hasAccountPatient ? 'Account (Patient Created)' : 'Walk-in (Receptionist Created)',
+              testType: result.testType,
+              serviceName: result.serviceName,
+              status: result.status,
+              sampleId: result.sampleId,
+              hasResults: !!result.results,
+              resultsType: typeof result.results,
+              resultsKeys: result.results ? Object.keys(result.results) : [],
+              appointmentPatient: result.appointment?.patient,
+              appointmentType: result.appointment?.type,
+              fullResultsStructure: result.results,
+              fullObject: result
+            });
           });
         }
         
         setCompletedTests(testResults);
       } else {
+        console.error('❌ Failed to load test results:', response.message);
         setError(response.message || 'Failed to load test results');
       }
     } catch (error) {
-      console.error('Error fetching test results:', error);
+      console.error('❌ Error fetching test results:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        response: error.response
+      });
       setError('Network error: ' + error.message);
     } finally {
       setLoading(false);

@@ -2010,12 +2010,13 @@ function MedTechDashboard({ currentUser, onLogout }) {
         </div>
       </div>
 
-      {/* Pregnancy Test Section */}
+      {/* Pregnancy Tests Section - Both Urine and Serum */}
       <div style={getTestSectionStyles('urinalysis')}>
-        <h4 style={{ color: '#495057', marginBottom: '15px' }}>Pregnancy Test (Urine)</h4>
+        <h4 style={{ color: '#495057', marginBottom: '15px' }}>Pregnancy Tests</h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
+          {/* Pregnancy Test (Urine) */}
           <div>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Result</label>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Pregnancy Test (Urine)</label>
             <select 
               style={{ 
                 width: '100%', 
@@ -2033,6 +2034,28 @@ function MedTechDashboard({ currentUser, onLogout }) {
               <option value="Positive">Positive</option>
             </select>
             <span style={{ fontSize: '11px', color: '#6c757d' }}>Ref: {getReferenceRange('pregnancy_test_urine')}</span>
+          </div>
+
+          {/* Pregnancy Test (Serum/β-HCG) */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Pregnancy Test (Serum/β-HCG)</label>
+            <select 
+              style={{ 
+                width: '100%', 
+                padding: '8px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px',
+                backgroundColor: '#fff',
+                color: '#333'
+              }}
+              value={resultForm.pregnancy_test_serum}
+              onChange={(e) => handleResultChange('pregnancy_test_serum', e.target.value)}
+            >
+              <option value="">Select result</option>
+              <option value="Negative">Negative</option>
+              <option value="Positive">Positive</option>
+            </select>
+            <span style={{ fontSize: '11px', color: '#6c757d' }}>Ref: {getReferenceRange('pregnancy_test_serum')}</span>
           </div>
         </div>
       </div>
@@ -2332,32 +2355,6 @@ function MedTechDashboard({ currentUser, onLogout }) {
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* Serum Pregnancy Test */}
-          <div>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#2c3e50' }}>
-              Pregnancy Test (Serum/β-HCG)
-            </label>
-            <select 
-              style={{ 
-                width: '100%', 
-                padding: '10px', 
-                border: '1px solid #ddd', 
-                borderRadius: '4px',
-                backgroundColor: '#fff',
-                color: '#333'
-              }}
-              value={resultForm.pregnancy_test_serum}
-              onChange={(e) => handleResultChange('pregnancy_test_serum', e.target.value)}
-            >
-              <option value="">Select result</option>
-              <option value="Positive">Positive</option>
-              <option value="Negative">Negative</option>
-            </select>
-            <span style={{ fontSize: '12px', color: '#6c757d', fontStyle: 'italic' }}>
-              Reference: {getReferenceRange('pregnancy_test_serum')}
-            </span>
           </div>
         </div>
       </div>

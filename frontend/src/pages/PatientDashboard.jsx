@@ -76,28 +76,76 @@ function PatientDashboard(props) {
             data: response.data
           });
           
-          // Transform API data to match component format
-          const transformedResults = response.data.map(result => ({
-            sampleId: result.sampleId,
-            patient: result.patientName || `${currentUser?.firstName} ${currentUser?.lastName}` || 'Patient',
-            patientId: result.patient,
-            testType: result.testType || result.serviceName,
-            results: result.results || {},
-            date: result.sampleDate,
-            status: result.status,
-            technician: result.medTech?.firstName ? `${result.medTech.firstName} ${result.medTech.lastName}` : 'medtech',
-            isNew: result.isNew,
-            isAbnormal: result.isAbnormal,
-            isCritical: result.isCritical,
-            _id: result._id
-          }));
+          // Log detailed information about each test result
+          response.data.forEach((result, index) => {
+            console.log(`📋 Test Result #${index + 1} (ID: ${result._id}):`, {
+              sampleId: result.sampleId,
+              testType: result.testType,
+              serviceName: result.serviceName,
+              status: result.status,
+              patientName: result.patientName,
+              patientId: result.patient,
+              hasResults: !!result.results,
+              resultsType: typeof result.results,
+              resultsKeys: result.results ? Object.keys(result.results) : [],
+              resultsStructure: result.results,
+              fullObject: result
+            });
+          });
+          
+          // Transform API data to match component format with safe fallbacks
+          const transformedResults = response.data.map((result, idx) => {
+            // Safe patient name extraction
+            let patientName = 'Patient';
+            if (result.patientName) {
+              patientName = result.patientName;
+            } else if (result.patient?.firstName && result.patient?.lastName) {
+              patientName = `${result.patient.firstName} ${result.patient.lastName}`;
+            } else if (currentUser?.firstName && currentUser?.lastName) {
+              patientName = `${currentUser.firstName} ${currentUser.lastName}`;
+            }
+            
+            // Safe results extraction with validation
+            let testResults = {};
+            if (result.results && typeof result.results === 'object') {
+              testResults = result.results;
+            } else {
+              console.warn(`⚠️ Test #${idx + 1} has invalid or missing results object:`, result.results);
+            }
+            
+            const transformed = {
+              sampleId: result.sampleId || `SAMPLE-${result._id?.substring(0, 8)}`,
+              patient: patientName,
+              patientId: result.patient?._id || result.patient,
+              testType: result.testType || result.serviceName || 'Unknown Test',
+              results: testResults,
+              date: result.sampleDate || result.createdAt,
+              status: result.status || 'pending',
+              technician: result.medTech?.firstName ? `${result.medTech.firstName} ${result.medTech.lastName}` : 'MedTech',
+              isNew: result.isNew || false,
+              isAbnormal: result.isAbnormal || false,
+              isCritical: result.isCritical || false,
+              _id: result._id,
+              // Store original data for debugging
+              _raw: result
+            };
+            
+            console.log(`✅ Transformed Test #${idx + 1}:`, transformed);
+            return transformed;
+          });
+          
           setTestResults(transformedResults);
         } else {
-          console.error('Failed to fetch test results:', response.message);
+          console.error('❌ Failed to fetch test results:', response.message);
           setTestResults([]);
         }
       } catch (error) {
-        console.error('Error loading test results:', error);
+        console.error('❌ Error loading test results:', error);
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          response: error.response
+        });
         setTestResults([]);
       }
     };
@@ -587,84 +635,239 @@ function PatientDashboard(props) {
   };
 
   // Helper function to get test result value from MongoDB data (same as ReviewResults)
+  // Complete field definitions based on MDLAB system arrangement (same as ReviewResults)
+  const testFieldDefinitions = {
+    chemistry: {
+      title: 'CLINICAL CHEMISTRY',
+      fields: [
+        { key: 'fbs', label: 'Glucose (FBS/RBS)', normalRange: '3.89-5.83 mmol/L', group: 'glucose' },
+        { key: 'cholesterol', label: 'Total Cholesterol', normalRange: '3.5-5.2 mmol/L', group: 'lipids' },
+        { key: 'triglyceride', label: 'Triglycerides', normalRange: '<2.26 mmol/L', group: 'lipids' },
+        { key: 'hdl', label: 'HDL Cholesterol', normalRange: '>1.05 mmol/L', group: 'lipids' },
+        { key: 'ldl', label: 'LDL Cholesterol', normalRange: '<2.9 mmol/L', group: 'lipids' },
+        { key: 'bua', label: 'Uric Acid', normalRange: '156-360 umol/L', group: 'kidney' },
+        { key: 'bun', label: 'BUN (Blood Urea Nitrogen)', normalRange: '1.7-8.3 mmol/L', group: 'kidney' },
+        { key: 'creatinine', label: 'Creatinine', normalRange: '53-97 umol/L', group: 'kidney' },
+        { key: 'ast_sgot', label: 'AST/SGOT', normalRange: '<31 U/L', group: 'liver' },
+        { key: 'alt_sgpt', label: 'ALT/SGPT', normalRange: '<34 U/L', group: 'liver' },
+        { key: 'sodium', label: 'Sodium (Na)', normalRange: '136-150 mmol/L', group: 'electrolytes' },
+        { key: 'potassium', label: 'Potassium (K)', normalRange: '3.5-5.0 mmol/L', group: 'electrolytes' },
+        { key: 'chloride', label: 'Chloride (Cl)', normalRange: '94-110 mmol/L', group: 'electrolytes' },
+        { key: 'magnesium', label: 'Magnesium (Mg)', normalRange: '0.70-1.05 mmol/L', group: 'electrolytes' },
+        { key: 'phosphorus', label: 'Phosphorus (P)', normalRange: '0.85-1.50 mmol/L', group: 'electrolytes' },
+        { key: 'fecalysis', label: 'Fecalysis', normalRange: 'See reference', group: 'other' }
+      ]
+    },
+    immunology: {
+      title: 'SEROLOGY/IMMUNOLOGY',
+      fields: [
+        { key: 'hepatitis_b', label: 'Hepatitis B Antigen (HbsAg)', normalRange: 'Non-Reactive', group: 'serology' },
+        { key: 'hepatitis_c', label: 'Hepatitis C', normalRange: 'Non-Reactive', group: 'serology' },
+        { key: 'hiv', label: 'HIV Screening', normalRange: 'Non-Reactive', group: 'serology' },
+        { key: 'vdrl', label: 'VDRL (Syphilis)', normalRange: 'Non-Reactive', group: 'serology' },
+        { key: 'dengue_ns1', label: 'Dengue NS1 Antigen', normalRange: 'Negative', group: 'dengue' },
+        { key: 'dengue_igg', label: 'Dengue IgG Antibody', normalRange: 'Negative', group: 'dengue' },
+        { key: 'dengue_igm', label: 'Dengue IgM Antibody', normalRange: 'Negative', group: 'dengue' },
+        { key: 'salmonella_igg', label: 'Salmonella IgG', normalRange: 'Non-Reactive', group: 'salmonella' },
+        { key: 'salmonella_igm', label: 'Salmonella IgM', normalRange: 'Non-Reactive', group: 'salmonella' },
+        { key: 'hpylori_antigen', label: 'H. Pylori Antigen', normalRange: 'Negative', group: 'hpylori' },
+        { key: 'hpylori_antibody', label: 'H. Pylori Antibody', normalRange: 'Negative', group: 'hpylori' },
+        { key: 'psa', label: 'PSA (Prostate Specific Antigen)', normalRange: '<4.0 ng/mL', group: 'tumor_markers' },
+        { key: 'crp', label: 'CRP (C-Reactive Protein)', normalRange: '<3.0 mg/L', group: 'inflammation' }
+      ]
+    },
+    hematology: {
+      title: 'HEMATOLOGY',
+      fields: [
+        { key: 'hemoglobin', label: 'Hemoglobin', normalRange: '110-160 g/L', group: 'basic' },
+        { key: 'hematocrit', label: 'Hematocrit', normalRange: '37-54%', group: 'basic' },
+        { key: 'rbc', label: 'RBC Count', normalRange: '3.50-5.50 x10¹²/L', group: 'basic' },
+        { key: 'platelets', label: 'Platelet Count', normalRange: '150-450 x10⁹/L', group: 'basic' },
+        { key: 'wbc', label: 'WBC Count', normalRange: '4.0-10.0 x10⁹/L', group: 'basic' },
+        { key: 'mcv', label: 'MCV', normalRange: '80-100 fL', group: 'indices' },
+        { key: 'mch', label: 'MCH', normalRange: '27.0-34.0 pg', group: 'indices' },
+        { key: 'mchc', label: 'MCHC', normalRange: '320-360 g/L', group: 'indices' },
+        { key: 'neutrophils', label: 'Segmenters (Neutrophils)', normalRange: '2.0-7.0 x10⁹/L', group: 'differential' },
+        { key: 'lymphocytes', label: 'Lymphocytes', normalRange: '0.8-4.0 x10⁹/L', group: 'differential' },
+        { key: 'monocytes', label: 'Monocytes', normalRange: '0.1-1.5 x10⁹/L', group: 'differential' },
+        { key: 'eosinophils', label: 'Eosinophils', normalRange: '0.0-0.4 x10⁹/L', group: 'differential' },
+        { key: 'basophils', label: 'Basophils', normalRange: '0.0-0.1 x10⁹/L', group: 'differential' },
+        { key: 'esr', label: 'ESR (Erythrocyte Sedimentation Rate)', normalRange: '<20 mm/hr', group: 'other' },
+        { key: 'aptt', label: 'APTT (Activated Partial Thromboplastin Time)', normalRange: '25-35 seconds', group: 'coagulation' },
+        { key: 'pt', label: 'PT (Prothrombin Time)', normalRange: '11-15 seconds', group: 'coagulation' },
+        { key: 'inr', label: 'INR (International Normalized Ratio)', normalRange: '0.8-1.2', group: 'coagulation' },
+        { key: 'bleeding_time', label: 'Bleeding Time', normalRange: '1-6 minutes', group: 'coagulation' },
+        { key: 'clotting_time', label: 'Clotting Time', normalRange: '5-15 minutes', group: 'coagulation' }
+      ]
+    },
+    urinalysis: {
+      title: 'CLINICAL MICROSCOPY',
+      fields: [
+        // Urinalysis
+        { key: 'color', label: 'Color', normalRange: 'Yellow', group: 'urine_physical' },
+        { key: 'transparency', label: 'Transparency', normalRange: 'Clear', group: 'urine_physical' },
+        { key: 'specificGravity', label: 'Specific Gravity', normalRange: '1.003-1.030', group: 'urine_physical' },
+        { key: 'ph', label: 'pH', normalRange: '4.6-8.0', group: 'urine_chemical' },
+        { key: 'protein', label: 'Protein', normalRange: 'Negative', group: 'urine_chemical' },
+        { key: 'glucose', label: 'Glucose', normalRange: 'Negative', group: 'urine_chemical' },
+        { key: 'ketones', label: 'Ketones', normalRange: 'Negative', group: 'urine_chemical' },
+        { key: 'bilirubin', label: 'Bilirubin', normalRange: 'Negative', group: 'urine_chemical' },
+        { key: 'urobilinogen', label: 'Urobilinogen', normalRange: 'Normal', group: 'urine_chemical' },
+        { key: 'blood', label: 'Blood', normalRange: 'Negative', group: 'urine_chemical' },
+        { key: 'leukocytes', label: 'Leukocytes', normalRange: 'Negative', group: 'urine_chemical' },
+        { key: 'nitrites', label: 'Nitrites', normalRange: 'Negative', group: 'urine_chemical' },
+        // Pregnancy Tests - grouped with Clinical Microscopy
+        { key: 'pregnancy_test_urine', label: 'Pregnancy Test (Urine)', normalRange: 'Negative', group: 'pregnancy' },
+        { key: 'pregnancy_test_serum', label: 'Pregnancy Test (Serum/β-HCG)', normalRange: 'Negative', group: 'pregnancy' }
+      ]
+    }
+  };
+
   const getTestFieldValue = (fieldKey, results) => {
     if (!results || !fieldKey) return null;
     
-    // Handle regular objects (JSON-serialized from MongoDB)
-    if (typeof results === 'object' && !(results instanceof Map)) {
-      return results[fieldKey];
-    }
-    
-    // Handle Map objects (direct MongoDB access)
-    if (results instanceof Map) {
-      return results.get(fieldKey);
+    try {
+      // Handle regular objects (JSON-serialized from MongoDB)
+      if (typeof results === 'object' && !(results instanceof Map)) {
+        const value = results[fieldKey];
+        
+        // If the value is an object with a 'value' property, extract it
+        if (value && typeof value === 'object' && 'value' in value) {
+          return value.value;
+        }
+        
+        // If the value is an object with a 'result' property, extract it
+        if (value && typeof value === 'object' && 'result' in value) {
+          return value.result;
+        }
+        
+        return value;
+      }
+      
+      // Handle Map objects (direct MongoDB access)
+      if (results instanceof Map) {
+        const value = results.get(fieldKey);
+        
+        // Apply same nested extraction logic
+        if (value && typeof value === 'object' && 'value' in value) {
+          return value.value;
+        }
+        if (value && typeof value === 'object' && 'result' in value) {
+          return value.result;
+        }
+        
+        return value;
+      }
+    } catch (error) {
+      console.error(`Error extracting field "${fieldKey}":`, error);
     }
     
     return null;
   };
 
-  // Function to organize test results for display in modal (similar to ReviewResults)
-  const getOrganizedTestResults = (testData) => {
-    if (!testData?.results) {
+  // Function to organize test results for display in modal (same as ReviewResults)
+  const getOrganizedTestResults = (modalTestData) => {
+    if (!modalTestData?.results) {
+      console.warn('⚠️ No results data in modalTestData:', modalTestData);
       return {};
     }
-
-    const results = testData.results;
-    const testType = testData.testType?.toLowerCase() || '';
     
-    // Define test categories based on test type
-    if (testType.includes('cbc') || testType.includes('blood')) {
-      return {
-        hematology: {
-          title: 'HEMATOLOGY',
-          fields: {
-            wbc: { label: 'White Blood Cell Count', value: getTestFieldValue('wbc', results) || getTestFieldValue('whiteBloodCells', results), normalRange: '4.0-11.0 x10³/µL' },
-            rbc: { label: 'Red Blood Cell Count', value: getTestFieldValue('rbc', results) || getTestFieldValue('redBloodCells', results), normalRange: '4.5-5.5 x10⁶/µL' },
-            hemoglobin: { label: 'Hemoglobin', value: getTestFieldValue('hemoglobin', results) || getTestFieldValue('hgb', results), normalRange: '12.0-16.0 g/dL' },
-            hematocrit: { label: 'Hematocrit', value: getTestFieldValue('hematocrit', results) || getTestFieldValue('hct', results), normalRange: '36-46%' },
-            platelets: { label: 'Platelet Count', value: getTestFieldValue('platelets', results) || getTestFieldValue('plateletCount', results), normalRange: '150-450 x10³/µL' }
-          }
-        }
-      };
-    } else if (testType.includes('urine')) {
-      return {
-        urinalysis: {
-          title: 'URINALYSIS',
-          fields: {
-            color: { label: 'Color', value: getTestFieldValue('color', results), normalRange: 'Yellow' },
-            transparency: { label: 'Transparency', value: getTestFieldValue('transparency', results), normalRange: 'Clear' },
-            specificGravity: { label: 'Specific Gravity', value: getTestFieldValue('specificGravity', results), normalRange: '1.010-1.025' },
-            protein: { label: 'Protein', value: getTestFieldValue('protein', results), normalRange: 'Negative' },
-            glucose: { label: 'Glucose', value: getTestFieldValue('glucose', results), normalRange: 'Negative' }
-          }
-        }
-      };
-    } else {
-      // Generic results display
-      const genericFields = {};
-      Object.entries(results).forEach(([key, value]) => {
+    console.log('🔍 Organizing test results:', {
+      testType: modalTestData.testType,
+      sampleId: modalTestData.sampleId,
+      resultsType: typeof modalTestData.results,
+      resultsKeys: Object.keys(modalTestData.results || {}),
+      results: modalTestData.results
+    });
+    
+    const results = {};
+    
+    Object.entries(testFieldDefinitions).forEach(([category, config]) => {
+      const categoryResults = {};
+      let hasData = false;
+      
+      config.fields.forEach(field => {
         // Skip date and time performed fields as they're now in the header
-        if (['date_performed', 'datePerformed', 'time_performed', 'timePerformed'].includes(key)) {
+        if (['date_performed', 'datePerformed', 'time_performed', 'timePerformed'].includes(field.key)) {
           return;
         }
         
-        const fieldValue = getTestFieldValue(key, results);
-        if (fieldValue) {
-          genericFields[key] = {
-            label: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1'),
-            value: fieldValue,
-            normalRange: 'See reference'
+        const value = getTestFieldValue(field.key, modalTestData.results);
+        if (value !== null && value !== undefined && value !== '') {
+          categoryResults[field.key] = {
+            label: field.label || field.key,
+            value: value,
+            normalRange: field.normalRange || 'See reference',
+            group: field.group || 'other'
           };
+          hasData = true;
+          console.log(`✅ Found ${category}.${field.key} = "${value}"`);
         }
       });
       
-      return {
-        general: {
-          title: testData.testType || 'TEST RESULTS',
-          fields: genericFields
+      if (hasData) {
+        results[category] = {
+          title: config.title || category.toUpperCase(),
+          fields: categoryResults
+        };
+        console.log(`✅ Added category "${category}" with ${Object.keys(categoryResults).length} fields`);
+      }
+    });
+    
+    // Check for remarks/comments ONLY - "OTHER RESULTS" is for remarks/comments only
+    const commentsFields = {};
+    
+    try {
+      const resultEntries = modalTestData.results instanceof Map 
+        ? Array.from(modalTestData.results.entries()) 
+        : Object.entries(modalTestData.results || {});
+      
+      resultEntries.forEach(([key, value]) => {
+        // ONLY include remarks/comments in "OTHER RESULTS"
+        const isCommentField = ['remarks', 'comments', 'comment', 'notes', 'observation', 'observations'].includes(key.toLowerCase());
+        
+        if (isCommentField) {
+          // Extract actual value if nested
+          let actualValue = value;
+          if (value && typeof value === 'object') {
+            actualValue = value.value || value.result || JSON.stringify(value);
+          }
+          
+          if (actualValue !== null && actualValue !== undefined && actualValue !== '') {
+            // Format the label nicely
+            const formattedLabel = key
+              .replace(/_/g, ' ')
+              .replace(/([A-Z])/g, ' $1')
+              .split(' ')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+              .join(' ')
+              .trim();
+            
+            commentsFields[key] = {
+              label: formattedLabel,
+              value: actualValue,
+              normalRange: '',
+              group: 'comments'
+            };
+            console.log(`✅ Found comment/remark field: ${key} = "${actualValue}"`);
+          }
         }
-      };
+      });
+    } catch (error) {
+      console.error('❌ Error processing comment fields:', error);
     }
+    
+    // Only add "OTHER RESULTS" if there are actual remarks/comments
+    if (Object.keys(commentsFields).length > 0) {
+      results['other'] = {
+        title: 'OTHER RESULTS',
+        fields: commentsFields
+      };
+      console.log(`✅ Added "OTHER RESULTS" category with ${Object.keys(commentsFields).length} comment/remark fields`);
+    }
+    
+    console.log('✅ Final organized results:', results);
+    return results;
   };
 
   // Helper function to calculate age from date of birth
@@ -1580,7 +1783,7 @@ function PatientDashboard(props) {
                       marginBottom: '15px',
                       textAlign: 'center'
                     }}>
-                      {categoryData.title}
+                      {categoryData?.title || category.toUpperCase()}
                     </div>
                     
                     {/* Tests Table */}
@@ -1593,25 +1796,37 @@ function PatientDashboard(props) {
                         </tr>
                       </thead>
                       <tbody>
-                        {Object.entries(categoryData.fields).map(([fieldKey, fieldData]) => (
-                          <tr key={fieldKey}>
-                            <td style={{ border: '1px solid #ddd', padding: '12px', fontWeight: 'bold', color: '#2d3748' }}>
-                              {fieldData.label}
-                            </td>
-                            <td style={{ 
-                              border: '1px solid #ddd', 
-                              padding: '12px', 
-                              textAlign: 'center',
-                              fontWeight: 'bold',
-                              color: fieldData.value && (fieldData.value.toString().includes('Positive') || fieldData.value.toString().includes('Reactive')) ? '#e74c3c' : '#27ae60'
-                            }}>
-                              {fieldData.value || 'Pending'}
-                            </td>
-                            <td style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center', color: '#2d3748' }}>
-                              {fieldData.normalRange}
-                            </td>
-                          </tr>
-                        ))}
+                        {categoryData?.fields && Object.entries(categoryData.fields).map(([fieldKey, fieldData]) => {
+                          const resultValue = fieldData?.value ?? 'Pending';
+                          const normalRange = fieldData?.normalRange ?? 'See reference';
+                          const label = fieldData?.label ?? fieldKey;
+                          
+                          // Determine color based on result value
+                          const isAbnormal = resultValue && (
+                            resultValue.toString().toLowerCase().includes('positive') || 
+                            resultValue.toString().toLowerCase().includes('reactive')
+                          );
+                          
+                          return (
+                            <tr key={fieldKey}>
+                              <td style={{ border: '1px solid #ddd', padding: '12px', fontWeight: 'bold', color: '#2d3748' }}>
+                                {label}
+                              </td>
+                              <td style={{ 
+                                border: '1px solid #ddd', 
+                                padding: '12px', 
+                                textAlign: 'center',
+                                fontWeight: 'bold',
+                                color: isAbnormal ? '#e74c3c' : '#27ae60'
+                              }}>
+                                {resultValue}
+                              </td>
+                              <td style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center', color: '#2d3748' }}>
+                                {normalRange}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
