@@ -4716,6 +4716,25 @@ select:focus {
   border-color: #cbd5e0;
 }
 
+.btn-cancel-schedule {
+  padding: 0.5rem 1rem;
+  background: #f7fafc;
+  color: #718096;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+  min-width: auto;
+}
+
+.btn-cancel-schedule:hover {
+  background: #edf2f7;
+  border-color: #cbd5e0;
+  color: #4a5568;
+}
+
 .btn-save {
   padding: 0.75rem 1.5rem;
   background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);

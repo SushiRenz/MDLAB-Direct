@@ -27,12 +27,6 @@ const validateCreateMobileLabSchedule = [
     .trim()
     .isLength({ max: 200 })
     .withMessage('Location name must not exceed 200 characters'),
-  body('location.address')
-    .notEmpty()
-    .withMessage('Location address is required')
-    .trim()
-    .isLength({ max: 300 })
-    .withMessage('Location address must not exceed 300 characters'),
   body('location.barangay')
     .notEmpty()
     .withMessage('Barangay is required')
@@ -45,11 +39,13 @@ const validateCreateMobileLabSchedule = [
     .isLength({ max: 100 })
     .withMessage('Municipality must not exceed 100 characters'),
   body('location.coordinates.lat')
-    .optional()
+    .notEmpty()
+    .withMessage('Latitude is required')
     .isFloat({ min: -90, max: 90 })
     .withMessage('Latitude must be a valid float between -90 and 90'),
   body('location.coordinates.lng')
-    .optional()
+    .notEmpty()
+    .withMessage('Longitude is required')
     .isFloat({ min: -180, max: 180 })
     .withMessage('Longitude must be a valid float between -180 and 180'),
   body('timeSlot.startTime')
@@ -169,11 +165,6 @@ const validateUpdateMobileLabSchedule = [
     .trim()
     .isLength({ max: 200 })
     .withMessage('Location name must not exceed 200 characters'),
-  body('location.address')
-    .optional()
-    .trim()
-    .isLength({ max: 300 })
-    .withMessage('Location address must not exceed 300 characters'),
   body('location.barangay')
     .optional()
     .trim()

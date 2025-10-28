@@ -2,6 +2,17 @@ import React, { useState, useEffect } from 'react';
 import '../design/Dashboard.css';
 import { userAPI, financeAPI, logsAPI, servicesAPI, mobileLabAPI, appointmentAPI, testResultsAPI } from '../services/api';
 
+// Helper function to format category names
+const formatCategoryName = (category) => {
+  const categoryMap = {
+    'clinical_chemistry': 'Clinical Chemistry',
+    'hematology': 'Hematology',
+    'clinical_microscopy': 'Clinical Microscopy',
+    'serology_immunology': 'Serology / Immunology'
+  };
+  return categoryMap[category] || category?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
 function Dashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [userManagementOpen, setUserManagementOpen] = useState(false);
@@ -441,9 +452,12 @@ function Dashboard({ currentUser, onLogout }) {
     dayOfWeek: 0,
     location: {
       name: '',
-      address: '',
       barangay: '',
-      municipality: ''
+      municipality: '',
+      coordinates: {
+        lat: '',
+        lng: ''
+      }
     },
     timeSlot: {
       startTime: '',
@@ -1939,7 +1953,6 @@ function Dashboard({ currentUser, onLogout }) {
         dayOfWeek: schedule.dayOfWeek || 0,
         location: {
           name: schedule.location?.name || '',
-          address: schedule.location?.address || '',
           barangay: schedule.location?.barangay || '',
           municipality: schedule.location?.municipality || '',
           coordinates: {
@@ -1996,9 +2009,12 @@ function Dashboard({ currentUser, onLogout }) {
       dayOfWeek: 0,
       location: {
         name: '',
-        address: '',
         barangay: '',
-        municipality: 'Nueva Vizcaya'
+        municipality: 'Nueva Vizcaya',
+        coordinates: {
+          lat: '',
+          lng: ''
+        }
       },
       timeSlot: {
         startTime: '',
@@ -3455,100 +3471,6 @@ function Dashboard({ currentUser, onLogout }) {
         </button>
       </div>
 
-      <div className="management-stats mobile-lab-stats">
-        <div className="stat-card mobile-lab-stat-card">
-          <div className="stat-info">
-            <div className="stat-label">Total Schedules</div>
-            <div className="stat-value">{mobileLabSchedules.length}</div>
-          </div>
-        </div>
-        <div className="stat-card mobile-lab-stat-card">
-          <div className="stat-info">
-            <div className="stat-label">Active Schedules</div>
-            <div className="stat-value">{mobileLabSchedules.filter(s => s.isActive).length}</div>
-          </div>
-        </div>
-        <div className="stat-card mobile-lab-stat-card">
-          <div className="stat-info">
-            <div className="stat-label">Locations</div>
-            <div className="stat-value">{new Set(mobileLabSchedules.map(s => s.location?.barangay)).size}</div>
-          </div>
-        </div>
-        <div className="stat-card mobile-lab-stat-card">
-          <div className="stat-info">
-            <div className="stat-label">This Month</div>
-            <div className="stat-value">{mobileLabSchedules.filter(s => s.status === 'Active' || s.status === 'Scheduled').length}</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="management-filters">
-        <div className="filter-group">
-          <select 
-            value={mobileLabFilters.dayOfWeek} 
-            onChange={(e) => setMobileLabFilters({...mobileLabFilters, dayOfWeek: e.target.value})}
-          >
-            <option value="">All Days</option>
-            <option value="0">Sunday</option>
-            <option value="1">Monday</option>
-            <option value="2">Tuesday</option>
-            <option value="3">Wednesday</option>
-            <option value="4">Thursday</option>
-            <option value="5">Friday</option>
-            <option value="6">Saturday</option>
-          </select>
-        </div>
-        <div className="filter-group">
-          <select 
-            value={mobileLabFilters.status} 
-            onChange={(e) => setMobileLabFilters({...mobileLabFilters, status: e.target.value})}
-          >
-            <option value="">All Status</option>
-            <option value="Active">Active</option>
-            <option value="Scheduled">Scheduled</option>
-            <option value="Next Location">Next Location</option>
-            <option value="On Call">On Call</option>
-            <option value="Cancelled">Cancelled</option>
-            <option value="Completed">Completed</option>
-          </select>
-        </div>
-        <div className="filter-group">
-          <input
-            type="text"
-            placeholder="Search municipality..."
-            value={mobileLabFilters.municipality}
-            onChange={(e) => setMobileLabFilters({...mobileLabFilters, municipality: e.target.value})}
-          />
-        </div>
-        <div className="filter-group">
-          <input
-            type="text"
-            placeholder="Search barangay..."
-            value={mobileLabFilters.barangay}
-            onChange={(e) => setMobileLabFilters({...mobileLabFilters, barangay: e.target.value})}
-          />
-        </div>
-        <button className="filter-btn" onClick={() => fetchMobileLabSchedules(1)}>
-          Apply Filters
-        </button>
-        <button 
-          className="clear-filters-btn" 
-          onClick={() => {
-            setMobileLabFilters({
-              dayOfWeek: '',
-              status: '',
-              municipality: '',
-              barangay: '',
-              isActive: '',
-              search: ''
-            });
-            fetchMobileLabSchedules(1);
-          }}
-        >
-          Clear
-        </button>
-      </div>
-
       <div className="table-container">
         {mobileLabError && (
           <div className="error-message">{mobileLabError}</div>
@@ -3563,16 +3485,13 @@ function Dashboard({ currentUser, onLogout }) {
                 <th>Day</th>
                 <th>Location</th>
                 <th>Time</th>
-                <th>Status</th>
-                <th>Capacity</th>
-                <th>Team</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {mobileLabSchedules.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="no-data">
+                  <td colSpan="4" className="no-data">
                     📋 No mobile lab schedules found
                     <br />
                     <small>Create your first schedule to get started</small>
@@ -3600,62 +3519,6 @@ function Dashboard({ currentUser, onLogout }) {
                         {schedule.timeSlot?.timeDisplay || 
                          `${schedule.timeSlot?.startTime} - ${schedule.timeSlot?.endTime}`}
                       </strong>
-                    </td>
-                    <td>
-                      <select 
-                        value={schedule.status} 
-                        onChange={(e) => handleUpdateScheduleStatus(schedule._id, e.target.value)}
-                        className={`status-select status-${schedule.status?.toLowerCase().replace(' ', '-')}`}
-                      >
-                        <option value="Active">Active</option>
-                        <option value="Scheduled">Scheduled</option>
-                        <option value="Next Location">Next Location</option>
-                        <option value="On Call">On Call</option>
-                        <option value="Cancelled">Cancelled</option>
-                        <option value="Completed">Completed</option>
-                      </select>
-                    </td>
-                    <td>
-                      <div className="capacity-display">
-                        <div className="capacity-numbers">
-                          {schedule.capacity?.currentBookings || 0} / {schedule.capacity?.maxPatients || 0}
-                        </div>
-                        <div className="capacity-bar">
-                          <div 
-                            className="capacity-fill" 
-                            style={{ 
-                              width: `${schedule.capacity?.maxPatients > 0 
-                                ? (schedule.capacity?.currentBookings || 0) / schedule.capacity?.maxPatients * 100
-                                : 0}%` 
-                            }}
-                          />
-                        </div>
-                        <div className="capacity-percentage">
-                          {schedule.capacity?.maxPatients > 0 
-                            ? `${Math.round((schedule.capacity?.currentBookings || 0) / schedule.capacity?.maxPatients * 100)}% filled`
-                            : '0% filled'
-                          }
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="team-assignment">
-                        {schedule.assignedTeam?.medTech && (
-                          <div className="team-member">
-                            <span className="team-member-role">MedTech:</span>
-                            {schedule.assignedTeam.medTech}
-                          </div>
-                        )}
-                        {schedule.assignedTeam?.driver && (
-                          <div className="team-member">
-                            <span className="team-member-role">Driver:</span>
-                            {schedule.assignedTeam.driver}
-                          </div>
-                        )}
-                        {!schedule.assignedTeam?.medTech && !schedule.assignedTeam?.driver && (
-                          <div className="team-unassigned">Not assigned</div>
-                        )}
-                      </div>
                     </td>
                     <td>
                       <div className="table-actions">
@@ -3747,25 +3610,11 @@ function Dashboard({ currentUser, onLogout }) {
                     <label>Location Name</label>
                     <input
                       type="text"
-                      placeholder="e.g., Bayombong Community Center"
+                      placeholder="e.g., QMED Pharmacy, Bayombong Public Market"
                       value={mobileLabFormData.location.name}
                       onChange={(e) => setMobileLabFormData({
                         ...mobileLabFormData,
                         location: { ...mobileLabFormData.location, name: e.target.value }
-                      })}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Address</label>
-                    <input
-                      type="text"
-                      placeholder="e.g., National Highway, Bayombong"
-                      value={mobileLabFormData.location.address}
-                      onChange={(e) => setMobileLabFormData({
-                        ...mobileLabFormData,
-                        location: { ...mobileLabFormData.location, address: e.target.value }
                       })}
                       required
                     />
@@ -3789,7 +3638,7 @@ function Dashboard({ currentUser, onLogout }) {
                     <label>Municipality</label>
                     <input
                       type="text"
-                      placeholder="e.g., Bayombong (Nueva Vizcaya only)"
+                      placeholder="e.g., Nueva Vizcaya"
                       value={mobileLabFormData.location.municipality}
                       onChange={(e) => setMobileLabFormData({
                         ...mobileLabFormData,
@@ -3799,47 +3648,75 @@ function Dashboard({ currentUser, onLogout }) {
                   </div>
 
                   <div className="form-group">
-                    <label>Start Time</label>
-                    <input
-                      type="text"
-                      placeholder="e.g., 8:00 AM, 8 AM, 8:30 in the morning"
-                      value={mobileLabFormData.timeSlot.startTime}
-                      onChange={(e) => setMobileLabFormData({
-                        ...mobileLabFormData,
-                        timeSlot: { ...mobileLabFormData.timeSlot, startTime: e.target.value }
-                      })}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>End Time</label>
-                    <input
-                      type="text"
-                      placeholder="e.g., 12:00 PM, 12 PM, 12 noon"
-                      value={mobileLabFormData.timeSlot.endTime}
-                      onChange={(e) => setMobileLabFormData({
-                        ...mobileLabFormData,
-                        timeSlot: { ...mobileLabFormData.timeSlot, endTime: e.target.value }
-                      })}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Max Patients</label>
+                    <label>Latitude</label>
                     <input
                       type="number"
-                      placeholder="e.g., 30 (monthly visit capacity)"
-                      value={mobileLabFormData.capacity.maxPatients}
+                      step="0.0001"
+                      placeholder="e.g., 16.4819"
+                      value={mobileLabFormData.location.coordinates.lat}
                       onChange={(e) => setMobileLabFormData({
                         ...mobileLabFormData,
-                        capacity: { ...mobileLabFormData.capacity, maxPatients: parseInt(e.target.value) }
+                        location: { 
+                          ...mobileLabFormData.location, 
+                          coordinates: { 
+                            ...mobileLabFormData.location.coordinates,
+                            lat: e.target.value 
+                          }
+                        }
                       })}
-                      min="1"
-                      max="100"
                       required
                     />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Longitude</label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      placeholder="e.g., 121.1503"
+                      value={mobileLabFormData.location.coordinates.lng}
+                      onChange={(e) => setMobileLabFormData({
+                        ...mobileLabFormData,
+                        location: { 
+                          ...mobileLabFormData.location, 
+                          coordinates: { 
+                            ...mobileLabFormData.location.coordinates,
+                            lng: e.target.value 
+                          }
+                        }
+                      })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Start Time</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., 8:00 AM"
+                        value={mobileLabFormData.timeSlot.startTime}
+                        onChange={(e) => setMobileLabFormData({
+                          ...mobileLabFormData,
+                          timeSlot: { ...mobileLabFormData.timeSlot, startTime: e.target.value }
+                        })}
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>End Time</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., 5:00 PM"
+                        value={mobileLabFormData.timeSlot.endTime}
+                        onChange={(e) => setMobileLabFormData({
+                          ...mobileLabFormData,
+                          timeSlot: { ...mobileLabFormData.timeSlot, endTime: e.target.value }
+                        })}
+                        required
+                      />
+                    </div>
                   </div>
 
                   <div className="form-group full-width">
@@ -3855,74 +3732,39 @@ function Dashboard({ currentUser, onLogout }) {
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label>Contact Phone</label>
-                    <input
-                      type="tel"
-                      placeholder="e.g., +63 912 345 6789"
-                      value={mobileLabFormData.contactInfo.phone}
-                      onChange={(e) => setMobileLabFormData({
-                        ...mobileLabFormData,
-                        contactInfo: { ...mobileLabFormData.contactInfo, phone: e.target.value }
-                      })}
-                    />
-                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Contact Phone</label>
+                      <input
+                        type="tel"
+                        placeholder="e.g., +63 912 345 6789"
+                        value={mobileLabFormData.contactInfo.phone}
+                        onChange={(e) => setMobileLabFormData({
+                          ...mobileLabFormData,
+                          contactInfo: { ...mobileLabFormData.contactInfo, phone: e.target.value }
+                        })}
+                      />
+                    </div>
 
-                  <div className="form-group">
-                    <label>Contact Person</label>
-                    <input
-                      type="text"
-                      placeholder="e.g., Juan Dela Cruz"
-                      value={mobileLabFormData.contactInfo.contactPerson}
-                      onChange={(e) => setMobileLabFormData({
-                        ...mobileLabFormData,
-                        contactInfo: { ...mobileLabFormData.contactInfo, contactPerson: e.target.value }
-                      })}
-                    />
+                    <div className="form-group">
+                      <label>Contact Person</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., Juan Dela Cruz"
+                        value={mobileLabFormData.contactInfo.contactPerson}
+                        onChange={(e) => setMobileLabFormData({
+                          ...mobileLabFormData,
+                          contactInfo: { ...mobileLabFormData.contactInfo, contactPerson: e.target.value }
+                        })}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="form-checkboxes">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={mobileLabFormData.isActive}
-                      onChange={(e) => setMobileLabFormData({
-                        ...mobileLabFormData,
-                        isActive: e.target.checked
-                      })}
-                    />
-                    <span>Active Schedule</span>
-                  </label>
-
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={mobileLabFormData.weatherDependent}
-                      onChange={(e) => setMobileLabFormData({
-                        ...mobileLabFormData,
-                        weatherDependent: e.target.checked
-                      })}
-                    />
-                    <span>Weather Dependent</span>
-                  </label>
-
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={mobileLabFormData.recurring.isRecurring}
-                      onChange={(e) => setMobileLabFormData({
-                        ...mobileLabFormData,
-                        recurring: { ...mobileLabFormData.recurring, isRecurring: e.target.checked }
-                      })}
-                    />
-                    <span>Monthly Recurring</span>
-                  </label>
-                </div>
               </div>
 
               <div className="modal-actions">
-                <button type="button" className="btn-cancel" onClick={closeMobileLabModal}>
+                <button type="button" className="btn-cancel-schedule" onClick={closeMobileLabModal}>
                   Cancel
                 </button>
                 <button type="submit" className="btn-save" disabled={mobileLabLoading}>
@@ -6052,13 +5894,10 @@ function Dashboard({ currentUser, onLogout }) {
               onChange={(e) => setServiceFilters(prev => ({ ...prev, category: e.target.value }))}
             >
               <option value="">All Categories</option>
-              <option value="blood_tests">Blood Tests</option>
-              <option value="urine_tests">Urine Tests</option>
-              <option value="imaging">Imaging</option>
-              <option value="pathology">Pathology</option>
-              <option value="special_tests">Special Tests</option>
-              <option value="package_deals">Package Deals</option>
-              <option value="emergency_tests">Emergency Tests</option>
+              <option value="clinical_chemistry">Clinical Chemistry</option>
+              <option value="hematology">Hematology</option>
+              <option value="clinical_microscopy">Clinical Microscopy</option>
+              <option value="serology_immunology">Serology / Immunology</option>
             </select>
             <select 
               className="filter-select"
@@ -6140,7 +5979,7 @@ function Dashboard({ currentUser, onLogout }) {
                         borderRadius: '4px', 
                         fontSize: '12px' 
                       }}>
-                        {service.category?.replace('_', ' ').toUpperCase()}
+                        {formatCategoryName(service.category)}
                       </span>
                     </td>
                     <td>
@@ -10183,13 +10022,10 @@ function Dashboard({ currentUser, onLogout }) {
                   required
                 >
                   <option value="">Select Category</option>
-                  <option value="blood_tests">Blood Tests</option>
-                  <option value="urine_tests">Urine Tests</option>
-                  <option value="imaging">Imaging</option>
-                  <option value="pathology">Pathology</option>
-                  <option value="special_tests">Special Tests</option>
-                  <option value="package_deals">Package Deals</option>
-                  <option value="emergency_tests">Emergency Tests</option>
+                  <option value="clinical_chemistry">Clinical Chemistry</option>
+                  <option value="hematology">Hematology</option>
+                  <option value="clinical_microscopy">Clinical Microscopy</option>
+                  <option value="serology_immunology">Serology / Immunology</option>
                 </select>
               </div>
             </div>

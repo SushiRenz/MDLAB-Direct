@@ -195,20 +195,6 @@ const priceListServices = [
     availability: '24_7'
   },
   {
-    serviceName: 'Serum Pregnancy Test',
-    description: 'Blood test for pregnancy detection with high accuracy.',
-    category: 'clinical_chemistry',
-    price: 250.00,
-    duration: '15 minutes',
-    sampleType: 'Blood (Serum tube)',
-    preparationInstructions: 'No special preparation required.',
-    isActive: true,
-    gender: 'female',
-    methodology: 'Chemiluminescent Immunoassay',
-    tags: ['pregnancy', 'hcg', 'women'],
-    availability: '24_7'
-  },
-  {
     serviceName: 'OGTT (Oral Glucose Tolerance Test)',
     description: '2-hour glucose tolerance test for diabetes diagnosis.',
     category: 'clinical_chemistry',
@@ -254,19 +240,6 @@ const priceListServices = [
     availability: '24_7'
   },
   {
-    serviceName: 'Blood Typing (ABO Rh)',
-    description: 'Determination of ABO blood group and Rh factor.',
-    category: 'hematology',
-    price: 150.00,
-    duration: '15 minutes',
-    sampleType: 'Blood (EDTA tube)',
-    preparationInstructions: 'No special preparation required.',
-    isActive: true,
-    methodology: 'Agglutination Method',
-    tags: ['blood type', 'abo', 'rh factor'],
-    availability: '24_7'
-  },
-  {
     serviceName: 'ESR (Erythrocyte Sedimentation Rate)',
     description: 'Test to detect inflammation in the body.',
     category: 'hematology',
@@ -277,6 +250,32 @@ const priceListServices = [
     isActive: true,
     methodology: 'Westergren Method',
     tags: ['esr', 'inflammation', 'sedimentation'],
+    availability: '24_7'
+  },
+  {
+    serviceName: 'PT (Prothrombin Time)',
+    description: 'Blood clotting test for monitoring anticoagulant therapy.',
+    category: 'hematology',
+    price: 200.00,
+    duration: '2-4 hours',
+    sampleType: 'Blood (Sodium citrate tube)',
+    preparationInstructions: 'No special preparation required. Patient should inform lab staff of any anticoagulant medications.',
+    isActive: true,
+    methodology: 'Photo-optical Method',
+    tags: ['clotting', 'coagulation', 'warfarin', 'anticoagulant'],
+    availability: '24_7'
+  },
+  {
+    serviceName: 'APTT (Activated Partial Thromboplastin Time)',
+    description: 'Blood clotting test for monitoring heparin therapy and detecting clotting disorders.',
+    category: 'hematology',
+    price: 250.00,
+    duration: '2-4 hours',
+    sampleType: 'Blood (Sodium citrate tube)',
+    preparationInstructions: 'No special preparation required. Patient should not be on anticoagulant therapy unless specifically being monitored.',
+    isActive: true,
+    methodology: 'Photo-optical Method',
+    tags: ['clotting', 'coagulation', 'heparin', 'bleeding disorders'],
     availability: '24_7'
   },
 
@@ -338,8 +337,36 @@ const priceListServices = [
     tags: ['pregnancy', 'urine', 'rapid test'],
     availability: '24_7'
   },
+  {
+    serviceName: 'Pregnancy Test (Serum)',
+    description: 'Quantitative blood pregnancy test (Beta hCG) for accurate pregnancy detection.',
+    category: 'clinical_microscopy',
+    price: 350.00,
+    duration: '1-2 hours',
+    sampleType: 'Blood (Serum tube)',
+    preparationInstructions: 'No special preparation required.',
+    isActive: true,
+    gender: 'female',
+    methodology: 'ELISA / Immunoassay',
+    tags: ['pregnancy', 'serum', 'beta hCG', 'blood test'],
+    availability: '24_7'
+  },
 
   // Serology / Immunology
+  {
+    serviceName: 'Blood Typing (ABO Rh)',
+    description: 'Determination of ABO blood group and Rh factor using immunological methods.',
+    category: 'serology_immunology',
+    price: 150.00,
+    duration: '15 minutes',
+    sampleType: 'Blood (EDTA tube)',
+    preparationInstructions: 'No special preparation required.',
+    isActive: true,
+    isPopular: true,
+    methodology: 'Agglutination Method (Immunohematology)',
+    tags: ['blood type', 'abo', 'rh factor', 'transfusion'],
+    availability: '24_7'
+  },
   {
     serviceName: 'Hepatitis B Antigen (HbsAg)',
     description: 'Screening test for Hepatitis B virus infection.',

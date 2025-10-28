@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import BookAppointmentModal from './BookAppointmentModal';
 import PatientProfile from './PatientProfile'; 
 import MobileLabScheduleModal from './MobileLabScheduleModal';
+import MobileLabMap from '../components/MobileLabMap';
 import { appointmentAPI, servicesAPI, testResultsAPI, mobileLabAPI } from '../services/api';
 import '../design/PatientDashboard.css';
 import '../design/BookAppointmentModal.css';
@@ -1368,183 +1369,112 @@ function PatientDashboard(props) {
 
   const renderMobileService = () => (
     <div className="mobile-service-container">
-      <div className="mobile-header">
-        <div className="header-content">
-          <h2>Mobile Lab Service</h2>
-          <p>Community laboratory testing in different barangays across Nueva Vizcaya</p>
-        </div>
-        <button 
-          className="request-service-btn"
-          onClick={() => setIsScheduleModalOpen(true)}
-        >
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '18px', height: '18px', marginRight: '8px'}}>
-            <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Check Schedule & Location
-        </button>
-      </div>
-
-      {/* Service Information */}
-      <div className="service-info">
-        <div className="info-card">
-          <div className="info-icon">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M4 17h2m0 0a2 2 0 104 0m-4 0a2 2 0 014 0m0 0h4m0 0a2 2 0 104 0m-4 0a2 2 0 014 0m0 0h2M3 12h1l2-4h12l2 4h1v3a1 1 0 01-1 1h-1m-14 0H4a1 1 0 01-1-1v-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="8" cy="17" r="2" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="16" cy="17" r="2" stroke="currentColor" strokeWidth="2"/>
-              <path d="M7 12h10" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M9 10h2m4 0h2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+      {/* Hero Section with Map */}
+      <div className="mobile-hero">
+        <div className="hero-content">
+          <h1>Mobile Laboratory Service</h1>
+          <p className="hero-subtitle">Bringing quality healthcare to communities across Nueva Vizcaya</p>
+          <button 
+            className="schedule-btn-primary"
+            onClick={() => setIsScheduleModalOpen(true)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '20px', height: '20px'}}>
+              <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-          </div>
-          <div className="info-content">
-            <h3>What is Mobile Lab Service?</h3>
-            <p>Our mobile laboratory unit visits different barangays and public spaces throughout Nueva Vizcaya on scheduled days. Community members can come to the designated location for professional lab testing without traveling to our main facility!</p>
-          </div>
-        </div>
-
-        <div className="service-features">
-          <div className="feature-item">
-            <div className="feature-icon">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" stroke="currentColor" strokeWidth="2"/>
-                <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="2"/>
-              </svg>
-            </div>
-            <div className="feature-text">Scheduled Community Visits</div>
-          </div>
-          <div className="feature-item">
-            <div className="feature-icon">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <div className="feature-text">Professional Medical Staff</div>
-          </div>
-          <div className="feature-item">
-            <div className="feature-icon">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-                <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1" stroke="currentColor" strokeWidth="2"/>
-              </svg>
-            </div>
-            <div className="feature-text">Complete Lab Testing</div>
-          </div>
-          <div className="feature-item">
-            <div className="feature-icon">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <div className="feature-text">Covers All Nueva Vizcaya</div>
-          </div>
+            View Full Schedule
+          </button>
         </div>
       </div>
 
-      {/* Service Schedule */}
-      <div className="service-schedule">
-        <h3>Mobile Lab Schedule</h3>
+      {/* Interactive Map Section */}
+      <div className="map-section">
+        <div className="map-header">
+          <h2>Our Coverage Area</h2>
+          <p>Serving communities throughout Nueva Vizcaya</p>
+        </div>
+        <MobileLabMap schedules={mobileLabSchedules} />
+      </div>
+
+      {/* Available Schedule Section */}
+      <div className="weekly-schedule-section">
+        <div className="section-header">
+          <h2>Available Schedule</h2>
+          <p>Find us in different barangays throughout the week</p>
+        </div>
+        
         {mobileLabLoading ? (
-          <div className="loading-state">Loading mobile lab schedules...</div>
+          <div className="loading-state">
+            <div className="spinner"></div>
+            <p>Loading schedules...</p>
+          </div>
         ) : mobileLabError ? (
           <div className="error-state">
-            <p>Unable to load mobile lab schedules: {mobileLabError}</p>
-            <button onClick={fetchMobileLabSchedules} className="retry-btn">Retry</button>
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '48px', height: '48px', marginBottom: '16px'}}>
+              <circle cx="12" cy="12" r="10" stroke="#ef4444" strokeWidth="2"/>
+              <path d="M12 8v4m0 4h.01" stroke="#ef4444" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            <p>Unable to load schedules</p>
+            <button onClick={fetchMobileLabSchedules} className="retry-btn">Try Again</button>
           </div>
         ) : mobileLabSchedules.length === 0 ? (
-          <div className="empty-state">
-            <p>No mobile lab schedules are currently available.</p>
-            <p>Please check back later or contact us for more information.</p>
+          <div className="empty-schedule-state">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '64px', height: '64px', marginBottom: '20px'}}>
+              <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <h3>No Schedules Available</h3>
+            <p>Check back soon for upcoming mobile lab visits to your area</p>
           </div>
         ) : (
-          <div className="schedule-grid">
-            {mobileLabSchedules.map((schedule) => (
-              <div key={schedule._id} className="schedule-card">
-                <div className="schedule-day">
-                  {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][schedule.dayOfWeek]}
+          <div className="schedule-timeline">
+            {mobileLabSchedules.map((schedule, index) => (
+              <div key={schedule._id} className="timeline-item">
+                <div className="timeline-marker">
+                  <div className="marker-dot"></div>
+                  {index < mobileLabSchedules.length - 1 && <div className="marker-line"></div>}
                 </div>
-                <div className="schedule-location">{schedule.location?.name}</div>
-                <div className="schedule-time">
-                  {schedule.timeSlot?.startTime} - {schedule.timeSlot?.endTime}
-                </div>
-                <div className="schedule-address">
-                  {schedule.location?.barangay}
-                  {schedule.location?.municipality && `, ${schedule.location?.municipality}`}
-                </div>
-                <div className={`schedule-status ${schedule.status?.toLowerCase().replace(' ', '-')}`}>
-                  {schedule.status}
+                <div className="timeline-content">
+                  <div className="timeline-day">
+                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][schedule.dayOfWeek]}
+                  </div>
+                  <div className="timeline-card">
+                    <div className="card-icon">
+                      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" fill="#21AEA8" opacity="0.2" stroke="#21AEA8" strokeWidth="2"/>
+                        <circle cx="12" cy="10" r="3" fill="white" stroke="#21AEA8" strokeWidth="2"/>
+                      </svg>
+                    </div>
+                    <div className="card-details">
+                      <h3>{schedule.location?.name}</h3>
+                      <div className="detail-row">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px'}}>
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                          <polyline points="12,6 12,12 16,14" stroke="currentColor" strokeWidth="2"/>
+                        </svg>
+                        <span>{schedule.timeSlot?.startTime} - {schedule.timeSlot?.endTime}</span>
+                      </div>
+                      <div className="detail-row">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px'}}>
+                          <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" stroke="currentColor" strokeWidth="2"/>
+                          <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" stroke="currentColor" strokeWidth="2"/>
+                        </svg>
+                        <span>{schedule.location?.barangay}{schedule.location?.municipality && `, ${schedule.location?.municipality}`}</span>
+                      </div>
+                      {schedule.notes && (
+                        <div className="card-notes">
+                          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '14px', height: '14px'}}>
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                            <path d="M12 16v-4m0-4h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                          </svg>
+                          {schedule.notes}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
-
-      {/* Available Tests */}
-      <div className="available-tests">
-        <h3>Available Tests</h3>
-        <div className="tests-grid">
-          <div className="test-category">
-            <h4>Blood Tests</h4>
-            <ul>
-              <li>Complete Blood Count (CBC)</li>
-              <li>Blood Sugar/Glucose</li>
-              <li>Lipid Profile</li>
-              <li>Liver Function Tests</li>
-              <li>Kidney Function Tests</li>
-            </ul>
-          </div>
-          <div className="test-category">
-            <h4>Urine Tests</h4>
-            <ul>
-              <li>Urinalysis</li>
-              <li>Urine Culture</li>
-              <li>24-Hour Urine Collection</li>
-              <li>Pregnancy Test</li>
-            </ul>
-          </div>
-          <div className="test-category">
-            <h4>Other Services</h4>
-            <ul>
-              <li>ECG/EKG</li>
-              <li>Blood Pressure Monitoring</li>
-              <li>Wound Care</li>
-              <li>Health Consultations</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      {/* Contact Information */}
-      <div className="contact-info">
-        <h3>Mobile Lab Service Information</h3>
-        <div className="contact-details">
-          <div className="contact-item">
-            <div className="contact-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-              </svg>
-            </div>
-            <div className="contact-text">Inquiries: +63 912 345 6789</div>
-          </div>
-          <div className="contact-item">
-            <div className="contact-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                <circle cx="12" cy="10" r="3"/>
-              </svg>
-            </div>
-            <div className="contact-text">Check our weekly schedule for locations</div>
-          </div>
-          <div className="contact-item">
-            <div className="contact-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12,6 12,12 16,14"/>
-              </svg>
-            </div>
-            <div className="contact-text">Walk-in available during scheduled hours</div>
-          </div>
-        </div>
       </div>
     </div>
   );

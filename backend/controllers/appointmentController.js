@@ -355,8 +355,11 @@ const createAppointment = asyncHandler(async (req, res) => {
     // Medical labs can handle multiple appointments per day
 
     // Create appointment with improved data handling
+    // For patient role users, automatically set patient field from authenticated user
+    const finalPatientId = req.user.role === 'patient' ? req.user._id : (patientId || null);
+    
     const appointmentData = {
-      patient: patientId || null,
+      patient: finalPatientId,
       patientName: patientName || (patient ? `${patient.firstName} ${patient.lastName}` : ''),
       contactNumber: contactNumber || patient?.phone || '',
       email: email || patient?.email || '',
@@ -379,6 +382,13 @@ const createAppointment = asyncHandler(async (req, res) => {
       createdByName: `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.username || 'System',
       status: type === 'walk-in' ? 'walk-in' : 'pending'
     };
+
+    console.log('📝 APPOINTMENT CREATION - Patient field:', {
+      userRole: req.user.role,
+      patientIdFromRequest: patientId,
+      finalPatientId: finalPatientId,
+      isPatientRole: req.user.role === 'patient'
+    });
 
     // Enhanced debugging for appointment data
     console.log('📝 APPOINTMENT DATA CONSTRUCTION:');

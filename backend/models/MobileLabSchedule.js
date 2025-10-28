@@ -32,11 +32,6 @@ const mobileLabScheduleSchema = new mongoose.Schema({
       required: true,
       trim: true
     },
-    address: {
-      type: String,
-      required: true,
-      trim: true
-    },
     barangay: {
       type: String,
       required: true,
@@ -51,13 +46,11 @@ const mobileLabScheduleSchema = new mongoose.Schema({
     coordinates: {
       lat: {
         type: Number,
-        required: false,
-        default: 0
+        required: true
       },
       lng: {
         type: Number,
-        required: false,
-        default: 0
+        required: true
       }
     }
   },

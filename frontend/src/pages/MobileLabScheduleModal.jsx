@@ -84,43 +84,9 @@ function MobileLabScheduleModal({
         </div>
 
         <div className="modal-body">
-          {/* Current Location Section */}
-          <div className="current-location-section">
-            <h3>Current Status</h3>
-            <div className="current-location-card">
-              <div className={`location-status ${currentLocation?.status?.toLowerCase().replace(' ', '-')}`}>
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill={currentLocation?.status === 'Active' ? '#10b981' : '#6b7280'}/>
-                </svg>
-                {currentLocation?.status === 'Active' ? 'Now Serving' : 
-                 currentLocation?.status === 'Next Location' ? 'Next Location' : 'No Active Service'}
-              </div>
-              <h4>{currentLocation?.location}</h4>
-              <p>Time: {currentLocation?.time}</p>
-              {currentLocation?.coordinates && currentLocation.coordinates.lat !== 0 && (
-                <div className="location-info">
-                  <span>GPS: {currentLocation.coordinates.lat}° N, {currentLocation.coordinates.lng}° E</span>
-                  <button 
-                    className="directions-btn"
-                    onClick={handleGetDirections}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '16px', height: '16px', marginRight: '6px'}}>
-                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <polyline points="10,9 9,9 8,9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    Get Directions
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Schedule Section */}
-          <div className="schedule-section">
-            <h3>Mobile Lab Schedule</h3>
+          {/* Schedule Details Section */}
+          <div className="schedule-details-section">
+            <h3>Schedule Information</h3>
             {loading ? (
               <div className="loading-state">Loading schedule...</div>
             ) : error ? (
@@ -135,27 +101,84 @@ function MobileLabScheduleModal({
             ) : (
               <div className="schedule-list">
                 {schedules.map((schedule) => (
-                  <div key={schedule._id} className="schedule-item">
-                    <div className="schedule-day">
-                      {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][schedule.dayOfWeek]}
-                    </div>
-                    <div className="schedule-details">
+                  <div key={schedule._id} className="schedule-item-detailed">
+                    <div className="schedule-header-detailed">
+                      <div className="schedule-day-badge">
+                        {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][schedule.dayOfWeek]}
+                      </div>
                       <h4>{schedule.location?.name}</h4>
-                      <p>Time: {schedule.timeSlot?.startTime} - {schedule.timeSlot?.endTime}</p>
-                      <p className="schedule-address">
-                        {schedule.location?.barangay}
-                        {schedule.location?.municipality && `, ${schedule.location?.municipality}`}
-                      </p>
-                      {schedule.notes && (
-                        <p className="schedule-notes">{schedule.notes}</p>
-                      )}
                     </div>
-                    <div className={`schedule-status ${schedule.status?.toLowerCase().replace(' ', '-')}`}>
-                      {schedule.status === 'Active' && <span className="status-indicator active"></span>}
-                      {schedule.status === 'Next Location' && <span className="status-indicator next"></span>}
-                      {schedule.status === 'Scheduled' && <span className="status-indicator scheduled"></span>}
-                      {schedule.status === 'On Call' && <span className="status-indicator on-call"></span>}
-                      {schedule.status}
+                    
+                    <div className="schedule-info-grid">
+                      <div className="info-item">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '18px', height: '18px'}}>
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                          <polyline points="12,6 12,12 16,14" stroke="currentColor" strokeWidth="2"/>
+                        </svg>
+                        <div>
+                          <label>Time</label>
+                          <p>{schedule.timeSlot?.startTime} - {schedule.timeSlot?.endTime}</p>
+                        </div>
+                      </div>
+
+                      <div className="info-item">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '18px', height: '18px'}}>
+                          <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" stroke="currentColor" strokeWidth="2"/>
+                          <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" stroke="currentColor" strokeWidth="2"/>
+                        </svg>
+                        <div>
+                          <label>Location</label>
+                          <p>{schedule.location?.barangay}, {schedule.location?.municipality}</p>
+                        </div>
+                      </div>
+
+                      {schedule.location?.coordinates && (
+                        <div className="info-item">
+                          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '18px', height: '18px'}}>
+                            <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" stroke="currentColor" strokeWidth="2"/>
+                          </svg>
+                          <div>
+                            <label>Coordinates</label>
+                            <p>{schedule.location.coordinates.lat.toFixed(4)}°N, {schedule.location.coordinates.lng.toFixed(4)}°E</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {schedule.contactInfo?.phone && (
+                        <div className="info-item">
+                          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '18px', height: '18px'}}>
+                            <path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" stroke="currentColor" strokeWidth="2"/>
+                          </svg>
+                          <div>
+                            <label>Contact Phone</label>
+                            <p>{schedule.contactInfo.phone}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {schedule.contactInfo?.contactPerson && (
+                        <div className="info-item">
+                          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '18px', height: '18px'}}>
+                            <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke="currentColor" strokeWidth="2"/>
+                          </svg>
+                          <div>
+                            <label>Contact Person</label>
+                            <p>{schedule.contactInfo.contactPerson}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {schedule.notes && (
+                        <div className="info-item full-width">
+                          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{width: '18px', height: '18px'}}>
+                            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke="currentColor" strokeWidth="2"/>
+                          </svg>
+                          <div>
+                            <label>Notes</label>
+                            <p>{schedule.notes}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

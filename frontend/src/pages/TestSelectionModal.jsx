@@ -53,6 +53,39 @@ function TestSelectionModal({ isOpen, onClose, onConfirm, availableServices = []
     }
   };
 
+  // Handle category selection (select all in category)
+  const handleCategorySelection = (category, services, isChecked) => {
+    if (isChecked) {
+      // Add all services in this category that aren't already selected
+      const newTests = services.filter(
+        service => !selectedTests.some(test => test._id === service._id)
+      );
+      setSelectedTests(prev => [...prev, ...newTests]);
+    } else {
+      // Remove all services in this category
+      const serviceIds = services.map(s => s._id);
+      setSelectedTests(prev => prev.filter(test => !serviceIds.includes(test._id)));
+    }
+  };
+
+  // Check if all tests in a category are selected
+  const isCategoryFullySelected = (services) => {
+    return services.every(service => 
+      selectedTests.some(test => test._id === service._id)
+    );
+  };
+
+  // Handle select all tests
+  const handleSelectAllTests = () => {
+    const allServices = Object.values(groupedServices).flat();
+    setSelectedTests(allServices);
+  };
+
+  // Handle deselect all tests
+  const handleDeselectAllTests = () => {
+    setSelectedTests([]);
+  };
+
   // Handle category expansion
   const toggleCategory = (category) => {
     setExpandedCategories(prev => ({
@@ -90,13 +123,9 @@ function TestSelectionModal({ isOpen, onClose, onConfirm, availableServices = []
         </div>
 
         <div className="modal-body">
-          {/* Search Bar */}
+          {/* Search Bar and Select All Button */}
           <div className="search-section">
             <div className="search-input-wrapper">
-              <svg className="search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
-                <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
               <input
                 type="text"
                 placeholder="Search for tests..."
@@ -105,6 +134,13 @@ function TestSelectionModal({ isOpen, onClose, onConfirm, availableServices = []
                 className="search-input"
               />
             </div>
+            <button
+              type="button"
+              className="btn-select-all"
+              onClick={selectedTests.length === availableServices.filter(s => s.isActive).length ? handleDeselectAllTests : handleSelectAllTests}
+            >
+              {selectedTests.length === availableServices.filter(s => s.isActive).length ? '✓ Deselect All' : '✓ Select All Tests'}
+            </button>
           </div>
 
           {/* Selected Tests Summary */}
@@ -134,57 +170,74 @@ function TestSelectionModal({ isOpen, onClose, onConfirm, availableServices = []
 
           {/* Test Categories */}
           <div className="test-categories">
-            {Object.entries(groupedServices).map(([category, services]) => (
-              <div key={category} className="category-section">
-                <div 
-                  className="category-header"
-                  onClick={() => toggleCategory(category)}
-                >
-                  <h3>
-                    <span className={`category-toggle ${expandedCategories[category] ? 'expanded' : ''}`}>
-                      ▶
-                    </span>
-                    {categoryDisplayNames[category]} ({services.length})
-                  </h3>
-                </div>
-                
-                {expandedCategories[category] && (
-                  <div className="category-content">
-                    <div className="tests-grid">
-                      {services.map(service => {
-                        const isSelected = selectedTests.some(test => test._id === service._id);
-                        return (
-                          <div key={service._id} className="test-item">
-                            <label className="test-checkbox">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={(e) => handleTestSelection(service, e.target.checked)}
-                              />
-                              <span className="checkmark"></span>
-                              <div className="test-details">
-                                <div className="test-name">{service.serviceName}</div>
-                                <div className="test-price">₱{service.price.toFixed(2)}</div>
-                                {service.preparationInstructions && (
-                                  <div className="test-preparation">
-                                    {service.preparationInstructions}
-                                  </div>
-                                )}
-                                {service.duration && (
-                                  <div className="test-duration">
-                                    Duration: {service.duration}
-                                  </div>
-                                )}
-                              </div>
-                            </label>
-                          </div>
-                        );
-                      })}
+            {Object.entries(groupedServices).map(([category, services]) => {
+              const isFullySelected = isCategoryFullySelected(services);
+              return (
+                <div key={category} className="category-section">
+                  <div 
+                    className="category-header"
+                  >
+                    <div className="category-header-content">
+                      <span 
+                        className={`category-toggle ${expandedCategories[category] ? 'expanded' : ''}`}
+                        onClick={() => toggleCategory(category)}
+                      >
+                        ▶
+                      </span>
+                      <h3 onClick={() => toggleCategory(category)}>
+                        {categoryDisplayNames[category]} ({services.length})
+                      </h3>
                     </div>
+                    <label className="category-checkbox" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isFullySelected}
+                        onChange={(e) => handleCategorySelection(category, services, e.target.checked)}
+                      />
+                      <span className="checkmark"></span>
+                      <span className="checkbox-label">Select All</span>
+                    </label>
                   </div>
-                )}
-              </div>
-            ))}
+                  
+                  {expandedCategories[category] && (
+                    <div className="category-content">
+                      <div className="tests-grid">
+                        {services.map(service => {
+                          const isSelected = selectedTests.some(test => test._id === service._id);
+                          return (
+                            <div key={service._id} className={`test-item ${isSelected ? 'selected' : ''}`}>
+                              <label className="test-checkbox-label">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => handleTestSelection(service, e.target.checked)}
+                                  className="test-checkbox-input"
+                                />
+                                <span className="test-checkmark"></span>
+                                <div className="test-details">
+                                  <div className="test-name">{service.serviceName}</div>
+                                  <div className="test-price">₱{service.price.toFixed(2)}</div>
+                                  {service.preparationInstructions && (
+                                    <div className="test-preparation">
+                                      {service.preparationInstructions}
+                                    </div>
+                                  )}
+                                  {service.duration && (
+                                    <div className="test-duration">
+                                      Duration: {service.duration}
+                                    </div>
+                                  )}
+                                </div>
+                              </label>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* No Results */}
