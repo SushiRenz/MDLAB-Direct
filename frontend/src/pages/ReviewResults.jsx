@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { testResultsAPI, appointmentAPI } from '../services/api';
 import '../design/Dashboard.css';
+import ReviewDSSSupport from '../components/ReviewDSSSupport';
+import { analyzeReviewResults } from '../utils/reviewDSSHelper';
 
 function ReviewResults({ currentUser }) {
   const [completedTests, setCompletedTests] = useState([]);
@@ -19,6 +21,8 @@ function ReviewResults({ currentUser }) {
   const [filterStatus, setFilterStatus] = useState('completed');
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [selectedTestForApproval, setSelectedTestForApproval] = useState(null);
+  const [showDSSModal, setShowDSSModal] = useState(false);
+  const [dssRecommendations, setDssRecommendations] = useState([]);
 
   // Complete field definitions based on MDLAB system arrangement (not appointment system)
   const testFieldDefinitions = {
@@ -433,6 +437,31 @@ function ReviewResults({ currentUser }) {
     setShowModal(true);
   };
 
+  const handleDSSSupport = () => {
+    console.log('🧠 DSS Support clicked');
+    console.log('🧠 testData:', testData);
+    console.log('🧠 testData.results:', testData?.results);
+    
+    // Analyze the current test data using the same organized results
+    const organizedResults = getOrganizedTestResults(testData);
+    console.log('🧠 organizedResults:', organizedResults);
+    console.log('🧠 organizedResults keys:', Object.keys(organizedResults));
+    
+    // Only analyze if we have results
+    if (Object.keys(organizedResults).length === 0) {
+      console.log('🧠 No results to analyze - showing empty state');
+      setDssRecommendations([]);
+      setShowDSSModal(true);
+      return;
+    }
+    
+    const recommendations = analyzeReviewResults(organizedResults);
+    console.log('🧠 recommendations:', recommendations);
+    
+    setDssRecommendations(recommendations);
+    setShowDSSModal(true);
+  };
+
   return (
     <div className="dashboard-container" style={{ backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
       <div className="content-area" style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -675,18 +704,40 @@ function ReviewResults({ currentUser }) {
                 alignItems: 'center'
               }}>
                 <h3 style={{ margin: 0, color: '#2c3e50' }}>Laboratory Test Results</h3>
-                <button
-                  onClick={() => setShowModal(false)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '24px',
-                    cursor: 'pointer',
-                    color: '#6c757d'
-                  }}
-                >
-                  ×
-                </button>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <button
+                    onClick={handleDSSSupport}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#21AEA8',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                    onMouseOver={(e) => e.target.style.backgroundColor = '#1a8e8a'}
+                    onMouseOut={(e) => e.target.style.backgroundColor = '#21AEA8'}
+                  >
+                    🧠 Support
+                  </button>
+                  <button
+                    onClick={() => setShowModal(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '24px',
+                      cursor: 'pointer',
+                      color: '#6c757d'
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
 
               {/* Professional Lab Report Content */}
@@ -757,7 +808,11 @@ function ReviewResults({ currentUser }) {
                     console.log('🔍 DEBUG: No organized results found, showing "No test results" message');
                     return (
                       <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-                        <p>No test results available for display.</p>
+                        <p style={{ fontSize: '16px', marginBottom: '10px' }}>⚠️ No test results have been entered yet.</p>
+                        <p style={{ fontSize: '14px', color: '#999' }}>
+                          This test record exists but the laboratory values have not been filled in. 
+                          Please complete the test in the MedTech Dashboard before reviewing.
+                        </p>
                       </div>
                     );
                   }
@@ -917,6 +972,14 @@ function ReviewResults({ currentUser }) {
               />
             </div>
           </div>
+        )}
+
+        {/* DSS Support Modal */}
+        {showDSSModal && (
+          <ReviewDSSSupport 
+            recommendations={dssRecommendations}
+            onClose={() => setShowDSSModal(false)}
+          />
         )}
       </div>
     </div>

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import '../design/Dashboard.css';
 import { appointmentAPI, testResultsAPI, servicesAPI } from '../services/api';
 import ReviewResults from './ReviewResults';
+import DSSSupport from '../components/DSSSupport';
+import { analyzeTestResults } from '../utils/dssHelper';
 
 function MedTechDashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('testing-queue');
@@ -9,6 +11,10 @@ function MedTechDashboard({ currentUser, onLogout }) {
   // Loading and error states
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // DSS Support state
+  const [showDSSSupport, setShowDSSSupport] = useState(false);
+  const [dssRecommendations, setDssRecommendations] = useState(null);
 
   // Testing Queue State - now fetches real checked-in appointments
   const [testingQueue, setTestingQueue] = useState([]);
@@ -2967,6 +2973,14 @@ function MedTechDashboard({ currentUser, onLogout }) {
   };
 
   // Handle going back to queue
+  // Handle DSS Support
+  const handleDSSSupport = () => {
+    // Analyze current form results
+    const recommendations = analyzeTestResults(resultForm);
+    setDssRecommendations(recommendations);
+    setShowDSSSupport(true);
+  };
+
   const handleBackToQueue = async () => {
     // Always show confirmation dialog when going back to queue
     const confirmed = window.confirm('Are you sure you want to go back to the testing queue?');
@@ -4004,6 +4018,22 @@ function MedTechDashboard({ currentUser, onLogout }) {
             Back to Queue
           </button>
           
+          <button
+            onClick={handleDSSSupport}
+            style={{
+              background: '#21AEA8',
+              color: 'white',
+              border: 'none',
+              padding: '15px 30px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: 'bold'
+            }}
+          >
+            🧠 Support
+          </button>
+          
           {!isViewOnlyMode ? (
             <>
               <button
@@ -4226,6 +4256,14 @@ function MedTechDashboard({ currentUser, onLogout }) {
             </button>
           </div>
         </div>
+      )}
+
+      {/* DSS Support Modal */}
+      {showDSSSupport && dssRecommendations && (
+        <DSSSupport
+          recommendations={dssRecommendations}
+          onClose={() => setShowDSSSupport(false)}
+        />
       )}
     </div>
   );
