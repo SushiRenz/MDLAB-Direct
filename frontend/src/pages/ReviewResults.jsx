@@ -723,7 +723,7 @@ function ReviewResults({ currentUser }) {
                     onMouseOver={(e) => e.target.style.backgroundColor = '#1a8e8a'}
                     onMouseOut={(e) => e.target.style.backgroundColor = '#21AEA8'}
                   >
-                    🧠 Support
+                    Support
                   </button>
                   <button
                     onClick={() => setShowModal(false)}

@@ -48,7 +48,7 @@ const ReviewDSSSupport = ({ recommendations, onClose }) => {
           alignItems: 'center'
         }}>
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold' }}>
-            🧠 Clinical Decision Support
+            Clinical Decision Support
           </h2>
           <button
             onClick={onClose}

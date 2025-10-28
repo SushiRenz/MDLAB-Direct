@@ -4,6 +4,8 @@ import PatientProfile from './PatientProfile';
 import MobileLabScheduleModal from './MobileLabScheduleModal';
 import MobileLabMap from '../components/MobileLabMap';
 import { appointmentAPI, servicesAPI, testResultsAPI, mobileLabAPI } from '../services/api';
+import ReviewDSSSupport from '../components/ReviewDSSSupport';
+import { analyzeReviewResults } from '../utils/reviewDSSHelper';
 import '../design/PatientDashboard.css';
 import '../design/BookAppointmentModal.css';
 
@@ -32,6 +34,10 @@ function PatientDashboard(props) {
   const [showResultModal, setShowResultModal] = useState(false);
   const [selectedTestResult, setSelectedTestResult] = useState(null);
   const [filteredResults, setFilteredResults] = useState([]);
+  
+  // DSS Support state
+  const [showDSSModal, setShowDSSModal] = useState(false);
+  const [dssRecommendations, setDssRecommendations] = useState([]);
 
   // Mobile Lab state
   const [mobileLabSchedules, setMobileLabSchedules] = useState([]);
@@ -871,6 +877,32 @@ function PatientDashboard(props) {
     return results;
   };
 
+  // Handle DSS Support
+  const handleDSSSupport = () => {
+    console.log('🧠 DSS Support clicked');
+    console.log('🧠 selectedTestResult:', selectedTestResult);
+    console.log('🧠 selectedTestResult.results:', selectedTestResult?.results);
+    
+    // Analyze the current test data using the same organized results
+    const organizedResults = getOrganizedTestResults(selectedTestResult);
+    console.log('🧠 organizedResults:', organizedResults);
+    console.log('🧠 organizedResults keys:', Object.keys(organizedResults));
+    
+    // Only analyze if we have results
+    if (Object.keys(organizedResults).length === 0) {
+      console.log('🧠 No results to analyze - showing empty state');
+      setDssRecommendations([]);
+      setShowDSSModal(true);
+      return;
+    }
+    
+    const recommendations = analyzeReviewResults(organizedResults);
+    console.log('🧠 recommendations:', recommendations);
+    
+    setDssRecommendations(recommendations);
+    setShowDSSModal(true);
+  };
+
   // Helper function to calculate age from date of birth
   const calculateAge = (dateOfBirth) => {
     if (!dateOfBirth) return null;
@@ -1620,18 +1652,40 @@ function PatientDashboard(props) {
               alignItems: 'center'
             }}>
               <h3 style={{ margin: 0, color: '#2c3e50' }}>Laboratory Test Results</h3>
-              <button
-                onClick={() => setShowResultModal(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '24px',
-                  cursor: 'pointer',
-                  color: '#6c757d'
-                }}
-              >
-                ×
-              </button>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <button
+                  onClick={handleDSSSupport}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#21AEA8',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  onMouseOver={(e) => e.target.style.backgroundColor = '#1a8e8a'}
+                  onMouseOut={(e) => e.target.style.backgroundColor = '#21AEA8'}
+                >
+                  Support
+                </button>
+                <button
+                  onClick={() => setShowResultModal(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '24px',
+                    cursor: 'pointer',
+                    color: '#6c757d'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
             </div>
 
             {/* Professional Lab Report Content */}
@@ -1830,6 +1884,14 @@ function PatientDashboard(props) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* DSS Support Modal */}
+      {showDSSModal && (
+        <ReviewDSSSupport 
+          recommendations={dssRecommendations}
+          onClose={() => setShowDSSModal(false)}
+        />
       )}
     </div>
   );
