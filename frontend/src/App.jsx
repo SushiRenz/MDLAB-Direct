@@ -243,36 +243,10 @@ function App() {
     updateTitle();
   }, [currentView]);
 
-  // Cross-tab session detection using storage events
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      // Only handle sessionStorage changes (though storage events typically fire for localStorage)
-      // We'll use a custom approach since sessionStorage doesn't trigger storage events across tabs
-      
-      // If another tab clears the session, detect it and redirect to login
-      if (e.key === 'sessionCleared' && e.newValue === 'true') {
-        console.log('Session cleared in another tab - logging out');
-        setIsAuthenticated(false);
-        setCurrentUser(null);
-        setCurrentView('login');
-        
-        // Clear this tab's session as well
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('user');
-        sessionStorage.removeItem('currentView');
-        
-        // Remove the signal
-        localStorage.removeItem('sessionCleared');
-      }
-    };
-
-    // Listen for storage events (works for localStorage only)
-    window.addEventListener('storage', handleStorageChange);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
+  // REMOVED: Cross-tab session detection
+  // Each tab now maintains independent sessions
+  // Logging out in one tab will NOT automatically log out other tabs
+  // This allows users to work in multiple tabs independently
 
   // Handle user data updates (e.g., from profile updates)
   const handleUserUpdate = (updatedUser) => {
@@ -330,7 +304,7 @@ function App() {
     // Get token before clearing (for backend logout call)
     const token = sessionStorage.getItem('token');
     
-    // Clear sessionStorage
+    // Clear sessionStorage (only affects current tab)
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('currentView');
@@ -339,9 +313,9 @@ function App() {
     // This allows remembered credentials to persist for future logins
     // If user wants to clear remembered credentials, they can uncheck "Remember Me" on next login
     
-    // Signal other tabs to log out too (using localStorage for cross-tab communication)
-    localStorage.setItem('sessionCleared', 'true');
-    setTimeout(() => localStorage.removeItem('sessionCleared'), 100);
+    // REMOVED: Cross-tab logout synchronization
+    // Each tab now maintains independent sessions
+    // Logging out in one tab will NOT affect other tabs
     
     // Clear session state
     setIsAuthenticated(false);
@@ -350,7 +324,7 @@ function App() {
     // Force navigation to login page
     setCurrentView('login');
     
-    console.log('User logged out successfully (remembered credentials preserved)');
+    console.log('User logged out successfully from this tab (other tabs remain logged in)');
     
     // Optional: Call backend logout endpoint
     if (token) {

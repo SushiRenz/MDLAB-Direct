@@ -493,7 +493,7 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
       
       <div className="login-right">
         <div className="login-box">
-          <h1 className="login-title">LOGIN</h1>
+          <h1 className="login-title">Sign In</h1>
           
           {/* Remembered credentials indicator */}
           {rememberMe && formData.identifier && (

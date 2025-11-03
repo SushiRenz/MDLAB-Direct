@@ -318,7 +318,7 @@ function SignUp({ onNavigateToLogin }) {
     <div className="signup-container">
       <div className="signup-center">
         <div className="signup-box">
-          <h1 className="signup-title">Create Patient Account</h1>
+          <h1 className="signup-title">Create your account</h1>
 
           <form onSubmit={handleSubmit} className="signup-form">
             {error && <div style={{
@@ -607,7 +607,7 @@ function SignUp({ onNavigateToLogin }) {
                 cursor: (loading || Object.values(validationErrors).some(error => error !== '')) ? 'not-allowed' : 'pointer'
               }}
             >
-              {loading ? 'Creating Account...' : 'Create Patient Account'}
+              {loading ? 'Creating Account...' : 'CREATE ACCOUNT'}
             </button>
           </form>
 
