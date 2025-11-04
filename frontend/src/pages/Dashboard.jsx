@@ -10300,47 +10300,11 @@ function Dashboard({ currentUser, onLogout }) {
             )}
           </div>
 
-          <div className="dashboard-dropdown">
-            <div className="dashboard-nav-item-header" onClick={toggleFinance}>
-              <div className="dashboard-nav-item-main">
-                <span className="dashboard-nav-text">Finance</span>
-              </div>
-              <span className={`dashboard-dropdown-arrow ${financeOpen ? 'open' : ''}`}>▼</span>
-            </div>
-            {financeOpen && (
-              <div className="dashboard-nav-submenu">
-                <div 
-                  className={`dashboard-nav-subitem ${activeSection === 'bills' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('bills')}
-                >
-                  Bills
-                </div>
-                <div 
-                  className={`dashboard-nav-subitem ${activeSection === 'transaction' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('transaction')}
-                >
-                  Transaction
-                </div>
-                <div 
-                  className={`dashboard-nav-subitem ${activeSection === 'payments' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('payments')}
-                >
-                  Payments
-                </div>
-                <div 
-                  className={`dashboard-nav-subitem ${activeSection === 'billing-rates' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('billing-rates')}
-                >
-                  Billing Rates
-                </div>
-                <div 
-                  className={`dashboard-nav-subitem ${activeSection === 'reports' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('reports')}
-                >
-                  Reports
-                </div>
-              </div>
-            )}
+          <div 
+            className={`dashboard-nav-item ${activeSection === 'payments' ? 'active' : ''}`}
+            onClick={() => handleSectionClick('payments')}
+          >
+            <span className="dashboard-nav-text">Payments</span>
           </div>
 
           <div 

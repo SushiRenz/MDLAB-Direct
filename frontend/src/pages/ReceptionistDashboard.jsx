@@ -870,46 +870,18 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
             <span className="receptionist-nav-text">Dashboard</span>
           </div>
 
-          <div className="receptionist-dropdown">
-            <div className="receptionist-nav-item-header" onClick={toggleAppointmentManagement}>
-              <div className="receptionist-nav-item-main">
-                <span className="receptionist-nav-text">Appointments</span>
-              </div>
-              <span className={`receptionist-dropdown-arrow ${appointmentManagementOpen ? 'open' : ''}`}>▼</span>
-            </div>
-            {appointmentManagementOpen && (
-              <div className="receptionist-nav-submenu">
-                <div
-                  className={`receptionist-nav-subitem ${activeSection === 'appointments' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('appointments')}
-                >
-                  View Appointments
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="receptionist-dropdown">
-            <div className="receptionist-nav-item-header" onClick={togglePatientServices}>
-              <div className="receptionist-nav-item-main">
-                <span className="receptionist-nav-text">Patient Services</span>
-              </div>
-              <span className={`receptionist-dropdown-arrow ${patientServicesOpen ? 'open' : ''}`}>▼</span>
-            </div>
-            {patientServicesOpen && (
-              <div className="receptionist-nav-submenu">
-                <div className="receptionist-nav-subitem">
-                  <span style={{color: '#999', fontStyle: 'italic'}}>Coming Soon</span>
-                </div>
-              </div>
-            )}
+          <div
+            className={`receptionist-nav-item ${activeSection === 'appointments' ? 'active' : ''}`}
+            onClick={() => handleSectionClick('appointments')}
+          >
+            <span className="receptionist-nav-text">Appointments</span>
           </div>
 
           <div
-            className={`receptionist-nav-item ${activeSection === 'billing-support' ? 'active' : ''}`}
-            onClick={() => handleSectionClick('billing-support')}
+            className={`receptionist-nav-item ${activeSection === 'payments' ? 'active' : ''}`}
+            onClick={() => handleSectionClick('payments')}
           >
-            <span className="receptionist-nav-text">Billing Support</span>
+            <span className="receptionist-nav-text">Payments</span>
           </div>
         </nav>
 
