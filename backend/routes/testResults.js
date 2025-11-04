@@ -138,6 +138,11 @@ const validateGetTestResults = [
       if (Array.isArray(value)) {
         return value.every(status => validStatuses.includes(status));
       }
+      // Handle comma-separated string (e.g., 'completed,released')
+      if (typeof value === 'string' && value.includes(',')) {
+        const statuses = value.split(',').map(s => s.trim());
+        return statuses.every(status => validStatuses.includes(status));
+      }
       return validStatuses.includes(value);
     })
     .withMessage('Invalid status value(s)'),
@@ -213,7 +218,7 @@ const validateStatsQuery = [
 
 // @route   GET /api/test-results
 // @desc    Get all test results with filtering and pagination
-// @access  Private (MedTech only)
+// @access  Private (MedTech, Pathologist, Admin, Owner)
 router.get('/', 
   (req, res, next) => {
     console.log('🚀 ROUTE DEBUG - GET /api/test-results hit with query:', req.query);
@@ -221,7 +226,7 @@ router.get('/',
     next();
   },
   auth.protect, 
-  auth.authorize('medtech'), 
+  auth.authorize('medtech', 'pathologist', 'admin', 'owner'), 
   validateGetTestResults, 
   getTestResults
 );

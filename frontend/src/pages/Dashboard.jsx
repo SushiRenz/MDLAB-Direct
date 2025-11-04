@@ -1,6 +1,94 @@
 import React, { useState, useEffect } from 'react';
 import '../design/Dashboard.css';
 import { userAPI, financeAPI, logsAPI, servicesAPI, mobileLabAPI, appointmentAPI, testResultsAPI } from '../services/api';
+import ReviewDSSSupport from '../components/ReviewDSSSupport';
+import { analyzeReviewResults } from '../utils/reviewDSSHelper';
+
+// Complete test field definitions for view modal
+const testFieldDefinitions = {
+  chemistry: {
+    title: 'CLINICAL CHEMISTRY',
+    fields: [
+      { key: 'fbs', label: 'Glucose (FBS/RBS)', normalRange: '3.89-5.83 mmol/L', group: 'glucose' },
+      { key: 'cholesterol', label: 'Total Cholesterol', normalRange: '3.5-5.2 mmol/L', group: 'lipids' },
+      { key: 'triglyceride', label: 'Triglycerides', normalRange: '<2.26 mmol/L', group: 'lipids' },
+      { key: 'hdl', label: 'HDL Cholesterol', normalRange: '>1.05 mmol/L', group: 'lipids' },
+      { key: 'ldl', label: 'LDL Cholesterol', normalRange: '<2.9 mmol/L', group: 'lipids' },
+      { key: 'bua', label: 'Uric Acid', normalRange: '156-360 umol/L', group: 'kidney' },
+      { key: 'bun', label: 'BUN (Blood Urea Nitrogen)', normalRange: '1.7-8.3 mmol/L', group: 'kidney' },
+      { key: 'creatinine', label: 'Creatinine', normalRange: '53-97 umol/L', group: 'kidney' },
+      { key: 'ast_sgot', label: 'AST/SGOT', normalRange: '<31 U/L', group: 'liver' },
+      { key: 'alt_sgpt', label: 'ALT/SGPT', normalRange: '<34 U/L', group: 'liver' },
+      { key: 'sodium', label: 'Sodium (Na)', normalRange: '136-150 mmol/L', group: 'electrolytes' },
+      { key: 'potassium', label: 'Potassium (K)', normalRange: '3.5-5.0 mmol/L', group: 'electrolytes' },
+      { key: 'chloride', label: 'Chloride (Cl)', normalRange: '94-110 mmol/L', group: 'electrolytes' },
+      { key: 'magnesium', label: 'Magnesium (Mg)', normalRange: '0.70-1.05 mmol/L', group: 'electrolytes' },
+      { key: 'phosphorus', label: 'Phosphorus (P)', normalRange: '0.85-1.50 mmol/L', group: 'electrolytes' },
+      { key: 'fecalysis', label: 'Fecalysis', normalRange: 'See reference', group: 'other' }
+    ]
+  },
+  immunology: {
+    title: 'SEROLOGY/IMMUNOLOGY',
+    fields: [
+      { key: 'hepatitis_b', label: 'Hepatitis B Antigen (HbsAg)', normalRange: 'Non-Reactive', group: 'serology' },
+      { key: 'hepatitis_c', label: 'Hepatitis C', normalRange: 'Non-Reactive', group: 'serology' },
+      { key: 'hiv', label: 'HIV Screening', normalRange: 'Non-Reactive', group: 'serology' },
+      { key: 'vdrl', label: 'VDRL (Syphilis)', normalRange: 'Non-Reactive', group: 'serology' },
+      { key: 'dengue_ns1', label: 'Dengue NS1 Antigen', normalRange: 'Negative', group: 'dengue' },
+      { key: 'dengue_igg', label: 'Dengue IgG Antibody', normalRange: 'Negative', group: 'dengue' },
+      { key: 'dengue_igm', label: 'Dengue IgM Antibody', normalRange: 'Negative', group: 'dengue' },
+      { key: 'salmonella_igg', label: 'Salmonella IgG', normalRange: 'Non-Reactive', group: 'salmonella' },
+      { key: 'salmonella_igm', label: 'Salmonella IgM', normalRange: 'Non-Reactive', group: 'salmonella' },
+      { key: 'hpylori_antigen', label: 'H. Pylori Antigen', normalRange: 'Negative', group: 'hpylori' },
+      { key: 'hpylori_antibody', label: 'H. Pylori Antibody', normalRange: 'Negative', group: 'hpylori' },
+      { key: 'psa', label: 'PSA (Prostate Specific Antigen)', normalRange: '<4.0 ng/mL', group: 'tumor_markers' },
+      { key: 'crp', label: 'CRP (C-Reactive Protein)', normalRange: '<3.0 mg/L', group: 'inflammation' }
+    ]
+  },
+  hematology: {
+    title: 'HEMATOLOGY',
+    fields: [
+      { key: 'hemoglobin', label: 'Hemoglobin', normalRange: '110-160 g/L', group: 'basic' },
+      { key: 'hematocrit', label: 'Hematocrit', normalRange: '37-54%', group: 'basic' },
+      { key: 'rbc', label: 'RBC Count', normalRange: '3.50-5.50 x10¹²/L', group: 'basic' },
+      { key: 'platelets', label: 'Platelet Count', normalRange: '150-450 x10⁹/L', group: 'basic' },
+      { key: 'wbc', label: 'WBC Count', normalRange: '4.0-10.0 x10⁹/L', group: 'basic' },
+      { key: 'mcv', label: 'MCV', normalRange: '80-100 fL', group: 'indices' },
+      { key: 'mch', label: 'MCH', normalRange: '27.0-34.0 pg', group: 'indices' },
+      { key: 'mchc', label: 'MCHC', normalRange: '320-360 g/L', group: 'indices' },
+      { key: 'neutrophils', label: 'Segmenters (Neutrophils)', normalRange: '2.0-7.0 x10⁹/L', group: 'differential' },
+      { key: 'lymphocytes', label: 'Lymphocytes', normalRange: '0.8-4.0 x10⁹/L', group: 'differential' },
+      { key: 'monocytes', label: 'Monocytes', normalRange: '0.1-1.5 x10⁩/L', group: 'differential' },
+      { key: 'eosinophils', label: 'Eosinophils', normalRange: '0.0-0.4 x10⁹/L', group: 'differential' },
+      { key: 'basophils', label: 'Basophils', normalRange: '0.0-0.1 x10⁹/L', group: 'differential' },
+      { key: 'esr', label: 'ESR (Erythrocyte Sedimentation Rate)', normalRange: '<20 mm/hr', group: 'other' },
+      { key: 'aptt', label: 'APTT (Activated Partial Thromboplastin Time)', normalRange: '25-35 seconds', group: 'coagulation' },
+      { key: 'pt', label: 'PT (Prothrombin Time)', normalRange: '11-15 seconds', group: 'coagulation' },
+      { key: 'inr', label: 'INR (International Normalized Ratio)', normalRange: '0.8-1.2', group: 'coagulation' },
+      { key: 'bleeding_time', label: 'Bleeding Time', normalRange: '1-6 minutes', group: 'coagulation' },
+      { key: 'clotting_time', label: 'Clotting Time', normalRange: '5-15 minutes', group: 'coagulation' }
+    ]
+  },
+  urinalysis: {
+    title: 'CLINICAL MICROSCOPY',
+    fields: [
+      { key: 'color', label: 'Color', normalRange: 'Yellow', group: 'urine_physical' },
+      { key: 'transparency', label: 'Transparency', normalRange: 'Clear', group: 'urine_physical' },
+      { key: 'specificGravity', label: 'Specific Gravity', normalRange: '1.003-1.030', group: 'urine_physical' },
+      { key: 'ph', label: 'pH', normalRange: '4.6-8.0', group: 'urine_chemical' },
+      { key: 'protein', label: 'Protein', normalRange: 'Negative', group: 'urine_chemical' },
+      { key: 'glucose', label: 'Glucose', normalRange: 'Negative', group: 'urine_chemical' },
+      { key: 'ketones', label: 'Ketones', normalRange: 'Negative', group: 'urine_chemical' },
+      { key: 'bilirubin', label: 'Bilirubin', normalRange: 'Negative', group: 'urine_chemical' },
+      { key: 'urobilinogen', label: 'Urobilinogen', normalRange: 'Normal', group: 'urine_chemical' },
+      { key: 'blood', label: 'Blood', normalRange: 'Negative', group: 'urine_chemical' },
+      { key: 'leukocytes', label: 'Leukocytes', normalRange: 'Negative', group: 'urine_chemical' },
+      { key: 'nitrites', label: 'Nitrites', normalRange: 'Negative', group: 'urine_chemical' },
+      { key: 'pregnancy_test_urine', label: 'Pregnancy Test (Urine)', normalRange: 'Negative', group: 'pregnancy' },
+      { key: 'pregnancy_test_serum', label: 'Pregnancy Test (Serum/β-HCG)', normalRange: 'Negative', group: 'pregnancy' }
+    ]
+  }
+};
 
 // Helper function to format category names
 const formatCategoryName = (category) => {
@@ -60,18 +148,18 @@ function Dashboard({ currentUser, onLogout }) {
   const [showCheckOutModal, setShowCheckOutModal] = useState(false);
   const [selectedAppointmentPatient, setSelectedAppointmentPatient] = useState(null);
 
-  // Results management state
+  // Results management state - Owner/Admin side (only completed/approved results)
   const [testResults, setTestResults] = useState([]);
   const [resultsLoading, setResultsLoading] = useState(false);
   const [resultsError, setResultsError] = useState('');
   const [resultSearchTerm, setResultSearchTerm] = useState('');
   const [resultFilterStatus, setResultFilterStatus] = useState('');
-  const [resultFilterType, setResultFilterType] = useState('');
   const [resultFilterDate, setResultFilterDate] = useState('');
   const [showResultModal, setShowResultModal] = useState(false);
-  const [showProcessResultModal, setShowProcessResultModal] = useState(false);
-  const [editingResult, setEditingResult] = useState(null);
+  const [showDeleteResultModal, setShowDeleteResultModal] = useState(false);
   const [selectedResult, setSelectedResult] = useState(null);
+  const [showDSSModal, setShowDSSModal] = useState(false);
+  const [dssRecommendations, setDssRecommendations] = useState([]);
 
   // Services state for appointment booking
   const [appointmentServices, setAppointmentServices] = useState([]);
@@ -307,6 +395,221 @@ function Dashboard({ currentUser, onLogout }) {
   });
 
   const user = currentUser;
+
+  // Helper function to parse and display multiple tests
+  const parseTestNames = (testTypeString) => {
+    if (!testTypeString) return [];
+    
+    // Split by comma and clean up each test name
+    const tests = testTypeString.split(',').map(test => test.trim());
+    
+    return tests;
+  };
+
+  // Helper function to get test count display
+  const getTestDisplayInfo = (testTypeString) => {
+    const tests = parseTestNames(testTypeString);
+    
+    if (tests.length <= 1) {
+      return {
+        mainTitle: tests[0] || 'Lab Test',
+        hasMultiple: false,
+        testCount: tests.length,
+        allTests: tests
+      };
+    }
+    
+    return {
+      mainTitle: `${tests.length} Laboratory Tests`,
+      hasMultiple: true,
+      testCount: tests.length,
+      allTests: tests
+    };
+  };
+
+  // Helper function to format service name for table display
+  const formatServiceNameForTable = (serviceName) => {
+    if (!serviceName) return 'No service';
+    
+    const tests = parseTestNames(serviceName);
+    if (tests.length <= 1) {
+      return serviceName;
+    }
+    
+    return `${tests.length} Tests: ${tests[0]}${tests.length > 1 ? `, +${tests.length - 1} more` : ''}`;
+  };
+
+  // Helper function to get test result value from MongoDB data
+  const getTestFieldValue = (fieldKey, results) => {
+    if (!results || !fieldKey) return null;
+    
+    try {
+      if (typeof results === 'object' && !(results instanceof Map)) {
+        const value = results[fieldKey];
+        
+        if (value && typeof value === 'object' && 'value' in value) {
+          return value.value;
+        }
+        
+        if (value && typeof value === 'object' && 'result' in value) {
+          return value.result;
+        }
+        
+        return value;
+      }
+      
+      if (results instanceof Map) {
+        const value = results.get(fieldKey);
+        
+        if (value && typeof value === 'object' && 'value' in value) {
+          return value.value;
+        }
+        if (value && typeof value === 'object' && 'result' in value) {
+          return value.result;
+        }
+        
+        return value;
+      }
+    } catch (error) {
+      console.error(`Error extracting field "${fieldKey}":`, error);
+    }
+    
+    return null;
+  };
+
+  // Get all test results organized by category
+  const getOrganizedTestResults = (modalTestData) => {
+    if (!modalTestData?.results) {
+      return {};
+    }
+    
+    const results = {};
+    
+    Object.entries(testFieldDefinitions).forEach(([category, config]) => {
+      const categoryFields = {};
+      let hasData = false;
+      
+      config.fields.forEach(field => {
+        if (['date_performed', 'datePerformed', 'time_performed', 'timePerformed'].includes(field.key)) {
+          return;
+        }
+        
+        const value = getTestFieldValue(field.key, modalTestData.results);
+        if (value !== null && value !== undefined && value !== '') {
+          categoryFields[field.key] = {
+            label: field.label || field.key,
+            value: value,
+            normalRange: field.normalRange || 'See reference',
+            group: field.group || 'other'
+          };
+          hasData = true;
+        }
+      });
+      
+      if (hasData) {
+        results[category] = {
+          title: config.title,
+          fields: categoryFields  // Changed from 'results' to 'fields' for DSS compatibility
+        };
+      }
+    });
+    
+    return results;
+  };
+
+  // DSS Support Handler for Test Results
+  const handleDSSSupport = () => {
+    console.log('🧠 DSS Support clicked');
+    console.log('🧠 selectedResult:', selectedResult);
+    console.log('🧠 selectedResult.results:', selectedResult?.results);
+    
+    // Analyze the current test data using the same organized results
+    const organizedResults = getOrganizedTestResults(selectedResult);
+    console.log('🧠 organizedResults:', organizedResults);
+    console.log('🧠 organizedResults keys:', Object.keys(organizedResults));
+    
+    // Only analyze if we have results
+    if (Object.keys(organizedResults).length === 0) {
+      console.log('🧠 No results to analyze - showing empty state');
+      setDssRecommendations([]);
+      setShowDSSModal(true);
+      return;
+    }
+    
+    const recommendations = analyzeReviewResults(organizedResults);
+    console.log('🧠 recommendations:', recommendations);
+    
+    setDssRecommendations(recommendations);
+    setShowDSSModal(true);
+  };
+
+  // Dropdown action handlers for appointments
+  const [activeDropdown, setActiveDropdown] = useState(null);
+
+  const toggleDropdown = (appointmentId) => {
+    setActiveDropdown(activeDropdown === appointmentId ? null : appointmentId);
+  };
+
+  const handleEditServiceAppointment = (appointment) => {
+    alert('Service editing functionality will be implemented soon. This allows changing the tests/services for this appointment.');
+    setActiveDropdown(null);
+  };
+
+  const handleEditStatusAppointment = (appointment) => {
+    const newStatus = prompt(`Enter new status for appointment ${appointment.appointmentId}:\n\nOptions: pending, confirmed, checked-in, in-progress, completed, cancelled, no-show`, appointment.status);
+    
+    if (newStatus && ['pending', 'confirmed', 'checked-in', 'in-progress', 'completed', 'cancelled', 'no-show'].includes(newStatus.toLowerCase())) {
+      // Update the appointment status
+      appointmentAPI.updateAppointment(appointment._id, { status: newStatus.toLowerCase() })
+        .then(response => {
+          if (response.success) {
+            setAppointments(prev => 
+              prev.map(apt => 
+                apt._id === appointment._id 
+                  ? { ...apt, status: newStatus.toLowerCase() }
+                  : apt
+              )
+            );
+            alert(`Status updated to: ${newStatus.toLowerCase()}`);
+          } else {
+            throw new Error(response.message || 'Failed to update status');
+          }
+        })
+        .catch(error => {
+          console.error('Error updating status:', error);
+          alert('Failed to update status: ' + error.message);
+        });
+    }
+    setActiveDropdown(null);
+  };
+
+  const handleDeleteAppointmentPermanent = async (appointment) => {
+    if (window.confirm(`Are you sure you want to permanently delete appointment ${appointment.appointmentId} for ${appointment.patientName}?\n\nThis action cannot be undone.`)) {
+      try {
+        const response = await appointmentAPI.deleteAppointment(appointment._id);
+        
+        if (response.success) {
+          setAppointments(appointments.filter(apt => apt._id !== appointment._id));
+          alert(`Appointment ${appointment.appointmentId} has been deleted successfully.`);
+        } else {
+          alert(`Failed to delete appointment: ${response.message}`);
+        }
+      } catch (error) {
+        console.error('Error deleting appointment:', error);
+        alert('Failed to delete appointment. Please try again.');
+      }
+    }
+    setActiveDropdown(null);
+  };
+
+  // Patient details modal for appointments
+  const [showPatientDetailsModal, setShowPatientDetailsModal] = useState(false);
+  const [selectedAppointmentDetails, setSelectedAppointmentDetails] = useState(null);
+
+  const handleViewAppointmentPatientDetails = (appointment) => {
+    setSelectedAppointmentDetails(appointment);
+    setShowPatientDetailsModal(true);
+  };
 
   // Dashboard data fetching
   const fetchDashboardData = async () => {
@@ -852,25 +1155,33 @@ function Dashboard({ currentUser, onLogout }) {
     }
   };
 
-  // Test Results Management Functions
+  // Test Results Management Functions - Owner/Admin side (only completed/approved results)
   const fetchTestResults = async () => {
     setResultsLoading(true);
     setResultsError('');
     try {
-      const params = {};
-      if (resultSearchTerm) params.search = resultSearchTerm;
-      if (resultFilterStatus) params.status = resultFilterStatus;
-      if (resultFilterType) params.testType = resultFilterType;
-      if (resultFilterDate) params.fromDate = resultFilterDate;
+      console.log('Fetching finished/released test results for owner/admin...');
       
+      const params = {
+        status: 'completed,released,reviewed',
+        limit: 100
+      };
+      
+      if (resultSearchTerm) params.search = resultSearchTerm;
+      
+      console.log('🔍 REQUEST PARAMS:', params);
       const response = await testResultsAPI.getTestResults(params);
+      console.log('✅ Finished results response:', response);
+      
       if (response.success) {
-        setTestResults(response.data || []);
+        const results = response.data || [];
+        console.log(`✅ Loaded ${results.length} finished test results`);
+        setTestResults(results);
       } else {
         throw new Error(response.message || 'Failed to fetch test results');
       }
     } catch (error) {
-      console.error('Fetch test results error:', error);
+      console.error('❌ Fetch test results error:', error);
       setResultsError('Failed to fetch test results: ' + error.message);
       setTestResults([]);
     } finally {
@@ -878,53 +1189,83 @@ function Dashboard({ currentUser, onLogout }) {
     }
   };
 
+  // Result action handlers
   const viewResult = (result) => {
     setSelectedResult(result);
     setShowResultModal(true);
   };
 
-  const editResult = (result) => {
-    setEditingResult(result);
-    setShowProcessResultModal(true);
+  const handleDeleteResultClick = (result) => {
+    setSelectedResult(result);
+    setShowDeleteResultModal(true);
   };
 
-  const processResult = async (result) => {
+  const handleDeleteResult = async () => {
+    if (!selectedResult) return;
+
     try {
-      const response = await testResultsAPI.updateTestResult(result._id, {
-        status: 'in-progress',
-        medTech: currentUser._id
-      });
+      setResultsLoading(true);
+      const response = await testResultsAPI.deleteTestResult(selectedResult._id);
       
       if (response.success) {
-        alert('Result processing started successfully!');
+        alert('Test result deleted successfully');
+        setShowDeleteResultModal(false);
+        setSelectedResult(null);
         fetchTestResults();
       } else {
-        throw new Error(response.message || 'Failed to process result');
+        throw new Error(response.message || 'Failed to delete test result');
       }
     } catch (error) {
-      console.error('Process result error:', error);
-      alert('Failed to process result: ' + error.message);
+      console.error('Delete error:', error);
+      alert('Failed to delete test result: ' + error.message);
+    } finally {
+      setResultsLoading(false);
     }
   };
 
-  const releaseResult = async (result) => {
-    if (!confirm('Are you sure you want to release this result to the patient?')) {
-      return;
+  // Get patient type (Walk-in or With Account)
+  const getPatientType = (result) => {
+    // If result has a patientId/patient reference, it's "With Account"
+    // If it's from a walk-in appointment or has no patient reference, it's "Walk-in"
+    if (result.patient && result.patient._id) {
+      return 'With Account';
     }
-    
-    try {
-      const response = await testResultsAPI.releaseTestResult(result._id);
-      
-      if (response.success) {
-        alert('Result released to patient successfully!');
-        fetchTestResults();
-      } else {
-        throw new Error(response.message || 'Failed to release result');
-      }
-    } catch (error) {
-      console.error('Release result error:', error);
-      alert('Failed to release result: ' + error.message);
+    if (result.appointment && result.appointment.type === 'walk-in') {
+      return 'Walk-in';
     }
+    if (result.patientId) {
+      return 'With Account';
+    }
+    return 'Walk-in';
+  };
+
+  // Helper to get patient name from result
+  const getPatientName = (result) => {
+    if (result.patientName) return result.patientName;
+    if (result.patient) {
+      const firstName = result.patient.firstName || '';
+      const lastName = result.patient.lastName || '';
+      return `${firstName} ${lastName}`.trim() || 'Unknown';
+    }
+    return 'Unknown';
+  };
+
+  // Helper to format service name
+  const formatServiceName = (result) => {
+    if (!result.service) return result.testType || 'N/A';
+    if (typeof result.service === 'string') return result.service;
+    if (result.service.name) return result.service.name;
+    return result.testType || 'N/A';
+  };
+
+  // Helper to format date
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   const printResult = async (result) => {
@@ -1004,7 +1345,21 @@ function Dashboard({ currentUser, onLogout }) {
     if (activeSection === 'results') {
       fetchTestResults();
     }
-  }, [activeSection, resultSearchTerm, resultFilterStatus, resultFilterType, resultFilterDate]);
+  }, [activeSection, resultSearchTerm]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.receptionist-dropdown-container')) {
+        setActiveDropdown(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
 
   // User Management Functions
   const fetchUsers = async (role = '') => {
@@ -3222,225 +3577,122 @@ function Dashboard({ currentUser, onLogout }) {
 
   // Results Management Function
   const renderResultsManagement = () => (
-    <div className="management-container results-management">
-      <div className="management-header">
-        <div className="management-title">
-          <h2>Test Results Management</h2>
-          <p>View, process, and manage laboratory test results</p>
-        </div>
-        <button className="add-btn" onClick={() => setShowProcessResultModal(true)}>
-          + Process New Result
-        </button>
-      </div>
-
-      <div className="management-stats">
-        <div className="stat-card">
-          <div className="stat-icon result-pending-icon"></div>
-          <div className="stat-info">
-            <div className="stat-label">Pending Results</div>
-            <div className="stat-value">{testResults.filter(result => result.status === 'pending').length}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon result-progress-icon"></div>
-          <div className="stat-info">
-            <div className="stat-label">In Progress</div>
-            <div className="stat-value">{testResults.filter(result => result.status === 'in-progress').length}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon result-completed-icon"></div>
-          <div className="stat-info">
-            <div className="stat-label">Completed Today</div>
-            <div className="stat-value">{testResults.filter(result => {
-              const today = new Date().toISOString().split('T')[0];
-              const resultDate = new Date(result.completedDate).toISOString().split('T')[0];
-              return result.status === 'completed' && resultDate === today;
-            }).length}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon result-critical-icon"></div>
-          <div className="stat-info">
-            <div className="stat-label">Critical Results</div>
-            <div className="stat-value">{testResults.filter(result => result.isCritical).length}</div>
-          </div>
+    <div className="receptionist-management-container">
+      <div className="receptionist-management-header">
+        <div className="receptionist-management-title">
+          <h2>Finished Test Results</h2>
+          <p>View and manage completed and released test results</p>
         </div>
       </div>
 
-      <div className="search-filter">
+      <div className="receptionist-search-filter">
         <input
           type="text"
-          placeholder="Search by patient name, sample ID..."
-          className="search-input"
+          placeholder="Search by sample ID, patient name..."
+          className="receptionist-search-input"
           value={resultSearchTerm}
           onChange={(e) => setResultSearchTerm(e.target.value)}
         />
         <select
-          className="filter-select"
+          className="receptionist-filter-select"
           value={resultFilterStatus}
           onChange={(e) => setResultFilterStatus(e.target.value)}
         >
           <option value="">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="in-progress">In Progress</option>
           <option value="completed">Completed</option>
           <option value="reviewed">Reviewed</option>
           <option value="released">Released</option>
         </select>
-        <select
-          className="filter-select"
-          value={resultFilterType}
-          onChange={(e) => setResultFilterType(e.target.value)}
-        >
-          <option value="">All Test Types</option>
-          <option value="Complete Blood Count (CBC)">CBC</option>
-          <option value="Blood Sugar Test">Blood Sugar</option>
-          <option value="Lipid Profile">Lipid Profile</option>
-          <option value="Urinalysis">Urinalysis</option>
-          <option value="X-Ray">X-Ray</option>
-          <option value="ECG">ECG</option>
-        </select>
         <input
           type="date"
-          className="date-filter"
+          className="receptionist-filter-date"
           value={resultFilterDate}
           onChange={(e) => setResultFilterDate(e.target.value)}
         />
       </div>
 
-      <div className="management-content">
-        <div className="data-table">
+      <div className="receptionist-management-content">
+        <div className="receptionist-data-table">
           <table>
             <thead>
               <tr>
                 <th>Sample ID</th>
                 <th>Patient Name</th>
                 <th>Test Type</th>
-                <th>Sample Date</th>
+                <th>Date Completed</th>
                 <th>Status</th>
-                <th>Flags</th>
-                <th>Assigned Staff</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {resultsLoading ? (
                 <tr>
-                  <td colSpan="8">Loading test results...</td>
+                  <td colSpan="6">Loading test results...</td>
+                </tr>
+              ) : resultsError ? (
+                <tr>
+                  <td colSpan="6" style={{color: '#e74c3c', textAlign: 'center', padding: '20px'}}>
+                    {resultsError}
+                  </td>
                 </tr>
               ) : testResults.length === 0 ? (
                 <tr>
-                  <td colSpan="8">No test results found</td>
+                  <td colSpan="6">No finished test results found</td>
                 </tr>
               ) : (
                 testResults
                   .filter(result => {
-                    const matchesSearch = !resultSearchTerm || 
-                      result.sampleId.toLowerCase().includes(resultSearchTerm.toLowerCase()) ||
-                      (result.patient && (result.patient.firstName + ' ' + result.patient.lastName).toLowerCase().includes(resultSearchTerm.toLowerCase()));
-                    const matchesStatus = !resultFilterStatus || result.status === resultFilterStatus;
-                    const matchesType = !resultFilterType || result.testType === resultFilterType;
-                    const matchesDate = !resultFilterDate || new Date(result.sampleDate).toISOString().split('T')[0] === resultFilterDate;
-                    return matchesSearch && matchesStatus && matchesType && matchesDate;
+                    const matchesSearch = resultSearchTerm === '' || 
+                      getPatientName(result).toLowerCase().includes(resultSearchTerm.toLowerCase()) ||
+                      (result.sampleId || '').toLowerCase().includes(resultSearchTerm.toLowerCase());
+                    const matchesStatus = resultFilterStatus === '' || 
+                      (result.status || '').toLowerCase() === resultFilterStatus.toLowerCase();
+                    const matchesDate = resultFilterDate === '' || 
+                      (result.completedDate && new Date(result.completedDate).toISOString().split('T')[0] === resultFilterDate) ||
+                      (result.releasedDate && new Date(result.releasedDate).toISOString().split('T')[0] === resultFilterDate);
+                    return matchesSearch && matchesStatus && matchesDate;
                   })
-                  .map(result => (
+                  .map((result) => (
                     <tr key={result._id}>
+                      <td>{result.sampleId || 'N/A'}</td>
+                      <td>{getPatientName(result)}</td>
+                      <td>{formatServiceName(result)}</td>
                       <td>
-                        <div className="sample-id">
-                          {result.sampleId}
-                          {result.isNew && <span className="new-badge">NEW</span>}
-                        </div>
+                        {formatDate(result.completedDate || result.releasedDate)}
                       </td>
                       <td>
-                        <div className="patient-info">
-                          <div className="patient-name">
-                            {result.patient ? `${result.patient.firstName} ${result.patient.lastName}` : 'Unknown Patient'}
-                          </div>
-                          <div className="patient-id">ID: {result.patient?.username || 'N/A'}</div>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="test-type">
-                          <div className="test-name">{result.testType}</div>
-                          {result.appointment && <div className="appointment-ref">Appt: {result.appointment.appointmentId}</div>}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="date-info">
-                          <div className="sample-date">{new Date(result.sampleDate).toLocaleDateString()}</div>
-                          <div className="sample-time">{new Date(result.sampleDate).toLocaleTimeString()}</div>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`status ${result.status}`}>
-                          {result.status}
+                        <span className={`receptionist-status ${(result.status || '').toLowerCase()}`}>
+                          {result.status || 'N/A'}
                         </span>
                       </td>
                       <td>
-                        <div className="result-flags">
-                          {result.isCritical && <span className="flag critical">CRITICAL</span>}
-                          {result.isAbnormal && <span className="flag abnormal">ABNORMAL</span>}
-                          {result.qcPassed && <span className="flag qc-passed">QC PASSED</span>}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="staff-assignments">
-                          {result.medTech && (
-                            <div className="medtech-assigned">
-                              MedTech: {result.medTech.firstName} {result.medTech.lastName}
-                            </div>
-                          )}
-                          {result.pathologist && (
-                            <div className="pathologist-assigned">
-                              Pathologist: {result.pathologist.firstName} {result.pathologist.lastName}
-                            </div>
-                          )}
-                          {!result.medTech && !result.pathologist && (
-                            <span className="unassigned">Unassigned</span>
-                          )}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="action-buttons">
+                        <div className="receptionist-action-buttons">
                           <button 
-                            className="action-btn view-btn"
+                            className="receptionist-btn-view"
                             onClick={() => viewResult(result)}
-                            title="View Details"
                           >
-                            👁️
+                            View
                           </button>
+                          
+                          {/* Red trash button for delete */}
                           <button 
-                            className="action-btn edit-btn"
-                            onClick={() => editResult(result)}
-                            title="Edit Result"
+                            className="receptionist-btn-delete"
+                            onClick={() => handleDeleteResultClick(result)}
+                            title="Delete"
+                            style={{
+                              backgroundColor: '#dc3545',
+                              color: 'white',
+                              border: 'none',
+                              padding: '8px 12px',
+                              borderRadius: '5px',
+                              cursor: 'pointer',
+                              fontSize: '16px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
                           >
-                            ✏️
-                          </button>
-                          {result.status === 'pending' && (
-                            <button 
-                              className="action-btn process-btn"
-                              onClick={() => processResult(result)}
-                              title="Process Result"
-                            >
-                              ⚙️
-                            </button>
-                          )}
-                          {result.status === 'completed' && (
-                            <button 
-                              className="action-btn release-btn"
-                              onClick={() => releaseResult(result)}
-                              title="Release Result"
-                            >
-                              📤
-                            </button>
-                          )}
-                          <button 
-                            className="action-btn print-btn"
-                            onClick={() => printResult(result)}
-                            title="Print Result"
-                          >
-                            🖨️
+                            🗑️
                           </button>
                         </div>
                       </td>
@@ -3451,10 +3703,6 @@ function Dashboard({ currentUser, onLogout }) {
           </table>
         </div>
       </div>
-
-      {resultsError && (
-        <div className="error-message">{resultsError}</div>
-      )}
     </div>
   );
 
@@ -6035,88 +6283,47 @@ function Dashboard({ currentUser, onLogout }) {
 
   // Appointment Management Component
   const renderAppointmentManagement = () => (
-    <div className="management-container">
-      <div className="management-header">
-        <div className="management-title">
+    <div className="receptionist-management-container">
+      <div className="receptionist-management-header">
+        <div className="receptionist-management-title">
           <h2>Appointment Management</h2>
           <p>View and manage patient appointments</p>
         </div>
-        <button className="add-btn" onClick={() => setShowScheduleModal(true)}>
+        <button className="receptionist-add-btn" onClick={() => setShowScheduleModal(true)}>
           + Schedule Appointment
         </button>
       </div>
 
-      <div className="management-stats">
-        <div className="stat-card">
-          <div className="stat-icon"></div>
-          <div className="stat-info">
-            <div className="stat-label">Today's Appointments</div>
-            <div className="stat-value">{appointments.filter(apt => {
-              const today = new Date().toISOString().split('T')[0];
-              return apt.appointmentDate === today;
-            }).length}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon"></div>
-          <div className="stat-info">
-            <div className="stat-label">Pending Appointments</div>
-            <div className="stat-value">{appointments.filter(apt => apt.status === 'pending' || apt.status === 'confirmed').length}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon"></div>
-          <div className="stat-info">
-            <div className="stat-label">Completed Today</div>
-            <div className="stat-value">{appointments.filter(apt => {
-              const today = new Date().toISOString().split('T')[0];
-              return apt.appointmentDate === today && apt.status === 'completed';
-            }).length}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon"></div>
-          <div className="stat-info">
-            <div className="stat-label">Walk-in Patients</div>
-            <div className="stat-value">{appointments.filter(apt => apt.type === 'walk-in').length}</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="search-filter">
+      <div className="receptionist-search-filter">
         <input
           type="text"
           placeholder="Search appointments..."
-          className="search-input"
+          className="receptionist-search-input"
           value={appointmentSearchTerm}
           onChange={(e) => setAppointmentSearchTerm(e.target.value)}
         />
         <select
-          className="filter-select"
+          className="receptionist-filter-select"
           value={appointmentFilterStatus}
           onChange={(e) => setAppointmentFilterStatus(e.target.value)}
         >
           <option value="">All Status</option>
           <option value="pending">Pending</option>
           <option value="confirmed">Confirmed</option>
-          <option value="checked-in">Checked In</option>
           <option value="in-progress">In Progress</option>
           <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
         </select>
         <input
           type="date"
-          className="date-filter"
+          className="receptionist-date-filter"
           value={appointmentFilterDate}
           onChange={(e) => setAppointmentFilterDate(e.target.value)}
         />
-        <button className="filter-btn" onClick={() => setShowWalkInModal(true)}>
-          + Walk-in Registration
-        </button>
       </div>
 
-      <div className="management-content">
-        <div className="data-table">
+      <div className="receptionist-management-content">
+        <div className="receptionist-data-table">
           <table>
             <thead>
               <tr>
@@ -6124,7 +6331,6 @@ function Dashboard({ currentUser, onLogout }) {
                 <th>Patient Name</th>
                 <th>Service</th>
                 <th>Date & Time</th>
-                <th>Type</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -6132,11 +6338,11 @@ function Dashboard({ currentUser, onLogout }) {
             <tbody>
               {appointmentLoading ? (
                 <tr>
-                  <td colSpan="7">Loading appointments...</td>
+                  <td colSpan="6">Loading appointments...</td>
                 </tr>
               ) : appointments.length === 0 ? (
                 <tr>
-                  <td colSpan="7">No appointments found</td>
+                  <td colSpan="6">No appointments found</td>
                 </tr>
               ) : (
                 appointments
@@ -6152,31 +6358,29 @@ function Dashboard({ currentUser, onLogout }) {
                     <tr key={appointment._id}>
                       <td>{appointment.appointmentId}</td>
                       <td>{appointment.patientName}</td>
-                      <td>{appointment.serviceName}</td>
+                      <td>{formatServiceNameForTable(appointment.serviceName)}</td>
                       <td>
-                        {new Date(appointment.appointmentDate).toLocaleDateString()} - {appointment.appointmentTime}
+                        {appointment.appointmentDate 
+                          ? `${new Date(appointment.appointmentDate).toLocaleDateString()} - ${appointment.appointmentTime || 'Any time during clinic hours'}`
+                          : 'Invalid Date - Any time during clinic hours'
+                        }
                       </td>
                       <td>
-                        <span className={`appointment-type ${appointment.type}`}>
-                          {appointment.type}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`status ${appointment.status}`}>
+                        <span className={`receptionist-status ${appointment.status}`}>
                           {appointment.status}
                         </span>
                       </td>
                       <td>
-                        <div className="action-buttons">
+                        <div className="receptionist-action-buttons">
                           <button 
-                            className="action-btn view" 
-                            onClick={() => handleViewAppointmentDetails(appointment)}
+                            className="receptionist-btn-view" 
+                            onClick={() => handleViewAppointmentPatientDetails(appointment)}
                           >
                             View
                           </button>
-                          {(appointment.status === 'confirmed' || appointment.status === 'pending') && (
+                          {appointment.status === 'confirmed' && (
                             <button 
-                              className="action-btn checkin" 
+                              className="receptionist-btn-checkin" 
                               onClick={() => handleCheckInAppointment(appointment)}
                             >
                               Check In
@@ -6184,26 +6388,46 @@ function Dashboard({ currentUser, onLogout }) {
                           )}
                           {appointment.status === 'checked-in' && (
                             <button 
-                              className="action-btn checkout" 
+                              className="receptionist-btn-checkout" 
                               onClick={() => handleCheckOutAppointment(appointment)}
                             >
                               Check Out
                             </button>
                           )}
-                          <button 
-                            className="action-btn edit" 
-                            onClick={() => handleEditAppointment(appointment)}
-                          >
-                            Edit
-                          </button>
-                          {appointment.status !== 'completed' && appointment.status !== 'cancelled' && (
+                          
+                          {/* Three-dot dropdown menu */}
+                          <div className="receptionist-dropdown-container">
                             <button 
-                              className="action-btn cancel" 
-                              onClick={() => handleCancelAppointment(appointment)}
+                              className="receptionist-btn-dropdown"
+                              onClick={() => toggleDropdown(appointment._id)}
+                              aria-label="More actions"
                             >
-                              Cancel
+                              ⋮
                             </button>
-                          )}
+                            
+                            {activeDropdown === appointment._id && (
+                              <div className="receptionist-dropdown-menu">
+                                <button 
+                                  className="receptionist-dropdown-item"
+                                  onClick={() => handleEditServiceAppointment(appointment)}
+                                >
+                                  Edit Service
+                                </button>
+                                <button 
+                                  className="receptionist-dropdown-item"
+                                  onClick={() => handleEditStatusAppointment(appointment)}
+                                >
+                                  Edit Status
+                                </button>
+                                <button 
+                                  className="receptionist-dropdown-item delete"
+                                  onClick={() => handleDeleteAppointmentPermanent(appointment)}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -6855,9 +7079,9 @@ function Dashboard({ currentUser, onLogout }) {
   };
 
   const renderViewBillModal = () => {
-    console.log('Rendering view modal, showViewBillModal:', showViewBillModal, 'selectedBill:', selectedBill);
-    
     if (!showViewBillModal || !selectedBill) return null;
+    
+    console.log('Rendering view modal, showViewBillModal:', showViewBillModal, 'selectedBill:', selectedBill);
     
     // Add safety checks for the bill data
     const bill = selectedBill;
@@ -8810,143 +9034,6 @@ function Dashboard({ currentUser, onLogout }) {
   };
 
   // Process Result Modal Component
-  const renderProcessResultModal = () => {
-    if (!showProcessResultModal) return null;
-    
-    const [resultData, setResultData] = useState(editingResult || {
-      sampleId: '',
-      testType: '',
-      results: {},
-      status: 'in-progress',
-      notes: '',
-      medTechNotes: '',
-      qcPassed: false
-    });
-    
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      try {
-        let response;
-        if (editingResult) {
-          response = await testResultsAPI.updateTestResult(editingResult._id, resultData);
-        } else {
-          response = await testResultsAPI.createTestResult(resultData);
-        }
-        
-        if (response.success) {
-          alert(`Test result ${editingResult ? 'updated' : 'created'} successfully!`);
-          setShowProcessResultModal(false);
-          setEditingResult(null);
-          fetchTestResults();
-        } else {
-          throw new Error(response.message || `Failed to ${editingResult ? 'update' : 'create'} test result`);
-        }
-      } catch (error) {
-        console.error('Process result error:', error);
-        alert(`Failed to ${editingResult ? 'update' : 'create'} test result: ` + error.message);
-      }
-    };
-    
-    return (
-      <div className="modal-overlay" onClick={() => setShowProcessResultModal(false)}>
-        <div className="modal-content process-result-modal" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <h3>{editingResult ? 'Edit Test Result' : 'Process New Test Result'}</h3>
-            <button className="close-button" onClick={() => setShowProcessResultModal(false)}>✕</button>
-          </div>
-          
-          <form onSubmit={handleSubmit}>
-            <div className="modal-body">
-              <div className="form-grid">
-                <div className="form-group">
-                  <label>Sample ID</label>
-                  <input
-                    type="text"
-                    value={resultData.sampleId}
-                    onChange={(e) => setResultData({...resultData, sampleId: e.target.value})}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Test Type</label>
-                  <select
-                    value={resultData.testType}
-                    onChange={(e) => setResultData({...resultData, testType: e.target.value})}
-                    required
-                  >
-                    <option value="">Select Test Type</option>
-                    <option value="Complete Blood Count (CBC)">Complete Blood Count (CBC)</option>
-                    <option value="Blood Sugar Test">Blood Sugar Test</option>
-                    <option value="Lipid Profile">Lipid Profile</option>
-                    <option value="Urinalysis">Urinalysis</option>
-                    <option value="X-Ray">X-Ray</option>
-                    <option value="ECG">ECG</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Status</label>
-                  <select
-                    value={resultData.status}
-                    onChange={(e) => setResultData({...resultData, status: e.target.value})}
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="reviewed">Reviewed</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div className="form-group">
-                <label>Notes</label>
-                <textarea
-                  value={resultData.notes}
-                  onChange={(e) => setResultData({...resultData, notes: e.target.value})}
-                  rows="3"
-                  placeholder="General notes about the test result..."
-                />
-              </div>
-              
-              <div className="form-group">
-                <label>MedTech Notes</label>
-                <textarea
-                  value={resultData.medTechNotes}
-                  onChange={(e) => setResultData({...resultData, medTechNotes: e.target.value})}
-                  rows="3"
-                  placeholder="Technical notes from medical technologist..."
-                />
-              </div>
-              
-              <div className="form-group">
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={resultData.qcPassed}
-                    onChange={(e) => setResultData({...resultData, qcPassed: e.target.checked})}
-                  />
-                  Quality Control Passed
-                </label>
-              </div>
-            </div>
-            
-            <div className="modal-footer">
-              <button 
-                type="button" 
-                className="btn btn-secondary" 
-                onClick={() => setShowProcessResultModal(false)}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="btn btn-primary">
-                {editingResult ? 'Update Result' : 'Process Result'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  };
-
   // Patient View Modal Component
   const renderViewPatientModal = () => {
     if (!showViewPatientModal || !selectedPatient) return null;
@@ -10375,9 +10462,7 @@ function Dashboard({ currentUser, onLogout }) {
       {/* Service Modal */}
       {ServiceModal()}
 
-      {/* Test Results Modals */}
-      {renderViewResultModal()}
-      {renderProcessResultModal()}
+      {/* Test Results Modals - Using Professional Lab Report Format Below */}
 
       {/* Appointment Management Modals */}
       {/* Schedule Appointment Modal */}
@@ -10652,6 +10737,496 @@ function Dashboard({ currentUser, onLogout }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Patient Details Modal for Appointments */}
+      {showPatientDetailsModal && selectedAppointmentDetails && (
+        <div className="receptionist-modal-overlay" onClick={() => setShowPatientDetailsModal(false)}>
+          <div className="receptionist-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="receptionist-modal-header">
+              <h3>Patient & Appointment Details</h3>
+              <button className="receptionist-modal-close" onClick={() => setShowPatientDetailsModal(false)}>×</button>
+            </div>
+            <div className="receptionist-modal-body">
+              <div className="receptionist-patient-details">
+                <div className="patient-info-section">
+                  <h4>Patient Information</h4>
+                  <div className="info-grid">
+                    <p><strong>Name:</strong> {selectedAppointmentDetails.patientName}</p>
+                    <p><strong>Contact:</strong> {selectedAppointmentDetails.contactNumber || 'Not provided'}</p>
+                    <p><strong>Email:</strong> {selectedAppointmentDetails.email || 'Not provided'}</p>
+                    <p><strong>Age:</strong> {selectedAppointmentDetails.age || 'Not provided'}</p>
+                    <p><strong>Gender:</strong> {selectedAppointmentDetails.sex || 'Not provided'}</p>
+                    <p><strong>Address:</strong> {selectedAppointmentDetails.address || 'Not provided'}</p>
+                  </div>
+                </div>
+                
+                <div className="appointment-info-section">
+                  <h4>Appointment Details</h4>
+                  <div className="info-grid">
+                    <p><strong>Appointment ID:</strong> {selectedAppointmentDetails.appointmentId}</p>
+                    <p><strong>Date:</strong> {selectedAppointmentDetails.appointmentDate}</p>
+                    <p><strong>Time:</strong> {selectedAppointmentDetails.appointmentTime}</p>
+                    <p><strong>Status:</strong> 
+                      <span className={`status-badge ${selectedAppointmentDetails.status}`}>
+                        {selectedAppointmentDetails.status}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="tests-info-section">
+                  <h4>Laboratory Tests</h4>
+                  <div className="tests-container">
+                    {(() => {
+                      const testInfo = getTestDisplayInfo(selectedAppointmentDetails.serviceName);
+                      
+                      if (testInfo.hasMultiple && testInfo.allTests && testInfo.allTests.length > 0) {
+                        return (
+                          <div className="multiple-tests">
+                            <div className="test-summary">
+                              <span className="test-count-badge">{testInfo.testCount} Tests Ordered</span>
+                            </div>
+                            <div className="test-list">
+                              {testInfo.allTests.map((test, index) => (
+                                <div key={index} className="test-item">
+                                  <span className="test-name">{test}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="single-test">
+                            <div className="test-item">
+                              <span className="test-name">{selectedAppointmentDetails.serviceName || 'Lab Test'}</span>
+                            </div>
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                </div>
+
+                {selectedAppointmentDetails.notes && (
+                  <div className="notes-section">
+                    <h4>Additional Notes</h4>
+                    <p className="notes-text">{selectedAppointmentDetails.notes}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="receptionist-modal-footer">
+              <button className="receptionist-btn-secondary" onClick={() => setShowPatientDetailsModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Modal - Professional Lab Report Format (Exact copy from FinishedTestResults) */}
+      {showResultModal && selectedResult && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            maxWidth: '900px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '20px',
+              borderBottom: '1px solid #dee2e6',
+              backgroundColor: '#f8f9fa',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{ margin: 0, color: '#2c3e50' }}>Laboratory Test Results</h3>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <button
+                  onClick={handleDSSSupport}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#21AEA8',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  onMouseOver={(e) => e.target.style.backgroundColor = '#1a8e8a'}
+                  onMouseOut={(e) => e.target.style.backgroundColor = '#21AEA8'}
+                >
+                  Support
+                </button>
+                <button
+                  onClick={() => setShowResultModal(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '24px',
+                    cursor: 'pointer',
+                    color: '#6c757d'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            {/* Professional Lab Report Content */}
+            <div style={{ padding: '25px' }}>
+              {/* Patient Information */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '15px',
+                marginBottom: '30px',
+                padding: '15px',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '6px'
+              }}>
+                <div>
+                  <strong>Patient:</strong> {getPatientName(selectedResult)}
+                </div>
+                <div>
+                  <strong>Test Type:</strong> {formatServiceName(selectedResult)}
+                </div>
+                <div>
+                  <strong>Sample Date:</strong> {selectedResult.sampleDate ? new Date(selectedResult.sampleDate).toLocaleDateString() : 'N/A'}
+                </div>
+                <div>
+                  <strong>Date Performed:</strong> {selectedResult.results?.date_performed || selectedResult.results?.datePerformed || 'N/A'}
+                </div>
+                <div>
+                  <strong>Time Performed:</strong> {selectedResult.results?.time_performed || selectedResult.results?.timePerformed || 'N/A'}
+                </div>
+                <div>
+                  <strong>Status:</strong> 
+                  <span style={{
+                    marginLeft: '8px',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    backgroundColor: selectedResult.status === 'completed' ? '#d4edda' : 
+                                     selectedResult.status === 'reviewed' ? '#d1ecf1' :
+                                     selectedResult.status === 'rejected' ? '#f8d7da' :
+                                     selectedResult.status === 'pending' ? '#fff3cd' :
+                                     '#f8f9fa',
+                    color: selectedResult.status === 'completed' ? '#155724' : 
+                           selectedResult.status === 'reviewed' ? '#0c5460' :
+                           selectedResult.status === 'rejected' ? '#721c24' :
+                           selectedResult.status === 'pending' ? '#856404' :
+                           '#495057'
+                  }}>
+                    {selectedResult.status === 'reviewed' ? 'reviewed' : (selectedResult.status || 'Pending')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Test Results by Category */}
+              {(() => {
+                const organizedResults = getOrganizedTestResults(selectedResult);
+                
+                if (Object.keys(organizedResults).length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                      <p style={{ fontSize: '16px', marginBottom: '10px' }}>⚠️ No test results have been entered yet.</p>
+                      <p style={{ fontSize: '14px', color: '#999' }}>
+                        This test record exists but the laboratory values have not been filled in.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return Object.entries(organizedResults).map(([category, categoryData]) => (
+                  <div key={category} style={{ marginBottom: '30px' }}>
+                    {/* Category Header */}
+                    <div style={{
+                      background: '#21AEA8',
+                      color: 'white',
+                      padding: '10px 15px',
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      marginBottom: '15px',
+                      textAlign: 'center'
+                    }}>
+                      {categoryData.title}
+                    </div>
+                    
+                    {/* Tests Table */}
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                      <thead>
+                        <tr style={{ background: '#f1f3f4' }}>
+                          <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Test</th>
+                          <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>Result</th>
+                          <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>Normal Range</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(categoryData.fields).map(([fieldKey, fieldData]) => (
+                          <tr key={fieldKey}>
+                            <td style={{ border: '1px solid #ddd', padding: '12px', fontWeight: 'bold' }}>
+                              {fieldData.label}
+                            </td>
+                            <td style={{ 
+                              border: '1px solid #ddd', 
+                              padding: '12px', 
+                              textAlign: 'center',
+                              fontWeight: 'bold',
+                              color: fieldData.value && (fieldData.value.includes('Positive') || fieldData.value.includes('Reactive')) ? '#e74c3c' : '#27ae60'
+                            }}>
+                              {fieldData.value || 'Pending'}
+                            </td>
+                            <td style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>
+                              {fieldData.normalRange}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ));
+              })()}
+
+              {/* Verification Note */}
+              <div style={{
+                marginTop: '30px',
+                fontSize: '13px',
+                color: '#666',
+                borderTop: '1px solid #eee',
+                paddingTop: '15px'
+              }}>
+                <p style={{ margin: '0 0 5px 0' }}>
+                  <strong>Specimen rechecked, result/s verified.</strong>
+                </p>
+              </div>
+
+              {/* Signatures */}
+              <div style={{ 
+                marginTop: '20px',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '40px',
+                fontSize: '13px',
+                textAlign: 'center'
+              }}>
+                <div>
+                  <div style={{ borderBottom: '1px solid #333', marginBottom: '5px', height: '40px' }}></div>
+                  <div style={{ fontWeight: 'bold' }}>MARIA SHIELA M. RAMOS, RMT</div>
+                  <div>License#0033711</div>
+                  <div>MEDICAL TECHNOLOGIST</div>
+                </div>
+                <div>
+                  <div style={{ borderBottom: '1px solid #333', marginBottom: '5px', height: '40px' }}></div>
+                  <div style={{ fontWeight: 'bold' }}>AMABEL A. CALUB,MD,DPSP</div>
+                  <div>License# 0109978</div>
+                  <div>PATHOLOGIST</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteResultModal && selectedResult && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowDeleteResultModal(false)}
+        >
+          <div 
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              width: '90%',
+              maxWidth: '500px',
+              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
+              overflow: 'hidden'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header with red accent */}
+            <div style={{
+              background: 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)',
+              padding: '25px',
+              color: 'white',
+              textAlign: 'center'
+            }}>
+              <h3 style={{ 
+                margin: '0 0 10px 0', 
+                fontSize: '24px',
+                fontWeight: '600'
+              }}>
+                Delete Test Result
+              </h3>
+              <p style={{ 
+                margin: 0, 
+                fontSize: '15px',
+                opacity: 0.95
+              }}>
+                Are you sure you want to delete this test result?
+              </p>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '30px' }}>
+              {/* Test Details */}
+              <div style={{
+                backgroundColor: '#f8f9fa',
+                borderRadius: '8px',
+                padding: '20px',
+                marginBottom: '20px'
+              }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <span style={{ 
+                    fontWeight: '600', 
+                    color: '#495057',
+                    fontSize: '14px'
+                  }}>Sample ID:</span>
+                  <span style={{ 
+                    marginLeft: '10px',
+                    color: '#212529',
+                    fontSize: '14px'
+                  }}>{selectedResult.sampleId || 'N/A'}</span>
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <span style={{ 
+                    fontWeight: '600', 
+                    color: '#495057',
+                    fontSize: '14px'
+                  }}>Patient:</span>
+                  <span style={{ 
+                    marginLeft: '10px',
+                    color: '#212529',
+                    fontSize: '14px'
+                  }}>{getPatientName(selectedResult)}</span>
+                </div>
+                <div>
+                  <span style={{ 
+                    fontWeight: '600', 
+                    color: '#495057',
+                    fontSize: '14px'
+                  }}>Test Type:</span>
+                  <span style={{ 
+                    marginLeft: '10px',
+                    color: '#212529',
+                    fontSize: '14px'
+                  }}>{formatServiceName(selectedResult)}</span>
+                </div>
+              </div>
+
+              {/* Warning Message */}
+              <div style={{
+                backgroundColor: '#fff3cd',
+                border: '1px solid #ffc107',
+                borderRadius: '8px',
+                padding: '15px',
+                textAlign: 'center'
+              }}>
+                <p style={{ 
+                  margin: 0,
+                  color: '#856404',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}>
+                  This action cannot be undone!
+                </p>
+              </div>
+            </div>
+
+            {/* Footer with action buttons */}
+            <div style={{
+              padding: '20px 30px',
+              backgroundColor: '#f8f9fa',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px'
+            }}>
+              <button 
+                onClick={() => setShowDeleteResultModal(false)}
+                disabled={resultsLoading}
+                style={{
+                  padding: '10px 24px',
+                  backgroundColor: 'white',
+                  color: '#6c757d',
+                  border: '2px solid #dee2e6',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: resultsLoading ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  opacity: resultsLoading ? 0.6 : 1
+                }}
+                onMouseOver={(e) => !resultsLoading && (e.target.style.backgroundColor = '#f8f9fa')}
+                onMouseOut={(e) => !resultsLoading && (e.target.style.backgroundColor = 'white')}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleDeleteResult}
+                disabled={resultsLoading}
+                style={{
+                  padding: '10px 24px',
+                  backgroundColor: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: resultsLoading ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  opacity: resultsLoading ? 0.6 : 1
+                }}
+                onMouseOver={(e) => !resultsLoading && (e.target.style.backgroundColor = '#c82333')}
+                onMouseOut={(e) => !resultsLoading && (e.target.style.backgroundColor = '#dc3545')}
+              >
+                {resultsLoading ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DSS Support Modal */}
+      {showDSSModal && (
+        <ReviewDSSSupport 
+          recommendations={dssRecommendations}
+          onClose={() => setShowDSSModal(false)}
+        />
       )}
     </div>
   );

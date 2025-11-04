@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import '../design/Dashboard.css';
 import { appointmentAPI, testResultsAPI, servicesAPI } from '../services/api';
 import ReviewResults from './ReviewResults';
+import FinishedTestResults from './FinishedTestResults';
 
 function MedTechDashboard({ currentUser, onLogout }) {
   const [activeSection, setActiveSection] = useState('testing-queue');
@@ -470,6 +471,10 @@ function MedTechDashboard({ currentUser, onLogout }) {
       case 'sample-tracking': return 'Sample Tracking';
       case 'result-entry': return 'Result Entry';
       case 'quality-control': return 'Quality Control';
+      case 'testing-queue': return 'Testing Queue';
+      case 'enter-results': return 'Enter Results';
+      case 'review': return 'Review Results';
+      case 'finished-results': return 'Finished Test Results';
       default: return 'MedTech Dashboard';
     }
   };
@@ -479,6 +484,7 @@ function MedTechDashboard({ currentUser, onLogout }) {
       case 'testing-queue': return renderTestingQueue();
       case 'enter-results': return renderEnterResults();
       case 'review': return renderReview();
+      case 'finished-results': return <FinishedTestResults currentUser={currentUser} />;
       default: return renderTestingQueue(); // Default to testing queue
     }
   };
@@ -4097,6 +4103,13 @@ function MedTechDashboard({ currentUser, onLogout }) {
             onClick={() => handleSectionClick('review')}
           >
             <span className="dashboard-nav-text">Review</span>
+          </div>
+
+          <div 
+            className={`dashboard-nav-item ${activeSection === 'finished-results' ? 'active' : ''}`}
+            onClick={() => handleSectionClick('finished-results')}
+          >
+            <span className="dashboard-nav-text">Finished Results</span>
           </div>
         </nav>
 

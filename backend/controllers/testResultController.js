@@ -52,14 +52,25 @@ const getTestResults = asyncHandler(async (req, res) => {
   } else if (req.user.role === 'medtech') {
     // MedTechs can see results they're assigned to or unassigned ones
     // BUT if filtering by appointmentId, allow access to any results for that appointment
-    if (!patientId && !appointmentId) {
+    // ALSO allow access to all finished results (completed/reviewed/released) for the Finished Results page
+    const requestingFinishedResults = status && (
+      (Array.isArray(status) && status.some(s => ['completed', 'reviewed', 'released'].includes(s))) ||
+      (typeof status === 'string' && (
+        status.split(',').some(s => ['completed', 'reviewed', 'released'].includes(s.trim()))
+      ))
+    );
+    
+    console.log('🔍 Status value:', status);
+    console.log('🔍 Requesting finished results?', requestingFinishedResults);
+    
+    if (!patientId && !appointmentId && !requestingFinishedResults) {
       query.$or = [
         { medTech: req.user._id },
         { medTech: null }
       ];
       console.log('🔍 Applied medtech role restriction (no patientId/appointmentId)');
     } else {
-      console.log('🔍 Skipping medtech role restriction (patientId or appointmentId provided)');
+      console.log('🔍 Skipping medtech role restriction (patientId/appointmentId/finishedResults provided)');
     }
   }
   // Admin, receptionist, pathologist can see all results
@@ -68,6 +79,11 @@ const getTestResults = asyncHandler(async (req, res) => {
   if (status) {
     if (Array.isArray(status)) {
       query.status = { $in: status };
+    } else if (typeof status === 'string' && status.includes(',')) {
+      // Handle comma-separated status values
+      const statusArray = status.split(',').map(s => s.trim());
+      query.status = { $in: statusArray };
+      console.log('🔍 Split comma-separated status into array:', statusArray);
     } else {
       query.status = status;
     }
