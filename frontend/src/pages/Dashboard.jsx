@@ -2514,35 +2514,12 @@ function Dashboard({ currentUser, onLogout }) {
         console.log('✅ Setting payments:', data.data || []);
         console.log('🔍 Payment structure sample:', data.data?.[0]);
         setPayments(data.data || []);
+      } else {
+        setPayments([]);
       }
     } catch (err) {
       console.error('❌ Failed to fetch payments:', err);
-      // For testing purposes, set mock data if backend is not available
-      console.log('🔧 Setting mock payment data for testing...');
-      setPayments([
-        {
-          _id: '1',
-          paymentId: 'PAY-2025-0001',
-          billId: 'BL-2025-001',
-          patientName: 'Maria Santos',
-          amountPaid: 2500,
-          paymentMethod: 'credit_card',
-          status: 'pending',
-          paymentDate: new Date().toISOString(),
-          verifiedBy: null
-        },
-        {
-          _id: '2',
-          paymentId: 'PAY-2025-0002',
-          billId: 'BL-2025-002',
-          patientName: 'Carlos Rodriguez',
-          amountPaid: 1400,
-          paymentMethod: 'cash',
-          status: 'verified',
-          paymentDate: new Date(Date.now() - 86400000).toISOString(), // Yesterday
-          verifiedBy: 'Admin User'
-        }
-      ]);
+      setPayments([]);
     }
   };
 
@@ -3545,7 +3522,6 @@ function Dashboard({ currentUser, onLogout }) {
       case 'payments': return 'Payment Records';
       case 'billing-rates': return 'Billing Rates';
       case 'reports': return 'Financial Reports';
-      case 'logs': return 'System Logs';
       case 'services': return 'Lab Services';
       case 'appointments': return 'Appointment Management';
       case 'results': return 'Test Results Management';
@@ -3566,7 +3542,6 @@ function Dashboard({ currentUser, onLogout }) {
       case 'payments': return renderPaymentRecords();
       case 'billing-rates': return renderBillingRates();
       case 'reports': return renderFinancialReports();
-      case 'logs': return renderSystemLogs();
       case 'services': return renderServices();
       case 'appointments': return renderAppointmentManagement();
       case 'results': return renderResultsManagement();
@@ -5329,70 +5304,20 @@ function Dashboard({ currentUser, onLogout }) {
       <div className="management-header">
         <div className="management-title">
           <h2>Payment Records</h2>
-          <p>Detailed payment history and reconciliation records</p>
-        </div>
-        <div className="header-actions">
-          <button className="add-btn" onClick={handleRecordPayment}>+ Record Payment</button>
-          <button className="reconcile-btn" onClick={handleExportReport}>Reconcile</button>
-        </div>
-      </div>
-
-      <div className="management-stats">
-        <div className="stat-card">
-          <div className="stat-icon"></div>
-          <div className="stat-info">
-            <div className="stat-label">Total Collected</div>
-            <div className="stat-value">₱{financeStats?.payments?.totalCollected?.toLocaleString() || '0'}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon"></div>
-          <div className="stat-info">
-            <div className="stat-label">Pending Verification</div>
-            <div className="stat-value">{financeStats?.payments?.pendingVerification || 0}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon"></div>
-          <div className="stat-info">
-            <div className="stat-label">Refunds Processed</div>
-            <div className="stat-value">{financeStats?.payments?.refundsProcessed || 0}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon"></div>
-          <div className="stat-info">
-            <div className="stat-label">Collection Rate</div>
-            <div className="stat-value">{financeStats?.payments?.collectionRate || 0}%</div>
-          </div>
+          <p>View all cash payment transactions</p>
         </div>
       </div>
 
       <div className="management-content">
-        <div className="content-header">
-          <div className="search-filter">
-            <input type="text" placeholder="Search payments..." className="search-input" />
-            <select className="filter-select">
-              <option>All Payments</option>
-              <option>Verified</option>
-              <option>Pending</option>
-              <option>Disputed</option>
-              <option>Refunded</option>
-            </select>
-          </div>
-        </div>
-
         <div className="data-table">
           <table>
             <thead>
               <tr>
                 <th>Payment ID</th>
-                <th>Bill Reference</th>
+                <th>Appointment Ref</th>
                 <th>Patient Name</th>
-                <th>Amount Paid</th>
-                <th>Payment Date</th>
-                <th>Method</th>
-                <th>Verified By</th>
+                <th>Amount</th>
+                <th>Date Paid</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -5401,33 +5326,21 @@ function Dashboard({ currentUser, onLogout }) {
               {payments.length > 0 ? payments.map((payment) => (
                 <tr key={payment._id}>
                   <td>{String(payment.paymentId || '')}</td>
-                  <td>{String(payment.billId?.billId || payment.billId || 'N/A')}</td>
+                  <td>{String(payment.appointmentId || 'N/A')}</td>
                   <td>{String(payment.patientName || '')}</td>
                   <td>₱{Number(payment.amountPaid || 0).toLocaleString()}</td>
                   <td>{new Date(payment.paymentDate).toLocaleString()}</td>
-                  <td>{String(payment.paymentMethod || '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</td>
-                  <td>{String(payment.verifiedBy?.name || payment.verifiedBy || '-')}</td>
-                  <td><span className={`status ${payment.status}`}>{String(payment.status || '').charAt(0).toUpperCase() + String(payment.status || '').slice(1)}</span></td>
+                  <td><span className={`status ${payment.status}`}>{String(payment.status || '').toUpperCase()}</span></td>
                   <td>
                     <div className="action-buttons">
-                      <button className="btn-view" title="View Details" onClick={() => handleViewPayment(payment)}>View</button>
-                      <button className="btn-edit" title="Edit Payment" onClick={() => openEditPaymentModal(payment)}>Edit</button>
-                      <button className="btn-receipt" title="Receipt" onClick={() => handlePrintPaymentReceipt(payment)}>Receipt</button>
-                      {payment.status === 'pending' && (
-                        <>
-                          <button className="btn-verify" title="Verify" onClick={() => handleVerifyPayment(payment)}>Verify</button>
-                          <button className="btn-dispute" title="Dispute" onClick={() => handleDisputePayment(payment)}>Dispute</button>
-                        </>
-                      )}
-                      {(payment.status === 'pending' || payment.status === 'disputed') && (
-                        <button className="btn-delete" title="Delete Pending/Disputed Payment" onClick={() => handleDeletePayment(payment._id)}>Delete</button>
-                      )}
+                      <button className="btn-view" title="View Details" onClick={() => openViewPaymentModal(payment)}>View</button>
+                      <button className="btn-delete" title="Delete Payment" onClick={() => handleDeletePayment(payment._id)}>Delete</button>
                     </div>
                   </td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '20px' }}>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '20px' }}>
                     No payments found
                   </td>
                 </tr>
@@ -7910,30 +7823,6 @@ function Dashboard({ currentUser, onLogout }) {
                     <span className="value amount">₱{Number(payment.amountPaid || 0).toLocaleString()}</span>
                   </div>
                   <div className="info-item">
-                    <span className="label">Payment Method:</span>
-                    <span className="value">
-                      {String(payment.paymentMethod || '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="info-section">
-                <h4>Patient & Bill Details</h4>
-                <div className="info-group">
-                  <div className="info-item">
-                    <span className="label">Patient Name:</span>
-                    <span className="value">{String(payment.patientName || '')}</span>
-                  </div>
-                  <div className="info-item">
-                    <span className="label">Bill Reference:</span>
-                    <span className="value">{String(payment.billId?.billId || payment.billId || 'N/A')}</span>
-                  </div>
-                  <div className="info-item">
-                    <span className="label">Reference Number:</span>
-                    <span className="value">{String(payment.referenceNumber || 'N/A')}</span>
-                  </div>
-                  <div className="info-item">
                     <span className="label">Payment Date:</span>
                     <span className="value">
                       {payment.paymentDate ? new Date(payment.paymentDate).toLocaleString() : 'N/A'}
@@ -7942,21 +7831,19 @@ function Dashboard({ currentUser, onLogout }) {
                 </div>
               </div>
 
-              <div className="info-section full-width">
-                <h4>Verification Details</h4>
+              <div className="info-section">
+                <h4>Patient Details</h4>
                 <div className="info-group">
                   <div className="info-item">
-                    <span className="label">Verified By:</span>
-                    <span className="value">{String(payment.verifiedBy?.name || payment.verifiedBy || 'Not verified')}</span>
+                    <span className="label">Patient Name:</span>
+                    <span className="value">{String(payment.patientName || '')}</span>
                   </div>
                   <div className="info-item">
-                    <span className="label">Verification Date:</span>
-                    <span className="value">
-                      {payment.verificationDate ? new Date(payment.verificationDate).toLocaleString() : 'Not verified'}
-                    </span>
+                    <span className="label">Appointment Reference:</span>
+                    <span className="value">{String(payment.appointmentId || 'N/A')}</span>
                   </div>
                   {payment.notes && (
-                    <div className="info-item">
+                    <div className="info-item full-width">
                       <span className="label">Notes:</span>
                       <span className="value">{String(payment.notes || '')}</span>
                     </div>
@@ -7969,9 +7856,6 @@ function Dashboard({ currentUser, onLogout }) {
           <div className="modal-footer">
             <button type="button" className="btn-secondary" onClick={closePaymentModals}>
               Close
-            </button>
-            <button type="button" className="btn-primary" onClick={() => openEditPaymentModal(payment)}>
-              Edit Payment
             </button>
             <button type="button" className="btn-print" onClick={() => handlePrintPaymentReceipt(payment)}>
               Print Receipt
@@ -10323,12 +10207,6 @@ function Dashboard({ currentUser, onLogout }) {
             </div>
             {logsOpen && (
               <div className="dashboard-nav-submenu">
-                <div 
-                  className={`dashboard-nav-subitem ${activeSection === 'logs' ? 'active' : ''}`}
-                  onClick={() => handleSectionClick('logs')}
-                >
-                  System Logs
-                </div>
                 <div 
                   className={`dashboard-nav-subitem ${activeSection === 'services' ? 'active' : ''}`}
                   onClick={() => handleSectionClick('services')}

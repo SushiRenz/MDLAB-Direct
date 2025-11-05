@@ -12,9 +12,7 @@ const {
   deleteTransaction,
   getPayments,
   createPayment,
-  updatePayment,
   deletePayment,
-  verifyPayment,
   getBillingRates,
   createBillingRate,
   updateBillingRate
@@ -22,16 +20,15 @@ const {
 
 const router = express.Router();
 
-// All routes require authentication and admin/staff access
+// All routes require authentication
 router.use(protect);
-router.use(authorize('admin', 'medtech', 'pathologist')); // Allow staff to view finance data
 
 // Finance dashboard stats
-router.get('/stats', getFinanceStats);
+router.get('/stats', authorize('admin', 'medtech', 'pathologist'), getFinanceStats);
 
 // Bills routes
 router.route('/bills')
-  .get(getBills)
+  .get(authorize('admin', 'medtech', 'pathologist'), getBills)
   .post(
     authorize('admin'), // Only admin can create bills
     [
@@ -84,7 +81,7 @@ router.delete('/bills/:id',
 
 // Transactions routes
 router.route('/transactions')
-  .get(getTransactions)
+  .get(authorize('admin', 'medtech', 'pathologist'), getTransactions)
   .post(
     authorize('admin'), // Only admin can create transactions
     [
@@ -149,77 +146,38 @@ router.route('/transactions/:id')
 
 // Payments routes
 router.route('/payments')
-  .get(getPayments)
+  .get(authorize('admin', 'receptionist'), getPayments)
   .post(
-    authorize('admin'), // Only admin can create payments
+    authorize('admin', 'receptionist'), // Allow receptionist to create payments
     [
       body('patientName')
         .notEmpty()
         .withMessage('Patient name is required'),
+      body('appointmentId')
+        .notEmpty()
+        .withMessage('Appointment ID is required'),
       body('amountPaid')
         .isNumeric()
         .withMessage('Amount paid must be a number')
         .isFloat({ min: 0 })
         .withMessage('Amount paid must be positive'),
-      body('paymentMethod')
-        .notEmpty()
-        .withMessage('Payment method is required')
-        .isIn(['cash', 'credit_card', 'debit_card', 'bank_transfer', 'check', 'online'])
-        .withMessage('Invalid payment method'),
-      body('patientId')
+      body('appointmentReference')
         .optional()
         .isMongoId()
-        .withMessage('Valid patient ID is required'),
-      body('billId')
-        .optional()
-        .isMongoId()
-        .withMessage('Valid bill ID is required'),
-      body('status')
-        .optional()
-        .isIn(['pending', 'verified', 'rejected', 'refunded'])
-        .withMessage('Invalid status')
+        .withMessage('Valid appointment reference is required')
     ],
     createPayment
   );
 
 router.route('/payments/:id')
-  .put(
-    authorize('admin'), // Only admin can update payments
-    [
-      body('patientName')
-        .optional()
-        .notEmpty()
-        .withMessage('Patient name cannot be empty'),
-      body('amountPaid')
-        .optional()
-        .isNumeric()
-        .withMessage('Amount paid must be a number')
-        .isFloat({ min: 0 })
-        .withMessage('Amount paid must be positive'),
-      body('paymentMethod')
-        .optional()
-        .isIn(['cash', 'credit_card', 'debit_card', 'bank_transfer', 'check', 'online'])
-        .withMessage('Invalid payment method'),
-      body('status')
-        .optional()
-        .isIn(['pending', 'verified', 'rejected', 'refunded'])
-        .withMessage('Invalid status')
-    ],
-    updatePayment
-  )
   .delete(
     authorize('admin'), // Only admin can delete payments
     deletePayment
   );
 
-router.put('/payments/:id/verify', 
-  authorize('admin'), // Only admin can verify payments
-  verifyPayment
-);
-
 // Billing rates routes
 router.route('/billing-rates')
-  .get(getBillingRates)
+  .get(authorize('admin', 'medtech', 'pathologist'), getBillingRates)
   .post(
     authorize('admin'), // Only admin can create billing rates
     [

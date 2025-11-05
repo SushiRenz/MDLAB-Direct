@@ -416,7 +416,7 @@ const getPayments = asyncHandler(async (req, res) => {
     search, 
     status, 
     page = 1, 
-    limit = 10,
+    limit = 100,
     sortBy = 'paymentDate',
     sortOrder = 'desc'
   } = req.query;
@@ -426,7 +426,8 @@ const getPayments = asyncHandler(async (req, res) => {
   if (search) {
     query.$or = [
       { paymentId: { $regex: search, $options: 'i' } },
-      { patientName: { $regex: search, $options: 'i' } }
+      { patientName: { $regex: search, $options: 'i' } },
+      { appointmentId: { $regex: search, $options: 'i' } }
     ];
   }
   
@@ -438,9 +439,7 @@ const getPayments = asyncHandler(async (req, res) => {
   sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
   const payments = await Payment.find(query)
-    .populate('patientId', 'name email')
-    .populate('billId', 'billId')
-    .populate('verifiedBy', 'name')
+    .populate('appointmentReference', 'appointmentId patientName serviceName')
     .sort(sortOptions)
     .limit(limit * 1)
     .skip((page - 1) * limit);
@@ -474,52 +473,39 @@ const createPayment = asyncHandler(async (req, res) => {
   }
 
   const { 
-    patientId,
     patientName,
-    billId,
+    appointmentId,
+    appointmentReference,
     amountPaid,
-    paymentMethod,
-    referenceNumber,
-    notes,
-    status = 'pending'
+    notes
   } = req.body;
 
-  // Verify patient exists if patientId provided
-  if (patientId) {
-    const patient = await User.findById(patientId);
-    if (!patient) {
+  // Verify appointment exists if appointmentReference provided
+  if (appointmentReference) {
+    const Appointment = require('../models/Appointment');
+    const appointment = await Appointment.findById(appointmentReference);
+    if (!appointment) {
       return res.status(404).json({
         success: false,
-        message: 'Patient not found'
-      });
-    }
-  }
-
-  // Verify bill exists if billId provided
-  if (billId) {
-    const bill = await Bill.findById(billId);
-    if (!bill) {
-      return res.status(404).json({
-        success: false,
-        message: 'Bill not found'
+        message: 'Appointment not found'
       });
     }
   }
 
   const payment = await Payment.create({
-    patientId,
     patientName,
-    billId,
+    appointmentId,
+    appointmentReference,
     amountPaid,
-    paymentMethod,
-    referenceNumber,
+    paymentMethod: 'cash',
     notes,
-    status,
+    status: 'paid',
     paymentDate: new Date()
   });
 
-  await payment.populate('patientId', 'name email');
-  await payment.populate('billId', 'billId');
+  if (appointmentReference) {
+    await payment.populate('appointmentReference', 'appointmentId patientName serviceName');
+  }
 
   res.status(201).json({
     success: true,
@@ -527,42 +513,7 @@ const createPayment = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Update payment
-// @route   PUT /api/finance/payments/:id
-// @access  Private/Admin
-const updatePayment = asyncHandler(async (req, res) => {
-  const payment = await Payment.findById(req.params.id);
 
-  if (!payment) {
-    return res.status(404).json({
-      success: false,
-      message: 'Payment not found'
-    });
-  }
-
-  // Prevent status change to verified through update - must use verify endpoint
-  if (req.body.status === 'verified' && payment.status !== 'verified') {
-    return res.status(400).json({
-      success: false,
-      message: 'Use the verify endpoint to verify payments'
-    });
-  }
-
-  const updatedPayment = await Payment.findByIdAndUpdate(
-    req.params.id,
-    req.body,
-    { new: true, runValidators: true }
-  );
-
-  await updatedPayment.populate('patientId', 'name email');
-  await updatedPayment.populate('billId', 'billId');
-  await updatedPayment.populate('verifiedBy', 'name');
-
-  res.status(200).json({
-    success: true,
-    data: updatedPayment
-  });
-});
 
 // @desc    Delete payment
 // @route   DELETE /api/finance/payments/:id
@@ -577,46 +528,11 @@ const deletePayment = asyncHandler(async (req, res) => {
     });
   }
 
-  // Security check: Only allow deletion of pending payments
-  if (payment.status === 'verified') {
-    return res.status(400).json({
-      success: false,
-      message: 'Verified payments cannot be deleted. Only pending payments can be removed.'
-    });
-  }
-
   await payment.deleteOne();
 
   res.status(200).json({
     success: true,
     message: `Payment ${payment.paymentId} deleted successfully`
-  });
-});
-
-// @desc    Verify payment
-// @route   PUT /api/finance/payments/:id/verify
-// @access  Private/Admin
-const verifyPayment = asyncHandler(async (req, res) => {
-  const payment = await Payment.findById(req.params.id);
-
-  if (!payment) {
-    return res.status(404).json({
-      success: false,
-      message: 'Payment not found'
-    });
-  }
-
-  payment.status = 'verified';
-  payment.verifiedBy = req.user.id;
-  payment.verificationDate = new Date();
-  await payment.save();
-
-  await payment.populate('patientId', 'name email');
-  await payment.populate('verifiedBy', 'name');
-
-  res.status(200).json({
-    success: true,
-    data: payment
   });
 });
 
@@ -736,9 +652,7 @@ module.exports = {
   deleteTransaction,
   getPayments,
   createPayment,
-  updatePayment,
   deletePayment,
-  verifyPayment,
   getBillingRates,
   createBillingRate,
   updateBillingRate

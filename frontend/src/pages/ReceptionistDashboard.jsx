@@ -52,6 +52,13 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
   const [showEditStatusModal, setShowEditStatusModal] = useState(false);
   const [editingAppointmentData, setEditingAppointmentData] = useState(null);
 
+  // Payments state
+  const [payments, setPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsError, setPaymentsError] = useState('');
+  const [showViewPaymentModal, setShowViewPaymentModal] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState(null);
+
   // Helper function to parse and display multiple tests
   const parseTestNames = (testTypeString) => {
     if (!testTypeString) return [];
@@ -561,11 +568,29 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
         console.log('Processing payment for appointment:', billData.appointment.appointmentId);
         console.log('Patient:', billData.patientName);
         
-        // Update appointment status to confirmed in local state - ONLY for this specific appointment
+        // Create payment record
+        const paymentData = {
+          patientName: billData.patientName,
+          appointmentId: billData.appointment.appointmentId,
+          appointmentReference: billData.appointment._id,
+          amountPaid: parseFloat(String(billData.price).replace(/,/g, '')),
+          notes: `Payment for ${billData.service}`
+        };
+
+        console.log('Creating payment record:', paymentData);
+        const paymentResponse = await financeAPI.createPayment(paymentData);
+        
+        if (!paymentResponse.success) {
+          throw new Error(paymentResponse.message || 'Failed to create payment record');
+        }
+
+        console.log('Payment record created:', paymentResponse.data);
+        
+        // Update appointment status to confirmed in local state
         const updatedAppointments = appointments.map(apt => {
           if (apt.appointmentId === billData.appointment.appointmentId) {
             console.log('Updating appointment:', apt.appointmentId, 'from status:', apt.status, 'to: confirmed');
-            return { ...apt, status: 'confirmed', billGenerated: true };
+            return { ...apt, status: 'confirmed', isPaid: true };
           }
           return apt;
         });
@@ -579,18 +604,17 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
           if (billData.appointment._id) {
             await appointmentAPI.updateAppointment(billData.appointment._id, { 
               status: 'confirmed',
-              billGenerated: true,
-              actualCost: billData.price || billData.appointment.totalPrice || billData.appointment.estimatedCost
+              isPaid: true,
+              actualCost: paymentData.amountPaid
             });
             console.log('Appointment status updated in backend for:', billData.appointment.appointmentId);
           }
         } catch (error) {
           console.error('Failed to update appointment status in backend:', error);
           console.error('Error details:', error.response?.data);
-          alert(`Warning: Payment confirmed locally, but failed to sync with server. Error: ${error.response?.data?.message || error.message}`);
         }
         
-        alert(`Payment confirmed for ${billData.patientName}! Appointment ${billData.appointment.appointmentId} status updated to confirmed.`);
+        alert(`✅ Payment confirmed for ${billData.patientName}!\nPayment ID: ${paymentResponse.data.paymentId}\nAppointment ${billData.appointment.appointmentId} marked as PAID.`);
         
         // Refresh appointments list to ensure consistency
         if (typeof fetchAppointments === 'function') {
@@ -602,7 +626,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
       }
     } catch (error) {
       console.error('Error processing payment:', error);
-      alert('Failed to process payment. Please try again.');
+      alert('Failed to process payment: ' + (error.message || 'Unknown error'));
     }
   };
 
@@ -828,6 +852,51 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     }
   };
 
+  // Fetch payments
+  const fetchPayments = async () => {
+    setPaymentsLoading(true);
+    setPaymentsError('');
+    try {
+      const response = await financeAPI.getPayments({ limit: 100 });
+      if (response.success) {
+        setPayments(response.data || []);
+      } else {
+        throw new Error(response.message || 'Failed to fetch payments');
+      }
+    } catch (error) {
+      console.error('Failed to fetch payments:', error);
+      setPaymentsError('Failed to load payments: ' + error.message);
+      setPayments([]);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
+
+  // Handle view payment
+  const handleViewPayment = (payment) => {
+    setSelectedPayment(payment);
+    setShowViewPaymentModal(true);
+  };
+
+  const handleDeletePayment = async (paymentId) => {
+    if (!window.confirm('Are you sure you want to delete this payment record? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const result = await financeAPI.deletePayment(paymentId);
+      if (result.success) {
+        alert('Payment deleted successfully');
+        fetchPayments(); // Refresh the list
+      } else {
+        alert(result.message || 'Failed to delete payment');
+      }
+    } catch (error) {
+      console.error('Error deleting payment:', error);
+      alert('Failed to delete payment');
+    }
+  };
+
   // Fetch services on component mount
   useEffect(() => {
     fetchServices();
@@ -837,6 +906,9 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
   useEffect(() => {
     if (activeSection === 'appointments') {
       fetchAppointments();
+    }
+    if (activeSection === 'payments') {
+      fetchPayments();
     }
   }, [activeSection, searchTerm, filterStatus, filterDate]);
 
@@ -910,7 +982,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
             {activeSection === 'check-in-out' && 'Patient Check-In/Check-Out'}
             {activeSection === 'patient-information' && 'Patient Information'}
             {activeSection === 'service-information' && 'Service Information'}
-            {activeSection === 'billing-support' && 'Billing Support'}
+            {activeSection === 'payments' && 'Payment Records'}
           </h1>
         </div>
 
@@ -1216,29 +1288,68 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
             </div>
           )}
 
-          {activeSection === 'billing-support' && (
-            <div className="receptionist-management-container">
-              <div className="receptionist-management-header">
-                <div className="receptionist-management-title">
-                  <h2>Billing Support</h2>
-                  <p>Assist patients with billing inquiries - Limited Access</p>
+          {activeSection === 'payments' && (
+            <div className="management-container">
+              <div className="management-header">
+                <div className="management-title">
+                  <h2>Payment Records</h2>
+                  <p>View all cash payment transactions</p>
                 </div>
               </div>
-              <div className="receptionist-billing-tools">
-                <div className="receptionist-billing-card">
-                  <h4>Generate Bill Estimate</h4>
-                  <p>Help patients estimate costs for services</p>
-                  <button className="receptionist-btn-secondary">Calculate Estimate</button>
-                </div>
-                <div className="receptionist-billing-card">
-                  <h4>Payment Information</h4>
-                  <p>Provide payment method and policy information</p>
-                  <button className="receptionist-btn-secondary">View Payment Options</button>
-                </div>
-                <div className="receptionist-billing-card">
-                  <h4>Insurance Verification</h4>
-                  <p>Basic insurance verification for patients</p>
-                  <button className="receptionist-btn-secondary">Check Coverage</button>
+
+              <div className="management-content">
+                <div className="data-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Payment ID</th>
+                        <th>Appointment Ref</th>
+                        <th>Patient Name</th>
+                        <th>Amount</th>
+                        <th>Date Paid</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paymentsLoading ? (
+                        <tr>
+                          <td colSpan="7" style={{ textAlign: 'center', padding: '20px' }}>
+                            Loading payments...
+                          </td>
+                        </tr>
+                      ) : paymentsError ? (
+                        <tr>
+                          <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: '#e74c3c' }}>
+                            {paymentsError}
+                          </td>
+                        </tr>
+                      ) : payments.length === 0 ? (
+                        <tr>
+                          <td colSpan="7" style={{ textAlign: 'center', padding: '20px' }}>
+                            No payments found
+                          </td>
+                        </tr>
+                      ) : (
+                        payments.map((payment) => (
+                          <tr key={payment._id}>
+                            <td>{String(payment.paymentId || '')}</td>
+                            <td>{String(payment.appointmentId || 'N/A')}</td>
+                            <td>{String(payment.patientName || '')}</td>
+                            <td>₱{Number(payment.amountPaid || 0).toLocaleString()}</td>
+                            <td>{new Date(payment.paymentDate).toLocaleString()}</td>
+                            <td><span className={`status ${payment.status}`}>{String(payment.status || '').toUpperCase()}</span></td>
+                            <td>
+                              <div className="action-buttons">
+                                <button className="btn-view" title="View Details" onClick={() => handleViewPayment(payment)}>View</button>
+                                <button className="btn-delete" title="Delete Payment" onClick={() => handleDeletePayment(payment._id)}>Delete</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -1605,6 +1716,63 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
                 setShowEditStatusModal(false);
               }}>
                 Update Status
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Payment Modal */}
+      {showViewPaymentModal && selectedPayment && (
+        <div className="receptionist-modal-overlay" onClick={() => setShowViewPaymentModal(false)}>
+          <div className="receptionist-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="receptionist-modal-header">
+              <h3>Payment Details</h3>
+              <button className="receptionist-modal-close" onClick={() => setShowViewPaymentModal(false)}>×</button>
+            </div>
+            <div className="receptionist-modal-body">
+              <div className="receptionist-form-container">
+                <div className="receptionist-info-grid">
+                  <div className="receptionist-info-item">
+                    <label>Payment ID:</label>
+                    <p>{selectedPayment.paymentId}</p>
+                  </div>
+                  <div className="receptionist-info-item">
+                    <label>Status:</label>
+                    <p>
+                      <span className={`receptionist-status-badge status-${selectedPayment.status.toLowerCase()}`}>
+                        {selectedPayment.status.toUpperCase()}
+                      </span>
+                    </p>
+                  </div>
+                  <div className="receptionist-info-item">
+                    <label>Amount Paid:</label>
+                    <p style={{fontWeight: 'bold', color: '#059669'}}>₱{selectedPayment.amountPaid.toLocaleString()}</p>
+                  </div>
+                  <div className="receptionist-info-item">
+                    <label>Payment Date:</label>
+                    <p>{new Date(selectedPayment.paymentDate).toLocaleString()}</p>
+                  </div>
+                  <div className="receptionist-info-item">
+                    <label>Patient Name:</label>
+                    <p>{selectedPayment.patientName}</p>
+                  </div>
+                  <div className="receptionist-info-item">
+                    <label>Appointment Reference:</label>
+                    <p>{selectedPayment.appointmentId}</p>
+                  </div>
+                  {selectedPayment.notes && (
+                    <div className="receptionist-info-item" style={{gridColumn: '1 / -1'}}>
+                      <label>Notes:</label>
+                      <p>{selectedPayment.notes}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="receptionist-modal-footer">
+              <button className="receptionist-btn-secondary" onClick={() => setShowViewPaymentModal(false)}>
+                Close
               </button>
             </div>
           </div>

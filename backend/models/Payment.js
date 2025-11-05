@@ -5,20 +5,13 @@ const PaymentSchema = new mongoose.Schema({
     type: String,
     unique: true
   },
-  billId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Bill',
+  appointmentId: {
+    type: String,
     required: true
   },
-  transactionId: {
+  appointmentReference: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Transaction',
-    required: true
-  },
-  patientId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    ref: 'Appointment'
   },
   patientName: {
     type: String,
@@ -34,24 +27,17 @@ const PaymentSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'credit_card', 'debit_card', 'gcash', 'bank_transfer', 'online_payment', 'insurance'],
+    enum: ['cash'],
+    default: 'cash',
     required: true
   },
   status: {
     type: String,
-    enum: ['verified', 'pending', 'disputed', 'refunded', 'cancelled'],
-    default: 'pending'
+    enum: ['paid', 'refunded'],
+    default: 'paid'
   },
-  verifiedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null
-  },
-  verificationDate: Date,
-  referenceNumber: String,
   receiptNumber: String,
   notes: String,
-  disputeReason: String,
   refundAmount: {
     type: Number,
     default: 0
