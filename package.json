@@ -1,0 +1,25 @@
+{
+  "name": "mdlab-direct-monorepo",
+  "version": "1.0.0",
+  "description": "MDLAB Direct - Laboratory Management System (Backend + Web + Mobile)",
+  "private": true,
+  "scripts": {
+    "backend": "cd backend & npm start",
+    "frontend": "cd frontend & npm run dev",
+    "mobile": "cd mobile & npm start",
+    "install-all": "cd backend & npm install & cd ../frontend & npm install & cd ../mobile & npm install",
+    "install-backend": "cd backend & npm install",
+    "install-frontend": "cd frontend & npm install",
+    "install-mobile": "cd mobile & npm install",
+    "dev": "start cmd /k \"cd backend && npm start\" & start cmd /k \"cd frontend && npm run dev\" & start cmd /k \"cd mobile && npm start\"",
+    "dev:backend-web": "start cmd /k \"cd backend && npm start\" & start cmd /k \"cd frontend && npm run dev\"",
+    "dev:backend-mobile": "start cmd /k \"cd backend && npm start\" & start cmd /k \"cd mobile && npm start\""
+  },
+  "workspaces": [
+    "backend",
+    "frontend",
+    "mobile"
+  ],
+  "author": "MDLAB Direct Team",
+  "license": "ISC"
+}
