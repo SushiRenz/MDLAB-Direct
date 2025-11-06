@@ -93,14 +93,32 @@ const LabTestModal = ({ visible, onClose, onConfirm }) => {
     const isExpanded = expandedCategories[categoryName];
     const categoryTests = testsByCategory[categoryName] || [];
     const filteredTests = filterTests(categoryTests);
+    const allCategorySelected = categoryTests.length > 0 && categoryTests.every(test => 
+      selectedTests.some(selectedTest => selectedTest._id === test._id)
+    );
+
+    const handleSelectAllCategory = () => {
+      if (allCategorySelected) {
+        // Deselect all tests in this category
+        setSelectedTests(prev => prev.filter(selectedTest => 
+          !categoryTests.some(test => test._id === selectedTest._id)
+        ));
+      } else {
+        // Select all tests in this category
+        const newTests = categoryTests.filter(test =>
+          !selectedTests.some(selectedTest => selectedTest._id === test._id)
+        );
+        setSelectedTests(prev => [...prev, ...newTests]);
+      }
+    };
 
     return (
       <View style={styles.categoryContainer}>
-        <Pressable 
-          style={styles.categoryHeader}
-          onPress={() => toggleCategory(categoryName)}
-        >
-          <View style={styles.categoryHeaderContent}>
+        <View style={styles.categoryHeader}>
+          <Pressable 
+            style={styles.categoryHeaderLeft}
+            onPress={() => toggleCategory(categoryName)}
+          >
             <Ionicons 
               name={isExpanded ? "chevron-down" : "chevron-forward"} 
               size={20} 
@@ -110,8 +128,20 @@ const LabTestModal = ({ visible, onClose, onConfirm }) => {
             <Text style={styles.categoryTitle}>
               {categoryName} ({categoryTests.length})
             </Text>
-          </View>
-        </Pressable>
+          </Pressable>
+          
+          <Pressable 
+            style={styles.categorySelectAll}
+            onPress={handleSelectAllCategory}
+          >
+            <View style={[styles.checkbox, allCategorySelected && styles.checkboxSelected]}>
+              {allCategorySelected && (
+                <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+              )}
+            </View>
+            <Text style={styles.categorySelectAllText}>Select All</Text>
+          </Pressable>
+        </View>
 
         {isExpanded && (
           <View style={styles.testsContainer}>
@@ -120,7 +150,9 @@ const LabTestModal = ({ visible, onClose, onConfirm }) => {
                 {searchTerm ? 'No tests match your search' : 'No tests available'}
               </Text>
             ) : (
-              filteredTests.map(test => renderTest(test))
+              <View style={styles.testsGrid}>
+                {filteredTests.map(test => renderTest(test))}
+              </View>
             )}
           </View>
         )}
@@ -135,34 +167,32 @@ const LabTestModal = ({ visible, onClose, onConfirm }) => {
     return (
       <Pressable
         key={test._id}
-        style={[styles.testItem, isSelected && styles.testItemSelected]}
+        style={[styles.testCard, isSelected && styles.testCardSelected]}
         onPress={() => toggleTestSelection(test)}
       >
-        <View style={styles.testContent}>
-          <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-            {isSelected && (
-              <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-            )}
-          </View>
-          
-          <View style={styles.testDetails}>
-            <Text style={styles.testName}>
-              {test.serviceName || test.name}
+        <View style={[styles.testCheckbox, isSelected && styles.testCheckboxSelected]}>
+          {isSelected && (
+            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+          )}
+        </View>
+        
+        <View style={styles.testInfo}>
+          <Text style={styles.testName}>
+            {test.serviceName || test.name}
+          </Text>
+          <Text style={styles.testPrice}>
+            ₱{(test.price || 0).toFixed(2)}
+          </Text>
+          {test.preparationInstructions && (
+            <Text style={styles.testPreparation}>
+              {test.preparationInstructions}
             </Text>
-            <Text style={styles.testPrice}>
-              ₱{(test.price || 0).toFixed(2)}
+          )}
+          {test.duration && (
+            <Text style={styles.testDuration}>
+              Duration: {test.duration}
             </Text>
-            {test.preparationInstructions && (
-              <Text style={styles.testPreparation}>
-                {test.preparationInstructions}
-              </Text>
-            )}
-            {test.duration && (
-              <Text style={styles.testDuration}>
-                Duration: {test.duration}
-              </Text>
-            )}
-          </View>
+          )}
         </View>
       </Pressable>
     );
@@ -184,16 +214,39 @@ const LabTestModal = ({ visible, onClose, onConfirm }) => {
           </Pressable>
         </View>
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#718096" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search for tests..."
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-            placeholderTextColor="#718096"
-          />
+        {/* Search Bar and Select All Button */}
+        <View style={styles.searchSection}>
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#718096" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search for tests..."
+              value={searchTerm}
+              onChangeText={setSearchTerm}
+              placeholderTextColor="#718096"
+            />
+          </View>
+          <Pressable 
+            style={styles.selectAllButton}
+            onPress={() => {
+              if (selectedTests.length > 0) {
+                setSelectedTests([]);
+              } else {
+                // Select all tests from all categories
+                const allTests = Object.values(testsByCategory).flat();
+                setSelectedTests(allTests);
+              }
+            }}
+          >
+            <Ionicons 
+              name={selectedTests.length > 0 ? "checkmark-circle" : "checkbox-outline"} 
+              size={18} 
+              color="#FFFFFF" 
+            />
+            <Text style={styles.selectAllButtonText}>
+              {selectedTests.length > 0 ? 'Deselect All' : 'Select All Tests'}
+            </Text>
+          </Pressable>
         </View>
 
         {/* Selected Tests Summary */}
@@ -299,11 +352,17 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: 4,
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  searchSection: {
     marginHorizontal: 20,
     marginVertical: 16,
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
     backgroundColor: '#F7FAFC',
@@ -318,6 +377,20 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: '#1A202C',
+  },
+  selectAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#21AEA8',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  selectAllButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   selectedSummary: {
     marginHorizontal: 20,
@@ -408,15 +481,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   categoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     backgroundColor: '#F7FAFC',
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  categoryHeaderContent: {
+  categoryHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   categoryIcon: {
     marginRight: 8,
@@ -426,8 +503,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1A202C',
   },
+  categorySelectAll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  categorySelectAllText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#4A5568',
+  },
   testsContainer: {
     marginTop: 8,
+  },
+  testsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   noTestsText: {
     fontSize: 14,
@@ -435,31 +527,45 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     padding: 20,
   },
-  testItem: {
+  testCard: {
+    width: '48.5%',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 8,
     padding: 12,
-    marginBottom: 8,
+    minHeight: 140,
   },
-  testItemSelected: {
+  testCardSelected: {
     borderColor: '#21AEA8',
+    borderWidth: 2,
     backgroundColor: '#F0F9FF',
   },
-  testContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  checkbox: {
+  testCheckbox: {
     width: 20,
     height: 20,
     borderRadius: 4,
     borderWidth: 2,
     borderColor: '#CBD5E0',
     backgroundColor: '#FFFFFF',
-    marginRight: 12,
-    marginTop: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  testCheckboxSelected: {
+    backgroundColor: '#21AEA8',
+    borderColor: '#21AEA8',
+  },
+  testInfo: {
+    flex: 1,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#CBD5E0',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -467,30 +573,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#21AEA8',
     borderColor: '#21AEA8',
   },
-  testDetails: {
-    flex: 1,
-  },
   testName: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#1A202C',
-    marginBottom: 4,
+    marginBottom: 6,
+    lineHeight: 18,
   },
   testPrice: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#21AEA8',
-    fontWeight: '600',
-    marginBottom: 4,
+    fontWeight: '700',
+    marginBottom: 8,
   },
   testPreparation: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#4A5568',
-    fontStyle: 'italic',
-    marginBottom: 2,
+    lineHeight: 15,
+    marginBottom: 4,
   },
   testDuration: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#718096',
+    fontStyle: 'italic',
   },
   footer: {
     flexDirection: 'row',
