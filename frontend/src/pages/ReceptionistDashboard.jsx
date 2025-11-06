@@ -897,6 +897,37 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
     }
   };
 
+  const handlePrintPaymentReceipt = (payment) => {
+    console.log('Printing payment receipt:', payment);
+    const receiptContent = `
+      MDLAB DIRECT - PAYMENT RECEIPT
+      ===============================
+      Payment ID: ${payment.paymentId}
+      Appointment Reference: ${payment.appointmentId || 'N/A'}
+      Patient: ${payment.patientName}
+      Date: ${new Date(payment.paymentDate).toLocaleDateString()}
+      
+      Amount: ₱${payment.amountPaid?.toLocaleString()}
+      Payment Method: Cash
+      Status: ${payment.status?.toUpperCase()}
+      ${payment.notes ? `\nNotes: ${payment.notes}` : ''}
+      
+      Thank you for your payment!
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head><title>Payment Receipt ${payment.paymentId}</title></head>
+        <body style="font-family: monospace; white-space: pre-line;">
+          ${receiptContent}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   // Fetch services on component mount
   useEffect(() => {
     fetchServices();
@@ -1724,55 +1755,69 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
 
       {/* View Payment Modal */}
       {showViewPaymentModal && selectedPayment && (
-        <div className="receptionist-modal-overlay" onClick={() => setShowViewPaymentModal(false)}>
-          <div className="receptionist-modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="receptionist-modal-header">
-              <h3>Payment Details</h3>
-              <button className="receptionist-modal-close" onClick={() => setShowViewPaymentModal(false)}>×</button>
+        <div className="modal-overlay" onClick={() => setShowViewPaymentModal(false)}>
+          <div className="modal-content large-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Payment Record Details</h3>
+              <button className="modal-close" onClick={() => setShowViewPaymentModal(false)}>×</button>
             </div>
-            <div className="receptionist-modal-body">
-              <div className="receptionist-form-container">
-                <div className="receptionist-info-grid">
-                  <div className="receptionist-info-item">
-                    <label>Payment ID:</label>
-                    <p>{selectedPayment.paymentId}</p>
-                  </div>
-                  <div className="receptionist-info-item">
-                    <label>Status:</label>
-                    <p>
-                      <span className={`receptionist-status-badge status-${selectedPayment.status.toLowerCase()}`}>
-                        {selectedPayment.status.toUpperCase()}
-                      </span>
-                    </p>
-                  </div>
-                  <div className="receptionist-info-item">
-                    <label>Amount Paid:</label>
-                    <p style={{fontWeight: 'bold', color: '#059669'}}>₱{selectedPayment.amountPaid.toLocaleString()}</p>
-                  </div>
-                  <div className="receptionist-info-item">
-                    <label>Payment Date:</label>
-                    <p>{new Date(selectedPayment.paymentDate).toLocaleString()}</p>
-                  </div>
-                  <div className="receptionist-info-item">
-                    <label>Patient Name:</label>
-                    <p>{selectedPayment.patientName}</p>
-                  </div>
-                  <div className="receptionist-info-item">
-                    <label>Appointment Reference:</label>
-                    <p>{selectedPayment.appointmentId}</p>
-                  </div>
-                  {selectedPayment.notes && (
-                    <div className="receptionist-info-item" style={{gridColumn: '1 / -1'}}>
-                      <label>Notes:</label>
-                      <p>{selectedPayment.notes}</p>
+            
+            <div className="modal-body">
+              <div className="info-grid">
+                <div className="info-section">
+                  <h4>Payment Information</h4>
+                  <div className="info-group">
+                    <div className="info-item">
+                      <span className="label">Payment ID:</span>
+                      <span className="value">{String(selectedPayment.paymentId || '')}</span>
                     </div>
-                  )}
+                    <div className="info-item">
+                      <span className="label">Status:</span>
+                      <span className={`value status ${selectedPayment.status}`}>
+                        {String(selectedPayment.status || '').charAt(0).toUpperCase() + String(selectedPayment.status || '').slice(1)}
+                      </span>
+                    </div>
+                    <div className="info-item">
+                      <span className="label">Amount Paid:</span>
+                      <span className="value amount">₱{Number(selectedPayment.amountPaid || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="info-item">
+                      <span className="label">Payment Date:</span>
+                      <span className="value">
+                        {selectedPayment.paymentDate ? new Date(selectedPayment.paymentDate).toLocaleString() : 'N/A'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="info-section">
+                  <h4>Patient Details</h4>
+                  <div className="info-group">
+                    <div className="info-item">
+                      <span className="label">Patient Name:</span>
+                      <span className="value">{String(selectedPayment.patientName || '')}</span>
+                    </div>
+                    <div className="info-item">
+                      <span className="label">Appointment Reference:</span>
+                      <span className="value">{String(selectedPayment.appointmentId || 'N/A')}</span>
+                    </div>
+                    {selectedPayment.notes && (
+                      <div className="info-item full-width">
+                        <span className="label">Notes:</span>
+                        <span className="value">{String(selectedPayment.notes || '')}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="receptionist-modal-footer">
-              <button className="receptionist-btn-secondary" onClick={() => setShowViewPaymentModal(false)}>
+
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={() => setShowViewPaymentModal(false)}>
                 Close
+              </button>
+              <button type="button" className="btn-print" onClick={() => handlePrintPaymentReceipt(selectedPayment)}>
+                Print Receipt
               </button>
             </div>
           </div>
