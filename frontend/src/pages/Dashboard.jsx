@@ -6484,7 +6484,6 @@ function Dashboard({ currentUser, onLogout }) {
                   <select name="role" defaultValue={editingUser?.role || currentRole}>
                     <option value="patient">Patient</option>
                     <option value="medtech">Medical Technologist</option>
-                    <option value="pathologist">Pathologist</option>
                     <option value="receptionist">Receptionist</option>
                     <option value="admin">Admin</option>
                   </select>

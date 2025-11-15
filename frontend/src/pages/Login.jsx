@@ -427,54 +427,6 @@ function Login({ onNavigateToSignUp, onNavigateToDashboard, onNavigateToAdminLog
 
   return (
     <div className="login-container">
-      {/* Subtle Admin Arrow - Top Right */}
-      <div 
-        onClick={handleAdminClick}
-        style={{
-          position: 'absolute',
-          top: '20px',
-          right: '25px',
-          width: '50px',
-          height: '50px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          opacity: '0.4',
-          transition: 'all 0.3s ease',
-          borderRadius: '50%',
-          zIndex: 10,
-          border: '1px solid rgba(0, 0, 0, 0.1)'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.opacity = '0.8';
-          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
-          e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)';
-          e.currentTarget.style.transform = 'scale(1.1)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.opacity = '0.4';
-          e.currentTarget.style.backgroundColor = 'transparent';
-          e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
-          e.currentTarget.style.transform = 'scale(1)';
-        }}
-        title="Staff Portal"
-      >
-        <svg 
-          width="20" 
-          height="20" 
-          viewBox="0 0 24 24" 
-          fill="none" 
-          stroke="currentColor" 
-          strokeWidth="2.5" 
-          strokeLinecap="round" 
-          strokeLinejoin="round"
-          style={{ color: '#4b5563' }}
-        >
-          <path d="M9 18l6-6-6-6"/>
-        </svg>
-      </div>
-
       <div className="login-left">
         <img 
           src={mdlabLogo} 

@@ -1,24 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import Dashboard from './pages/Dashboard';
 import AdminLogin from './pages/AdminLogin';
 import MedTechDashboard from './pages/MedTechDashboard';
-import PathologistDashboard from './pages/PathologistDashboard';
 import PatientDashboard from './pages/PatientDashboard';
 import ReceptionistDashboard from './pages/ReceptionistDashboard';
 import api from './services/api'; // Use the configured axios instance
 import authDebugger from './utils/authDebugger';
 
 function App() {
-  const [currentView, setCurrentView] = useState('login');
+  const [currentView, setCurrentView] = useState('landing');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+
+  // Check URL path for staff/admin login on mount
+  useEffect(() => {
+    const path = window.location.pathname;
+    console.log('Current URL path:', path);
+    if (path === '/staff' || path === '/admin' || path === '/staff-login') {
+      console.log('Staff URL detected, setting view to admin-login');
+      setCurrentView('admin-login');
+      sessionStorage.setItem('currentView', 'admin-login');
+    } else {
+      // Only set to landing if not already set
+      const savedView = sessionStorage.getItem('currentView');
+      if (!savedView) {
+        setCurrentView('landing');
+        sessionStorage.setItem('currentView', 'landing');
+      }
+    }
+  }, []);
 
   // Handle authentication persistence with proper role-based routing
   useEffect(() => {
     const handleAuthenticationAndRouting = async () => {
+      // Check URL first to preserve staff login intent
+      const path = window.location.pathname;
+      const isStaffUrl = path === '/staff' || path === '/admin' || path === '/staff-login';
+      
       const token = sessionStorage.getItem('token');
       const user = sessionStorage.getItem('user');
       
@@ -134,7 +156,6 @@ function App() {
                 'admin': 'dashboard',
                 'receptionist': 'receptionist-dashboard',
                 'medtech': 'medtech-dashboard',
-                'pathologist': 'pathologist-dashboard',
                 'patient': 'patient-portal'
               };
               
@@ -165,10 +186,6 @@ function App() {
                   setCurrentView('medtech-dashboard');
                   sessionStorage.setItem('currentView', 'medtech-dashboard');
                   break;
-                case 'pathologist':
-                  setCurrentView('pathologist-dashboard');
-                  sessionStorage.setItem('currentView', 'pathologist-dashboard');
-                  break;
                 case 'patient':
                   setCurrentView('patient-portal');
                   sessionStorage.setItem('currentView', 'patient-portal');
@@ -194,13 +211,24 @@ function App() {
           sessionStorage.removeItem('currentView');
           setCurrentUser(null);
           setIsAuthenticated(false);
-          setCurrentView('login');
+          // Preserve staff URL intent
+          if (!isStaffUrl) {
+            setCurrentView('login');
+          }
         }
       } else {
-        // No stored credentials - always go to login
-        console.log('No stored credentials - going to login');
-        setCurrentView('login');
-        sessionStorage.setItem('currentView', 'login');
+        // No stored credentials - check if this is a staff URL
+        console.log('No stored credentials - checking URL');
+        if (isStaffUrl) {
+          // Staff URL without credentials - show admin login
+          setCurrentView('admin-login');
+          sessionStorage.setItem('currentView', 'admin-login');
+        } else if (!savedView) {
+          // No credentials and no saved view - show landing page
+          setCurrentView('landing');
+          sessionStorage.setItem('currentView', 'landing');
+        }
+        // If savedView exists, keep the current view (already set by first useEffect)
       }
     };
     
@@ -211,6 +239,9 @@ function App() {
   useEffect(() => {
     const updateTitle = () => {
       switch (currentView) {
+        case 'landing':
+          document.title = 'MDLAB Direct - Your Trusted Laboratory Partner';
+          break;
         case 'login':
           document.title = 'MDLAB Direct - Login';
           break;
@@ -228,9 +259,6 @@ function App() {
           break;
         case 'medtech-dashboard':
           document.title = 'MDLAB Direct - MedTech Dashboard';
-          break;
-        case 'pathologist-dashboard':
-          document.title = 'MDLAB Direct - Pathologist Dashboard';
           break;
         case 'patient-portal':
           document.title = 'MDLAB Direct - Patient Portal';
@@ -285,10 +313,6 @@ function App() {
       case 'medtech':
         setCurrentView('medtech-dashboard');
         sessionStorage.setItem('currentView', 'medtech-dashboard');
-        break;
-      case 'pathologist':
-        setCurrentView('pathologist-dashboard');
-        sessionStorage.setItem('currentView', 'pathologist-dashboard');
         break;
       case 'patient':
         setCurrentView('patient-portal');
@@ -399,11 +423,6 @@ function App() {
             targetView = 'medtech-dashboard';
             setCurrentView('medtech-dashboard');
             break;
-          case 'pathologist':
-            console.log('Routing to pathologist dashboard');
-            targetView = 'pathologist-dashboard';
-            setCurrentView('pathologist-dashboard');
-            break;
           case 'patient':
             console.log('Routing to patient portal');
             targetView = 'patient-portal';
@@ -434,6 +453,13 @@ function App() {
 
   const renderCurrentView = () => {
     switch (currentView) {
+      case 'landing':
+        return (
+          <LandingPage
+            onNavigateToLogin={handleNavigateToLogin}
+            onNavigateToSignUp={handleNavigateToSignUp}
+          />
+        );
       case 'login':
         return (
           <Login
@@ -477,13 +503,6 @@ function App() {
             onLogout={handleLogout}
           />
         );
-      case 'pathologist-dashboard':
-        return (
-          <PathologistDashboard
-            currentUser={currentUser}
-            onLogout={handleLogout}
-          />
-        );
       case 'patient-portal':
         return (
           <PatientDashboard
@@ -494,10 +513,9 @@ function App() {
         );
       default:
         return (
-          <Login
+          <LandingPage
+            onNavigateToLogin={handleNavigateToLogin}
             onNavigateToSignUp={handleNavigateToSignUp}
-            onNavigateToDashboard={handleNavigateToDashboard}
-            onNavigateToAdminLogin={handleNavigateToAdminLogin}
           />
         );
     }
