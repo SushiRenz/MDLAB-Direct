@@ -33,7 +33,7 @@ const PaymentSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['paid', 'refunded'],
+    enum: ['pending', 'paid', 'verified', 'disputed', 'refunded'],
     default: 'paid'
   },
   receiptNumber: String,
@@ -51,8 +51,21 @@ const PaymentSchema = new mongoose.Schema({
 PaymentSchema.pre('save', async function(next) {
   if (!this.paymentId) {
     const year = new Date().getFullYear();
-    const count = await this.constructor.countDocuments({});
-    this.paymentId = `PAY-${year}-${String(count + 1).padStart(4, '0')}`;
+    
+    // Find the last payment ID for this year to avoid duplicates
+    const lastPayment = await this.constructor.findOne({
+      paymentId: { $regex: `^PAY-${year}-` }
+    }).sort({ paymentId: -1 });
+    
+    let nextNumber = 1;
+    if (lastPayment && lastPayment.paymentId) {
+      const lastNumber = parseInt(lastPayment.paymentId.split('-')[2]);
+      if (!isNaN(lastNumber)) {
+        nextNumber = lastNumber + 1;
+      }
+    }
+    
+    this.paymentId = `PAY-${year}-${String(nextNumber).padStart(4, '0')}`;
   }
   next();
 });

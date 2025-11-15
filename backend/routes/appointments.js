@@ -183,9 +183,8 @@ router.get('/:id', getAppointment);
 
 // @route   PUT /api/appointments/:id
 // @desc    Update appointment
-// @access  Private (Admin, Receptionist)
+// @access  Private (Admin, Receptionist, Patient - own only)
 router.put('/:id', 
-  authorize('admin', 'receptionist'),
   [
     body('patientName')
       .optional()

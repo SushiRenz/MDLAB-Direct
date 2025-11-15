@@ -171,7 +171,7 @@ router.route('/payments')
 
 router.route('/payments/:id')
   .delete(
-    authorize('admin'), // Only admin can delete payments
+    authorize('admin', 'receptionist'), // Allow receptionist to delete pending/disputed payments
     deletePayment
   );
 

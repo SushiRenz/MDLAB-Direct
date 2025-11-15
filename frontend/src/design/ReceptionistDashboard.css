@@ -448,6 +448,7 @@
   font-weight: 500;
   transition: all 0.2s ease;
   text-align: left;
+  color: #2c3e50; /* Dark text color for visibility on light background */
 }
 
 .receptionist-quick-btn:hover {

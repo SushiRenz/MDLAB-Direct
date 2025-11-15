@@ -43,6 +43,7 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
   // Bill generation state
   const [showBillModal, setShowBillModal] = useState(false);
   const [billData, setBillData] = useState(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // Dropdown menu state for appointment actions
   const [activeDropdown, setActiveDropdown] = useState(null);
@@ -563,8 +564,15 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
   const handlePaymentConfirmation = async (isPaid) => {
     if (!billData) return;
     
+    // Prevent double submission
+    if (isProcessingPayment) {
+      console.log('Payment already being processed, ignoring duplicate click');
+      return;
+    }
+    
     try {
       if (isPaid) {
+        setIsProcessingPayment(true);
         console.log('Processing payment for appointment:', billData.appointment.appointmentId);
         console.log('Patient:', billData.patientName);
         
@@ -626,7 +634,18 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
       }
     } catch (error) {
       console.error('Error processing payment:', error);
-      alert('Failed to process payment: ' + (error.message || 'Unknown error'));
+      
+      // Better error message handling
+      let errorMessage = 'Unknown error';
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      alert('Failed to process payment: ' + errorMessage);
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
@@ -1660,11 +1679,19 @@ function ReceptionistDashboard({ currentUser, onLogout }) {
               </div>
             </div>
             <div className="receptionist-modal-footer">
-              <button className="receptionist-btn-secondary" onClick={() => handlePaymentConfirmation(false)}>
+              <button 
+                className="receptionist-btn-secondary" 
+                onClick={() => handlePaymentConfirmation(false)}
+                disabled={isProcessingPayment}
+              >
                 Not Paid
               </button>
-              <button className="receptionist-btn-primary" onClick={() => handlePaymentConfirmation(true)}>
-                Payment Confirmed
+              <button 
+                className="receptionist-btn-primary" 
+                onClick={() => handlePaymentConfirmation(true)}
+                disabled={isProcessingPayment}
+              >
+                {isProcessingPayment ? 'Processing...' : 'Payment Confirmed'}
               </button>
             </div>
           </div>

@@ -36,20 +36,43 @@ const validateRegister = [
     .withMessage('Last name can only contain letters and spaces'),
 
   body('phone')
-    .optional()
-    .matches(/^(\+63|0)[0-9]{10}$/)
-    .withMessage('Please provide a valid Philippine phone number'),
+    .optional({ nullable: true, checkFalsy: true })
+    .custom((value) => {
+      // Allow empty string, null, or undefined
+      if (!value || value.trim() === '') {
+        return true;
+      }
+      // More flexible phone validation - accept various formats
+      const cleaned = value.replace(/[\s\-\(\)]/g, ''); // Remove spaces, dashes, parentheses
+      
+      // Accept Philippine formats: +639xxxxxxxxx, 09xxxxxxxxx, 9xxxxxxxxx, or international format
+      if (/^(\+?63|0)?9\d{9}$/.test(cleaned)) {
+        return true;
+      }
+      
+      // Accept other international formats (10-15 digits)
+      if (/^\+?\d{10,15}$/.test(cleaned)) {
+        return true;
+      }
+      
+      throw new Error('Please provide a valid phone number');
+    }),
 
   body('dateOfBirth')
     .optional()
-    .isISO8601()
-    .toDate()
     .custom((value) => {
       if (!value) return true; // Optional field
       
-      const today = new Date();
+      // Accept both ISO8601 strings and Date objects
       const birthDate = new Date(value);
-      const age = today.getFullYear() - birthDate.getFullYear();
+      
+      // Check if date is valid
+      if (isNaN(birthDate.getTime())) {
+        throw new Error('Please provide a valid date of birth');
+      }
+      
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
       const monthDiff = today.getMonth() - birthDate.getMonth();
       
       if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
@@ -152,14 +175,43 @@ const validateUpdateProfile = [
     .withMessage('Last name can only contain letters and spaces'),
 
   body('phone')
-    .optional()
-    .matches(/^(\+63|0)[0-9]{10}$/)
-    .withMessage('Please provide a valid Philippine phone number'),
+    .optional({ nullable: true, checkFalsy: true })
+    .custom((value) => {
+      // Allow empty string, null, or undefined
+      if (!value || value.trim() === '') {
+        return true;
+      }
+      // More flexible phone validation - accept various formats
+      const cleaned = value.replace(/[\s\-\(\)]/g, ''); // Remove spaces, dashes, parentheses
+      
+      // Accept Philippine formats: +639xxxxxxxxx, 09xxxxxxxxx, 9xxxxxxxxx, or international format
+      if (/^(\+?63|0)?9\d{9}$/.test(cleaned)) {
+        return true;
+      }
+      
+      // Accept other international formats (10-15 digits)
+      if (/^\+?\d{10,15}$/.test(cleaned)) {
+        return true;
+      }
+      
+      throw new Error('Please provide a valid phone number');
+    }),
 
   body('dateOfBirth')
     .optional()
-    .isISO8601()
-    .withMessage('Please provide a valid date of birth'),
+    .custom((value) => {
+      if (!value) return true; // Optional field
+      
+      // Accept both ISO8601 strings and Date objects
+      const birthDate = new Date(value);
+      
+      // Check if date is valid
+      if (isNaN(birthDate.getTime())) {
+        throw new Error('Please provide a valid date of birth');
+      }
+      
+      return true;
+    }),
 
   body('gender')
     .optional()
@@ -241,9 +293,27 @@ const validateUpdateUser = [
     .withMessage('Last name can only contain letters and spaces'),
 
   body('phone')
-    .optional()
-    .matches(/^(\+63|0)[0-9]{10}$/)
-    .withMessage('Please provide a valid Philippine phone number'),
+    .optional({ nullable: true, checkFalsy: true })
+    .custom((value) => {
+      // Allow empty string, null, or undefined
+      if (!value || value.trim() === '') {
+        return true;
+      }
+      // More flexible phone validation - accept various formats
+      const cleaned = value.replace(/[\s\-\(\)]/g, ''); // Remove spaces, dashes, parentheses
+      
+      // Accept Philippine formats: +639xxxxxxxxx, 09xxxxxxxxx, 9xxxxxxxxx, or international format
+      if (/^(\+?63|0)?9\d{9}$/.test(cleaned)) {
+        return true;
+      }
+      
+      // Accept other international formats (10-15 digits)
+      if (/^\+?\d{10,15}$/.test(cleaned)) {
+        return true;
+      }
+      
+      throw new Error('Please provide a valid phone number');
+    }),
 
   body('role')
     .optional()
@@ -252,8 +322,19 @@ const validateUpdateUser = [
 
   body('dateOfBirth')
     .optional()
-    .isISO8601()
-    .withMessage('Please provide a valid date of birth'),
+    .custom((value) => {
+      if (!value) return true; // Optional field
+      
+      // Accept both ISO8601 strings and Date objects
+      const birthDate = new Date(value);
+      
+      // Check if date is valid
+      if (isNaN(birthDate.getTime())) {
+        throw new Error('Please provide a valid date of birth');
+      }
+      
+      return true;
+    }),
 
   body('gender')
     .optional()

@@ -490,34 +490,63 @@ const createPayment = asyncHandler(async (req, res) => {
         message: 'Appointment not found'
       });
     }
+    
+    // Check if payment already exists for this appointment
+    const existingPayment = await Payment.findOne({ 
+      appointmentReference,
+      status: 'paid'
+    });
+    
+    if (existingPayment) {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment already exists for this appointment',
+        data: existingPayment
+      });
+    }
   }
 
-  const payment = await Payment.create({
-    patientName,
-    appointmentId,
-    appointmentReference,
-    amountPaid,
-    paymentMethod: 'cash',
-    notes,
-    status: 'paid',
-    paymentDate: new Date()
-  });
+  try {
+    const payment = await Payment.create({
+      patientName,
+      appointmentId,
+      appointmentReference,
+      amountPaid,
+      paymentMethod: 'cash',
+      notes,
+      status: 'paid',
+      paymentDate: new Date()
+    });
 
-  if (appointmentReference) {
-    await payment.populate('appointmentReference', 'appointmentId patientName serviceName');
+    if (appointmentReference) {
+      await payment.populate('appointmentReference', 'appointmentId patientName serviceName');
+    }
+
+    res.status(201).json({
+      success: true,
+      data: payment
+    });
+  } catch (error) {
+    // Handle duplicate key error specifically
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyValue)[0];
+      return res.status(400).json({
+        success: false,
+        message: `A payment with this ${field} already exists. Please refresh the page and try again.`,
+        field: field
+      });
+    }
+    
+    // Re-throw other errors to be handled by error handler middleware
+    throw error;
   }
-
-  res.status(201).json({
-    success: true,
-    data: payment
-  });
 });
 
 
 
 // @desc    Delete payment
 // @route   DELETE /api/finance/payments/:id
-// @access  Private/Admin
+// @access  Private/Admin, Receptionist (pending/disputed only)
 const deletePayment = asyncHandler(async (req, res) => {
   const payment = await Payment.findById(req.params.id);
 
@@ -526,6 +555,18 @@ const deletePayment = asyncHandler(async (req, res) => {
       success: false,
       message: 'Payment not found'
     });
+  }
+
+  // Only allow deletion of pending or disputed payments for audit purposes
+  // Verified/completed payments should be kept
+  if (payment.status === 'verified' || payment.status === 'completed') {
+    // Only admins can delete verified payments
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only pending or disputed payment records can be deleted. Verified payments must be kept for audit purposes.'
+      });
+    }
   }
 
   await payment.deleteOne();

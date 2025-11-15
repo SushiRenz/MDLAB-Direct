@@ -467,6 +467,37 @@ const updateAppointment = asyncHandler(async (req, res) => {
       });
     }
 
+    // Check if patient is updating their own appointment
+    if (req.user.role === 'patient') {
+      // Patients can only update their own appointments
+      if (appointment.patient.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not authorized to update this appointment'
+        });
+      }
+
+      // Patients can only update specific fields (for rescheduling)
+      const allowedFields = ['appointmentDate', 'appointmentTime', 'serviceId', 'notes', 'status'];
+      const attemptedFields = Object.keys(req.body);
+      const unauthorizedFields = attemptedFields.filter(field => !allowedFields.includes(field));
+      
+      if (unauthorizedFields.length > 0) {
+        return res.status(403).json({
+          success: false,
+          message: `Patients can only update: ${allowedFields.join(', ')}. Attempted to update: ${unauthorizedFields.join(', ')}`
+        });
+      }
+
+      // If patient is updating status, only allow 'confirmed' (for rescheduling) or 'cancelled'
+      if (req.body.status && !['confirmed', 'cancelled'].includes(req.body.status)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Patients can only set status to confirmed or cancelled'
+        });
+      }
+    }
+
     // Check if appointment can be modified
     if (!appointment.canBeModified()) {
       return res.status(400).json({

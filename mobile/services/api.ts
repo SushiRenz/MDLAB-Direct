@@ -4,7 +4,7 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios';
 // API Configuration
 const getApiBaseUrl = () => {
   const BACKEND_PORT = '5000';
-  const BACKEND_IP = '192.168.1.112'; // Your computer's IP address
+  const BACKEND_IP = '192.168.68.115'; // Your computer's IP address - UPDATED Nov 8, 2025
   
   return `http://${BACKEND_IP}:${BACKEND_PORT}/api`;
 };
@@ -212,12 +212,21 @@ export const authAPI = {
     gender?: string;
   }): Promise<ApiResponse<{ user: User; token: string }>> => {
     try {
+      console.log('📝 Attempting to register user...');
+      console.log('   Email:', userData.email);
+      console.log('   Username:', userData.username);
+      console.log('   API URL:', `${API_BASE_URL}/auth/register`);
+      
       const response: AxiosResponse<LoginResponse> = await api.post('/auth/register', userData);
+      
+      console.log('✅ Registration response status:', response.status);
+      console.log('   Success:', response.data.success);
       
       // Store token and user data
       if (response.data.success && response.data.token) {
         await AsyncStorage.setItem('token', response.data.token);
         await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
+        console.log('✅ Token and user data stored successfully');
       }
       
       return {
@@ -229,10 +238,65 @@ export const authAPI = {
         }
       };
     } catch (error: any) {
-      console.error('Register error:', error);
+      console.error('❌ REGISTRATION ERROR DETAILS:');
+      console.error('   Error type:', error.constructor.name);
+      console.error('   Error code:', error.code);
+      console.error('   Error message:', error.message);
+      console.error('   Response status:', error.response?.status);
+      console.error('   Response data:', JSON.stringify(error.response?.data, null, 2));
+      
+      let errorMessage = 'Registration failed';
+      
+      // Network errors
+      if (error.code === 'ECONNREFUSED') {
+        errorMessage = '❌ Cannot connect to server\n\n' +
+                       'The backend server is not running or not reachable.\n\n' +
+                       'Solutions:\n' +
+                       '• Make sure backend server is running (npm start in backend folder)\n' +
+                       '• Check if your device and computer are on the same WiFi\n' +
+                       `• Verify IP address in api.ts (currently: ${API_BASE_URL})`;
+      } else if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
+        errorMessage = '❌ Connection timeout\n\n' +
+                       'The server is taking too long to respond.\n\n' +
+                       'Solutions:\n' +
+                       '• Check your WiFi connection\n' +
+                       '• Verify the IP address is correct\n' +
+                       '• Make sure firewall isn\'t blocking port 5000';
+      } else if (error.message.includes('Network Error')) {
+        errorMessage = '❌ Network Error\n\n' +
+                       'Cannot reach the backend server.\n\n' +
+                       'Solutions:\n' +
+                       '• Ensure your device and computer are on the SAME WiFi network\n' +
+                       '• Check the IP address in mobile/services/api.ts\n' +
+                       `• Current API URL: ${API_BASE_URL}\n` +
+                       '• Find your computer\'s IP: Run "ipconfig" (Windows) or "ifconfig" (Mac)';
+      }
+      // Validation errors
+      else if (error.response?.status === 400) {
+        const validationErrors = error.response?.data?.errors;
+        if (validationErrors && Array.isArray(validationErrors)) {
+          const errorList = validationErrors.map((err: any) => `• ${err.msg || err.message}`).join('\n');
+          errorMessage = `❌ Validation Error\n\n${errorList}`;
+        } else {
+          errorMessage = error.response?.data?.message || 'Invalid registration data';
+        }
+      }
+      // Conflict errors (user exists)
+      else if (error.response?.status === 409 || error.response?.status === 400) {
+        errorMessage = error.response?.data?.message || 'User already exists';
+      }
+      // Server errors
+      else if (error.response?.status >= 500) {
+        errorMessage = '❌ Server Error\n\nThe backend server encountered an error. Check backend logs.';
+      }
+      // Use backend message if available
+      else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
       return {
         success: false,
-        message: error.response?.data?.message || 'Registration failed',
+        message: errorMessage,
         error: error.response?.data?.error,
         errors: error.response?.data?.errors
       };
@@ -245,12 +309,20 @@ export const authAPI = {
     password: string;
   }): Promise<ApiResponse<{ user: User; token: string }>> => {
     try {
+      console.log('🔐 Attempting to login...');
+      console.log('   Identifier:', credentials.identifier);
+      console.log('   API URL:', `${API_BASE_URL}/auth/login`);
+      
       const response: AxiosResponse<LoginResponse> = await api.post('/auth/login', credentials);
+      
+      console.log('✅ Login response status:', response.status);
+      console.log('   Success:', response.data.success);
       
       // Store token and user data
       if (response.data.success && response.data.token) {
         await AsyncStorage.setItem('token', response.data.token);
         await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
+        console.log('✅ Login successful - token and user data stored');
       }
       
       return {
@@ -262,19 +334,48 @@ export const authAPI = {
         }
       };
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('❌ LOGIN ERROR DETAILS:');
+      console.error('   Error type:', error.constructor.name);
+      console.error('   Error code:', error.code);
+      console.error('   Error message:', error.message);
+      console.error('   Response status:', error.response?.status);
+      console.error('   Response data:', JSON.stringify(error.response?.data, null, 2));
       
-      let errorMessage = 'Network error - please check your connection';
+      let errorMessage = 'Login failed';
       
+      // Network errors
       if (error.code === 'ECONNREFUSED') {
-        errorMessage = 'Backend server is not running';
+        errorMessage = '❌ Cannot connect to server\n\n' +
+                       'The backend server is not running or not reachable.\n\n' +
+                       'Solutions:\n' +
+                       '• Make sure backend server is running\n' +
+                       '• Check if your device and computer are on the same WiFi\n' +
+                       `• Verify IP address (currently: ${API_BASE_URL})`;
+      } else if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
+        errorMessage = '❌ Connection timeout\n\n' +
+                       'Solutions:\n' +
+                       '• Check your WiFi connection\n' +
+                       '• Verify the IP address is correct';
+      } else if (error.message.includes('Network Error')) {
+        errorMessage = '❌ Network Error\n\n' +
+                       'Cannot reach the backend server.\n\n' +
+                       'Solutions:\n' +
+                       '• Ensure device and computer are on the SAME WiFi\n' +
+                       `• Current API: ${API_BASE_URL}\n` +
+                       '• Run "ipconfig" to find your computer\'s IP';
+      }
+      // Authentication errors
+      else if (error.response?.status === 401) {
+        errorMessage = '❌ Invalid credentials\n\nPlease check your email/username and password.';
+      } else if (error.response?.status === 423) {
+        errorMessage = '❌ Account locked\n\nToo many failed login attempts. Please try again later.';
       } else if (error.response?.status === 404) {
-        errorMessage = 'Login endpoint not found';
+        errorMessage = '❌ Login endpoint not found\n\nBackend API might not be configured correctly.';
       } else if (error.response?.status === 500) {
-        errorMessage = 'Server error - please try again later';
-      } else if (error.response?.status === 401 || error.response?.status === 403) {
-        errorMessage = error.response?.data?.message || 'Invalid username or password';
-      } else if (error.response?.data?.message) {
+        errorMessage = '❌ Server error\n\nPlease try again later or contact support.';
+      }
+      // Use backend message if available
+      else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       }
       
